@@ -1,3 +1,16 @@
 spring:
   application:
     name: smart-lims
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smart_lims_db}
+    username: ${DB_USERNAME:smart_lims_user}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+
+  flyway:
+    enabled: true
