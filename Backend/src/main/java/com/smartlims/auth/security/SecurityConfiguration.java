@@ -4,11 +4,14 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.ObjectPostProcessor;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
@@ -29,6 +32,7 @@ public class SecurityConfiguration {
     }
 
     @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain securityFilterChain(HttpSecurity http, JsonSecurityErrorHandler errors,
             CookieCsrfTokenRepository csrfRepository, RequestTokenResolver tokenResolver,
             CurrentAccountAuthenticationConverter accountConverter) throws Exception {
@@ -38,8 +42,19 @@ public class SecurityConfiguration {
                 .logout(logout -> logout.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> {})
-                // Brainova issues CSRF tokens but its validation middleware is disabled.
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository)
+                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+                        .requireCsrfProtectionMatcher(tokenResolver::requiresCsrf)
+                        .withObjectPostProcessor(new ObjectPostProcessor<CsrfFilter>() {
+                            @Override
+                            public <O extends CsrfFilter> O postProcess(O filter) {
+                                // Resource Server adds a CSRF exemption for any resolved token, including
+                                // our cookies. Override that composite matcher with the transport policy.
+                                filter.setRequireCsrfProtectionMatcher(tokenResolver::requiresCsrf);
+                                filter.setAccessDeniedHandler(errors);
+                                return filter;
+                            }
+                        }))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(errors)
                         .accessDeniedHandler(errors))
@@ -68,7 +83,8 @@ public class SecurityConfiguration {
             throw new IllegalStateException("Insecure cookies are allowed only in the local profile");
         }
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        repository.setCookieCustomizer(cookie -> cookie.path("/").sameSite("None").secure(secureCookies));
+        repository.setCookieCustomizer(cookie -> cookie.path("/")
+                .sameSite(secureCookies ? "None" : "Lax").secure(secureCookies));
         return repository;
     }
 

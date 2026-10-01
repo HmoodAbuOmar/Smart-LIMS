@@ -71,6 +71,9 @@ public class UserAccount {
     @Column(name = "reset_code_expires_at")
     private Instant resetCodeExpiresAt;
 
+    @Column(name = "reset_code_failed_attempts", nullable = false)
+    private int resetCodeFailedAttempts;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -113,6 +116,7 @@ public class UserAccount {
         passwordHash = hash;
         emailVerifiedAt = now;
         invitationAcceptedAt = now;
+        clearResetCode();
     }
 
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -135,8 +139,18 @@ public class UserAccount {
     public void setResetCode(String hash, Instant expiresAt) {
         resetCodeHash = hash;
         resetCodeExpiresAt = expiresAt;
+        resetCodeFailedAttempts = 0;
     }
-    public void clearResetCode() { resetCodeHash = null; resetCodeExpiresAt = null; }
+    public void incorrectResetCode() {
+        if (++resetCodeFailedAttempts >= 5) clearResetCode();
+    }
+    public void clearResetCode() {
+        resetCodeHash = null;
+        resetCodeExpiresAt = null;
+        resetCodeFailedAttempts = 0;
+    }
+
+    public void markFirstAdministratorInvitation() { origin = AccountOrigin.FIRST_ADMIN_INVITATION; }
 
     public void changePassword(String passwordHash) {
         this.passwordHash = passwordHash;

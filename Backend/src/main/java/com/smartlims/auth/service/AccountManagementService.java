@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,10 +29,13 @@ public class AccountManagementService {
     private final EmailIdentity identities;
     private final PasswordPolicy policy;
     private final PasswordEncoder passwords;
+    private final UserNames userNames;
+    private final AdministratorCoordination administrators;
 
     public AccountManagementService(UserAccountRepository users, EmailActionTokenRepository tokens,
             VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
-            PasswordPolicy policy, PasswordEncoder passwords) {
+            PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
+            AdministratorCoordination administrators) {
         this.users = users;
         this.tokens = tokens;
         this.values = values;
@@ -39,20 +43,42 @@ public class AccountManagementService {
         this.identities = identities;
         this.policy = policy;
         this.passwords = passwords;
+        this.userNames = userNames;
+        this.administrators = administrators;
     }
 
     @Transactional
     public AccountResponse create(CreateAccountRequest request) {
+        administrators.lock();
         String canonical = identities.canonicalize(request.email());
-        if (users.existsByEmail(canonical) || users.existsByUserNameIgnoreCase(request.userName())) {
-            throw new AuthRequestException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS", "Email or username already exists.", null);
+        String name = userNames.normalize(request.userName());
+        if (users.existsByEmail(canonical)) {
+            throw new AuthRequestException(HttpStatus.CONFLICT, "EMAIL_IN_USE", "Email already exists.", "email");
         }
-        UserAccount user = users.saveAndFlush(UserAccount.invite(request.fullName().strip(), canonical,
-                request.userName().strip(), request.phoneNumber().strip(), request.role()));
+        if (users.existsByUserNameIgnoreCase(name)) throw UserNames.conflict();
+        UserAccount user;
+        try {
+            user = users.saveAndFlush(UserAccount.invite(request.fullName().strip(), canonical,
+                    name, request.phoneNumber().strip(), request.role()));
+        } catch (DataIntegrityViolationException error) {
+            throw AccountConstraintErrors.translate(error);
+        }
         String token = values.create();
         tokens.saveAndFlush(EmailActionToken.invitation(user, values.hash(token), Instant.now().plusSeconds(86400)));
         email.sendSetPassword(canonical, user.getId(), token);
         return AccountResponse.from(user);
+    }
+
+    @Transactional
+    public void provisionFirstAdministrator(CreateAccountRequest request) {
+        administrators.lock();
+        if (users.existsByRole(Role.ADMIN)) {
+            throw new AuthRequestException(HttpStatus.CONFLICT, "ADMIN_ALREADY_EXISTS",
+                    "An administrator already exists; provisioning refused.", null);
+        }
+        AccountResponse created = create(new CreateAccountRequest(request.fullName(), request.email(),
+                request.userName(), request.phoneNumber(), Role.ADMIN));
+        locked(created.id()).markFirstAdministratorInvitation();
     }
 
     @Transactional
@@ -95,18 +121,27 @@ public class AccountManagementService {
     public AccountResponse update(UUID id, UpdateAccountRequest request) {
         UserAccount user = locked(id);
         String canonical = identities.canonicalize(request.email());
-        if ((!canonical.equals(user.getEmail()) && users.existsByEmail(canonical))
-                || (!request.userName().equalsIgnoreCase(user.getUserName())
-                && users.existsByUserNameIgnoreCase(request.userName()))) {
-            throw new AuthRequestException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS", "Email or username already exists.", null);
+        if (!canonical.equals(identities.canonicalize(user.getEmail()))) {
+            throw new AuthRequestException(HttpStatus.BAD_REQUEST, "EMAIL_CHANGE_NOT_ALLOWED",
+                    "Changing the email address is not supported.", "email");
         }
-        user.setProfile(request.fullName().strip(), canonical, request.userName().strip(),
+        String name = userNames.normalize(request.userName());
+        if (!name.equalsIgnoreCase(user.getUserName()) && users.existsByUserNameIgnoreCase(name)) {
+            throw UserNames.conflict();
+        }
+        user.setProfile(request.fullName().strip(), canonical, name,
                 request.phoneNumber().strip());
+        try {
+            users.flush();
+        } catch (DataIntegrityViolationException error) {
+            throw AccountConstraintErrors.translate(error);
+        }
         return AccountResponse.from(user);
     }
 
     @Transactional
     public AccountResponse setBlocked(UUID actor, UUID id, boolean blocked) {
+        administrators.lock();
         UserAccount user = locked(id);
         if (blocked && actor.equals(id)) throw protectedAdmin();
         guardLastAdmin(user, blocked || user.getRole() != Role.ADMIN);
@@ -116,6 +151,7 @@ public class AccountManagementService {
 
     @Transactional
     public AccountResponse changeRole(UUID actor, UUID id, Role role) {
+        administrators.lock();
         UserAccount user = locked(id);
         if (actor.equals(id) && user.getRole() != role) throw protectedAdmin();
         if (user.getRole() == role) return AccountResponse.from(user);
@@ -127,6 +163,7 @@ public class AccountManagementService {
 
     @Transactional
     public void delete(UUID actor, UUID id) {
+        administrators.lock();
         UserAccount user = locked(id);
         if (actor.equals(id)) throw protectedAdmin();
         guardLastAdmin(user, true);

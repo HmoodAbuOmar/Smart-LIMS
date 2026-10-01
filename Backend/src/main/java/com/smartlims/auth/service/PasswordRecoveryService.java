@@ -7,11 +7,11 @@ import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.auth.security.LoginEligibility;
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PasswordRecoveryService {
@@ -20,15 +20,18 @@ public class PasswordRecoveryService {
     private final PasswordPolicy policy;
     private final EmailIdentity identities;
     private final VerificationEmailSender email;
+    private final TransactionTemplate transactions;
     private final SecureRandom random = new SecureRandom();
 
     public PasswordRecoveryService(UserAccountRepository users, PasswordEncoder passwords,
-            PasswordPolicy policy, EmailIdentity identities, VerificationEmailSender email) {
+            PasswordPolicy policy, EmailIdentity identities, VerificationEmailSender email,
+            TransactionTemplate transactions) {
         this.users = users;
         this.passwords = passwords;
         this.policy = policy;
         this.identities = identities;
         this.email = email;
+        this.transactions = transactions;
     }
 
     @Transactional
@@ -40,15 +43,22 @@ public class PasswordRecoveryService {
         email.sendPasswordReset(user.getEmail(), code);
     }
 
-    @Transactional
     public void reset(ResetPasswordRequest request) {
         policy.validate(request.newPassword(), "newPassword");
+        // Return failures from the transaction so incorrect-attempt updates commit before throwing.
+        AuthRequestException failure = transactions.execute(status -> resetLocked(request));
+        if (failure != null) throw failure;
+    }
+
+    private AuthRequestException resetLocked(ResetPasswordRequest request) {
         UserAccount user = lockedByEmail(request.email());
         if (!LoginEligibility.eligible(user) || user.getResetCodeHash() == null
-                || user.getResetCodeExpiresAt() == null || !user.getResetCodeExpiresAt().isAfter(Instant.now())
-                || !passwords.matches(request.code(), user.getResetCodeHash())) {
-            throw new AuthRequestException(HttpStatus.BAD_REQUEST, "INVALID_RESET_CODE",
-                    "Invalid or expired reset code.", "code");
+                || user.getResetCodeExpiresAt() == null || !user.getResetCodeExpiresAt().isAfter(Instant.now())) {
+            return invalidCode();
+        }
+        if (!passwords.matches(request.code(), user.getResetCodeHash())) {
+            user.incorrectResetCode();
+            return invalidCode();
         }
         if (passwords.matches(request.newPassword(), user.getPasswordHash())) {
             throw new AuthRequestException(HttpStatus.BAD_REQUEST, "SAME_PASSWORD",
@@ -56,12 +66,18 @@ public class PasswordRecoveryService {
         }
         user.changePassword(passwords.encode(request.newPassword()));
         email.sendPasswordChanged(user.getEmail());
+        return null;
+    }
+
+    private AuthRequestException invalidCode() {
+        return new AuthRequestException(HttpStatus.BAD_REQUEST, "INVALID_RESET_CODE",
+                "Invalid or expired reset code.", "code");
     }
 
     private UserAccount lockedByEmail(String supplied) {
         String canonical = identities.canonicalize(supplied);
-        UserAccount found = users.findByEmail(canonical).orElseThrow(this::unavailable);
-        return users.findWithLockById(found.getId()).orElseThrow(this::unavailable);
+        // Read the account for the first time while acquiring the lock, avoiding a stale managed entity.
+        return users.findWithLockByEmail(canonical).orElseThrow(this::unavailable);
     }
 
     private AuthRequestException unavailable() {

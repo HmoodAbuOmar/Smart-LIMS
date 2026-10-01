@@ -26,6 +26,6 @@ public class AccessCookieFactory {
 
     private ResponseCookie.ResponseCookieBuilder base(String value) {
         return ResponseCookie.from("access_token", value)
-                .httpOnly(true).secure(secure).path("/").sameSite("None");
+                .httpOnly(true).secure(secure).path("/").sameSite(secure ? "None" : "Lax");
     }
 }

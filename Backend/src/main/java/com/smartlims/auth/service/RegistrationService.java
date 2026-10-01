@@ -2,7 +2,6 @@ package com.smartlims.auth.service;
 
 import com.smartlims.auth.dto.RegistrationRequest;
 import com.smartlims.auth.dto.RegistrationResponse;
-import com.smartlims.auth.email.MailDeliveryException;
 import com.smartlims.auth.email.VerificationEmailSender;
 import com.smartlims.auth.entity.AccountOrigin;
 import com.smartlims.auth.entity.EmailActionPurpose;
@@ -13,18 +12,14 @@ import com.smartlims.auth.repository.UserAccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.Instant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 @Service
 public class RegistrationService {
-    private static final Logger log = LoggerFactory.getLogger(RegistrationService.class);
     private static final Duration VERIFICATION_LIFETIME = Duration.ofHours(24);
 
     private final UserAccountRepository users;
@@ -34,10 +29,11 @@ public class RegistrationService {
     private final PasswordPolicy passwordPolicy;
     private final VerificationTokens verificationTokens;
     private final PasswordEncoder passwordEncoder;
+    private final UserNames userNames;
 
     public RegistrationService(UserAccountRepository users, EmailActionTokenRepository tokens,
             VerificationEmailSender emailSender, EmailIdentity emailIdentity, PasswordPolicy passwordPolicy,
-            VerificationTokens verificationTokens, PasswordEncoder passwordEncoder) {
+            VerificationTokens verificationTokens, PasswordEncoder passwordEncoder, UserNames userNames) {
         this.users = users;
         this.tokens = tokens;
         this.emailSender = emailSender;
@@ -45,6 +41,7 @@ public class RegistrationService {
         this.passwordPolicy = passwordPolicy;
         this.verificationTokens = verificationTokens;
         this.passwordEncoder = passwordEncoder;
+        this.userNames = userNames;
     }
 
     @Transactional
@@ -59,16 +56,16 @@ public class RegistrationService {
         if (users.existsByEmail(email)) {
             throw duplicateEmail();
         }
-        String userName = request.userName().strip();
+        String userName = userNames.normalize(request.userName());
         if (users.existsByUserNameIgnoreCase(userName)) {
-            throw new AuthRequestException(HttpStatus.CONFLICT, "USERNAME_IN_USE", "Username already exists.", "userName");
+            throw UserNames.conflict();
         }
         UserAccount user = UserAccount.registerPatient(fullName, email, userName,
                 request.phoneNumber().strip(), passwordEncoder.encode(request.password()));
         try {
             users.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
-            throw duplicateEmail();
+            throw AccountConstraintErrors.translate(e);
         }
         String rawToken = verificationTokens.create();
         tokens.saveAndFlush(EmailActionToken.verification(user, verificationTokens.hash(rawToken),

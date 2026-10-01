@@ -16,8 +16,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     long countByRoleAndEnabledTrueAndEmailVerifiedAtIsNotNull(com.smartlims.auth.entity.Role role);
 
     boolean existsByEmail(String email);
+    boolean existsByRole(com.smartlims.auth.entity.Role role);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserAccount u where u.id = :id")
     Optional<UserAccount> findWithLockById(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from UserAccount u where u.email = :email")
+    Optional<UserAccount> findWithLockByEmail(@Param("email") String email);
 }
