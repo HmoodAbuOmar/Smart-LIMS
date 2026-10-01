@@ -2,6 +2,10 @@ spring:
   application:
     name: smart-lims
 
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/smart_lims_db}
     username: ${DB_USERNAME:smart_lims_user}
@@ -14,3 +18,34 @@ spring:
 
   flyway:
     enabled: true
+
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": ${SMTP_AUTH:true}
+      "[mail.smtp.starttls.enable]": ${SMTP_STARTTLS:true}
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
+
+smartlims:
+  auth:
+    jwt:
+      secret-base64: ${AUTH_JWT_SECRET_BASE64}
+      duration-minutes: ${AUTH_JWT_DURATION_MINUTES:60}
+    browser:
+      allowed-origins: ${AUTH_ALLOWED_ORIGINS:}
+      secure-cookies: ${AUTH_SECURE_COOKIES:true}
+    email:
+      from: ${AUTH_EMAIL_FROM:}
+      frontend-base-url: ${AUTH_FRONTEND_BASE_URL:}
+    password:
+      argon2:
+        salt-length: 16
+        hash-length: 32
+        parallelism: 1
+        memory-kib: 19456
+        iterations: 2

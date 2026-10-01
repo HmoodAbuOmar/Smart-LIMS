@@ -1,10 +1,8 @@
 package com.smartlims;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class SmartLimsApplicationTests {
+class SmartLimsApplicationTests extends IsolatedPostgresTest {
 
     @Test
     void contextLoads() {
