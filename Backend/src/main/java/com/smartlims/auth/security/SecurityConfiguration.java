@@ -67,6 +67,12 @@ public class SecurityConfiguration {
                                 "/api/auth/confirm-email").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/patients").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/patients/{id}").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/patients")
+                                .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.GET, "/api/patients/{id}")
+                                .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/auth/register",
                                 "/api/auth/login", "/api/auth/cookie-login",
                                 "/api/auth/logout", "/api/auth/forgot-password",

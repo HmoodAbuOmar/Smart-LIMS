@@ -7,13 +7,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(basePackages = "com.smartlims.auth.controller")
+@Order(0)
+@RestControllerAdvice(basePackages = {"com.smartlims.auth.controller", "com.smartlims.patients.controller"})
 public class AuthErrorHandler {
 
     @ExceptionHandler(AuthRequestException.class)
