@@ -1,0 +1,219 @@
+.sl-auth-layout {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 900px) {
+  .sl-auth-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sl-auth-layout__brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--sl-space-10);
+  background: linear-gradient(
+    145deg,
+    var(--sl-primary-700),
+    var(--sl-primary-500)
+  );
+  color: var(--sl-white);
+}
+
+.sl-auth-layout__brand h1 {
+  color: var(--sl-white);
+  font-size: 2rem;
+}
+
+.sl-auth-layout__brand p {
+  opacity: 0.92;
+  max-width: 28rem;
+}
+
+.sl-auth-layout__form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sl-space-8);
+  background: var(--sl-bg);
+}
+
+.sl-auth-panel {
+  width: 100%;
+  max-width: 420px;
+}
+
+.sl-auth-panel__title {
+  margin-bottom: var(--sl-space-2);
+}
+
+.sl-auth-panel__subtitle {
+  color: var(--sl-text-muted);
+  font-size: var(--sl-text-sm);
+  margin-bottom: var(--sl-space-6);
+}
+
+.sl-app-shell {
+  display: grid;
+  grid-template-columns: var(--sl-sidebar-width) 1fr;
+  min-height: 100svh;
+}
+
+@media (max-width: 960px) {
+  .sl-app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sl-app-shell--sidebar-open .sl-sidebar {
+    transform: translateX(0);
+  }
+}
+
+.sl-sidebar {
+  background: var(--sl-surface);
+  border-right: 1px solid var(--sl-border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  z-index: 20;
+}
+
+@media (max-width: 960px) {
+  .sl-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: var(--sl-sidebar-width);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--sl-shadow-lg);
+  }
+}
+
+.sl-sidebar__brand {
+  padding: var(--sl-space-5);
+  border-bottom: 1px solid var(--sl-border);
+  font-weight: 700;
+  color: var(--sl-primary-600);
+  font-size: var(--sl-text-lg);
+}
+
+.sl-sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sl-space-3);
+}
+
+.sl-sidebar__link {
+  display: block;
+  padding: var(--sl-space-2) var(--sl-space-3);
+  border-radius: var(--sl-radius-md);
+  color: var(--sl-text);
+  font-size: var(--sl-text-sm);
+  text-decoration: none;
+  margin-bottom: 2px;
+}
+
+.sl-sidebar__link:hover {
+  background: var(--sl-gray-100);
+  text-decoration: none;
+}
+
+.sl-sidebar__link--active {
+  background: var(--sl-primary-50);
+  color: var(--sl-primary-700);
+  font-weight: 600;
+}
+
+.sl-sidebar__footer {
+  padding: var(--sl-space-4);
+  border-top: 1px solid var(--sl-border);
+  font-size: var(--sl-text-xs);
+  color: var(--sl-text-muted);
+}
+
+.sl-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sl-topbar {
+  height: var(--sl-topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sl-space-5);
+  background: var(--sl-surface);
+  border-bottom: 1px solid var(--sl-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.sl-topbar__menu {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .sl-topbar__menu {
+    display: inline-flex;
+  }
+}
+
+.sl-page {
+  flex: 1;
+  padding: var(--sl-space-6);
+  max-width: var(--sl-content-max);
+  width: 100%;
+  margin: 0 auto;
+}
+
+.sl-page-header {
+  margin-bottom: var(--sl-space-6);
+}
+
+.sl-page-header__desc {
+  color: var(--sl-text-muted);
+  font-size: var(--sl-text-sm);
+  margin: 0;
+}
+
+.sl-landing {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.sl-landing__hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--sl-space-10) var(--sl-space-6);
+  background: linear-gradient(
+    180deg,
+    var(--sl-primary-50) 0%,
+    var(--sl-bg) 60%
+  );
+}
+
+.sl-landing__hero h1 {
+  font-size: 2.25rem;
+  max-width: 640px;
+}
+
+.sl-landing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sl-space-3);
+  justify-content: center;
+  margin-top: var(--sl-space-6);
+}
