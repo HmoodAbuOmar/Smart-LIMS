@@ -10,7 +10,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 public record UpdatePatientRequest(
         @JsonDeserialize(using = PatientJson.Text.class) @NotBlank @Size(max = 120) String fullName,
         @JsonDeserialize(using = PatientJson.BirthDate.class) @NotNull LocalDate dateOfBirth,
-        @NotNull PatientGender gender,
+        @JsonDeserialize(using = PatientJson.Gender.class) @NotNull PatientGender gender,
         @JsonDeserialize(using = PatientJson.Text.class) @NotBlank @Size(max = 20) String phoneNumber,
         @JsonDeserialize(using = PatientJson.Text.class) @Size(max = 500) String address) {
     public UpdatePatientRequest {

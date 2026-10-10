@@ -6,9 +6,9 @@ import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.auth.security.JwtKeyConfiguration;
-import com.smartlims.auth.service.AuthRequestException;
 import com.smartlims.patients.dto.CreatePatientRequest;
 import com.smartlims.patients.entity.PatientGender;
+import com.smartlims.patients.exception.PatientForbiddenException;
 import com.smartlims.patients.repository.PatientRepository;
 import com.smartlims.patients.service.PatientService;
 import jakarta.servlet.http.Cookie;
@@ -134,6 +134,26 @@ class PatientManagementTest extends IsolatedPostgresTest {
     }
 
     @Test
+    void identicalPutStillPersistsUpdatedTimestampAndPreservesOtherFields() throws Exception {
+        JsonNode original = create(Role.ADMIN, BODY);
+        UUID id = UUID.fromString(original.get("id").asString());
+        Instant previous = Instant.parse("2020-01-01T00:00:00Z");
+        jdbc.update("UPDATE patients SET updated_at = ? WHERE id = ?", java.sql.Timestamp.from(previous), id);
+        MvcResult result = mvc.perform(bearer(put("/api/patients/" + id), Role.RECEPTIONIST)
+                .contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isOk()).andReturn();
+        JsonNode updated = json.readTree(result.getResponse().getContentAsString());
+        for (String field : List.of("id", "patientNumber", "fullName", "dateOfBirth", "gender", "phoneNumber", "address", "createdAt")) {
+            assertEquals(original.get(field), updated.get(field), field);
+        }
+        Instant persisted = patients.findById(id).orElseThrow().getUpdatedAt();
+        assertTrue(persisted.isAfter(previous));
+        assertEquals(persisted, Instant.parse(updated.get("updatedAt").asString()));
+        assertNull(patients.findById(id).orElseThrow().getUser());
+        assertEquals(actors.get(Role.ADMIN).getId(), jdbc.queryForObject(
+                "SELECT created_by FROM patients WHERE id = ?", UUID.class, id));
+    }
+
+    @Test
     void roleMatrixOwnershipAndMissingProfilesAreEnforced() throws Exception {
         String own = create(Role.ADMIN, BODY).get("id").asString();
         String other = create(Role.RECEPTIONIST, BODY).get("id").asString();
@@ -220,10 +240,14 @@ class PatientManagementTest extends IsolatedPostgresTest {
     @ParameterizedTest
     @ValueSource(strings = {"page=-1", "page=abc", "page=2147483648", "size=0", "size=101", "size=",
             "sort=id,asc", "sort=fullName", "sort=fullName,ASC", "sort=fullName,asc,desc", "sort=",
-            "sort=createdAt,desc&sort=fullName,asc"})
+            "sort=createdAt,desc&sort=fullName,asc", "page=", "page=1.5", "size=1.5", "size=2147483648",
+            "page=0&page=0", "size=20&size=20", "search=Example&search=Example"})
     void invalidQueriesReturnExistingErrorEnvelope(String query) throws Exception {
         MvcResult result = mvc.perform(bearer(get("/api/patients?" + query), Role.ADMIN))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Please correct the request fields."))
+                .andExpect(jsonPath("$.fieldErrors." + query.substring(0, query.indexOf('=')))
+                        .value("Please correct the request fields."))
                 .andExpect(header().string("Cache-Control", "no-store")).andReturn();
         assertEquals(json.readTree(result.getResponse().getContentAsString()).get("requestId").asString(),
                 result.getResponse().getHeader("X-Request-Id"));
@@ -245,7 +269,8 @@ class PatientManagementTest extends IsolatedPostgresTest {
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_JSON"));
         }
         for (String body : List.of("{", BODY.replace("UNKNOWN", "unknown"), BODY.replace("UNKNOWN", "OTHER"),
-                BODY.replace("\"UNKNOWN\"", "0"), BODY.replace("2000-01-01", "2000-02-30"),
+                BODY.replace("\"UNKNOWN\"", "0"), BODY.replace("\"UNKNOWN\"", "false"),
+                BODY.replace("2000-01-01", "2000-02-30"),
                 BODY.replace("\" Example Patient \"", "123"), BODY.replace("\" 000001 \"", "123"),
                 BODY.replace("\" Example Address \"", "true"), BODY.replace("\"2000-01-01\"", "[2000,1,1]"))) {
             mvc.perform(bearer(post("/api/patients"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(body))
@@ -304,9 +329,11 @@ class PatientManagementTest extends IsolatedPostgresTest {
     void concurrentCreatesUseUniqueSequenceNumbersAndServiceEnforcesRoles() throws Exception {
         var admin = authentication(Role.ADMIN);
         var request = new CreatePatientRequest("Concurrent Example", LocalDate.of(2000, 1, 1), PatientGender.UNKNOWN, "000001", null);
-        AuthRequestException denied = assertThrows(AuthRequestException.class,
+        PatientForbiddenException denied = assertThrows(PatientForbiddenException.class,
                 () -> service.create(authentication(Role.PATIENT), request));
-        assertEquals("FORBIDDEN", denied.getCode());
+        assertEquals("Access is denied.", denied.getMessage());
+        mvc.perform(bearer(post("/api/patients"), Role.PATIENT).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
         CountDownLatch start = new CountDownLatch(1);
         try (ExecutorService executor = Executors.newFixedThreadPool(4)) {
             List<Future<String>> results = new ArrayList<>();

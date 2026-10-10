@@ -294,7 +294,7 @@ Do not include calculated age in this DTO; clients can calculate age from dateOf
 
 ## 10. Errors and HTTP status semantics
 
-The patients module reuses `AuthErrorHandler` for request exceptions, Bean Validation, and JSON errors, and keeps `JsonSecurityErrorHandler` for security failures. Patient-specific unexpected failures use the same envelope. Authentication error behavior is unchanged.
+`com.smartlims.patients.exception.PatientErrorHandler` handles patient exceptions, Bean Validation, JSON errors, and unexpected patient failures using the existing `AuthErrorHandler.ApiError` envelope. Patient services and query DTOs throw patient-specific exceptions rather than `AuthRequestException`. `AuthErrorHandler` is scoped to authentication controllers, and `JsonSecurityErrorHandler` continues to handle security-filter failures. Authentication error behavior is unchanged.
 
 Every handled error below has this JSON structure:
 
@@ -320,7 +320,7 @@ Every handled error below has this JSON structure:
 | 404 | `PATIENT_NOT_FOUND` | Staff ID does not exist; patient ID does not exist or is not linked to the authenticated patient |
 | 500 | `INTERNAL_SERVER_ERROR` | Unexpected patient-module failure; no SQL or sensitive internals |
 
-Bean Validation uses the message `Please correct the request fields.` and maps each invalid field to `Invalid value.`. Service checks for future dates, UUIDs, and query parameters use the same code and top-level message, with the affected field mapped to `Please correct the request fields.`. JSON parsing errors use `Invalid request body.` and empty field errors. These examples reflect the tested implementation:
+Bean Validation uses the message `Please correct the request fields.` and maps each invalid field to `Invalid value.`. Service checks for future dates and UUIDs, and query DTO validation, use the same code and top-level message, with the affected field mapped to `Please correct the request fields.`. JSON parsing errors use `Invalid request body.` and empty field errors. These examples reflect the tested implementation:
 
 ```json
 {
@@ -407,18 +407,21 @@ Expected: both creations may succeed; no phone-uniqueness conflict.
 ## 13. Implemented details and verification
 
 - `V3__patients.sql` adds `patient_number_seq` and `patients`. V1 and V2 are unchanged. Unique patient numbers/account links, gender checks, nonblank name/phone checks, and non-cascading user foreign keys are enforced. FK and default-list-order indexes are included.
-- The module is under `com.smartlims.patients`, with entity/enum, repository, normalized validated create/update records, response/page records, transactional service, controller, and patient-specific error fallback.
+- The layer refactor leaves all three migrations, the schema, and the sequence unchanged.
+- The module is under `com.smartlims.patients`: `controller` handles HTTP transport; `dto` owns request normalization/validation and response records; `service` owns application operations, role/ownership checks, field assignments, and transactions; `entity` holds persistence mappings, constructors, getters, and the required setters; `repository` handles persistence; `mapper.PatientMapper` converts entities/pages to responses; `exception` contains patient exceptions and `PatientErrorHandler`; `specification.PatientSpecifications` supplies reusable literal search predicates.
 - New profiles always have `user_id = NULL`; `created_by` is the current authenticated staff account. No API or entity mutator links an account in this phase. A future linking workflow must verify the target account's PATIENT role. Controlled integration fixtures use PATIENT accounts for existing links.
 - UUIDs follow the existing JPA generation strategy. Sequence numbers are formatted as `PAT-%06d` using a minimum width, and are allocated independently of transaction rollback. Timestamps are persisted before building write responses; successful PUT requests update `updated_at`, including unchanged payloads.
+- `PatientService` creates the entity using its patient-number/creator constructor and assigns demographic/contact fields through setters. It explicitly sets `updated_at` before flushing PUT updates so identical payloads still persist a new timestamp. There are no generated-ID, created-at, account-link, patient-number, or creator setters.
+- HTTP query parameters are converted to a validated `PatientQueryRequest` before calling the service. It owns normalization, defaults, numeric/sort validation, repeated-known-parameter rejection, and the existing first-error ordering. The service owns sort execution, the stable ID tie-breaker, and the distant-page count fallback.
 - Text normalization runs before length validation. Module-scoped JSON deserializers require string name/phone/address fields and a valid string `YYYY-MM-DD` birth date; gender requires an exact uppercase enum string. Existing authentication JSON coercion settings are unchanged.
 - Patient-owned reads use `findByIdAndUser_Id`; search uses parameterized JPA criteria with escaped literal LIKE patterns and `id ASC` after the whitelisted sort. Very distant pages beyond the result count are answered without overflowing JPA's integer offset.
 - Existing authentication, cookie, CSRF, CORS, registration, and invitation flows remain in place. Authentication regression cleanup now includes `patients` because its foreign keys retain user references.
 
-Verified patient checks: `PatientRequestTest` (1 test) and `PatientManagementTest` (19 tests including parameterized cases), all passing with no skips. They cover normalization, persistence, shared phone/duplicate demographics, timestamp/identity preservation, linked-profile update isolation, all role permissions, ownership concealment, current account role/eligibility, anonymous access, cookie CSRF, literal wildcard/backslash search, sorting/tie-breaking, pagination/empty pages, input rejection, sanitized unexpected errors, migration history, unique links/numbers, foreign keys, and 12 concurrent creates plus seven-digit patient-number formatting.
+Verified patient checks after the layer refactor: `PatientRequestTest` (3 tests) and `PatientManagementTest` (27 tests including parameterized cases), all passing with no skips. They cover normalization, query DTO defaults/bounds and first-error ordering, repeated known query parameters and exact error messages, persistence, shared phone/duplicate demographics, timestamp/identity preservation including identical PUT, linked-profile update isolation, all role permissions, ownership concealment, current account role/eligibility, anonymous access, cookie CSRF, literal wildcard/backslash search, sorting/tie-breaking, pagination/empty pages, input rejection, sanitized unexpected errors, migration history, unique links/numbers, foreign keys, and 12 concurrent creates plus seven-digit patient-number formatting.
 
 Tests use a freshly initialized, temporary PostgreSQL 16 cluster bound to loopback and the guarded `smartlims_auth_regression` database. Hibernate schema validation and Flyway validation run in the test context. No development database is used.
 
-Full verification: `mvnw.cmd clean verify -Dspring.test.mockmvc.print=NONE` passed all 50 tests with zero failures, errors, or skips, including 21 authentication regression cases, browser security, provisioning, and application context checks. The executable JAR was built successfully. An earlier incremental verify encountered a class-loading failure for the existing nested `AuthErrorHandler.ApiError` class; the complete clean rebuild passed without application-logic changes.
+Full verification after the layer refactor: `mvnw.cmd clean verify -Dspring.test.mockmvc.print=NONE` passed all 60 tests with zero failures, errors, or skips, including 21 authentication regression cases, browser security, provisioning, and application context checks. The executable JAR was built successfully.
 
 Commands:
 

@@ -29,7 +29,7 @@ public class PatientController {
 
     @GetMapping
     public PatientPageResponse list(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken authentication) {
-        return patients.list(authentication, query);
+        return patients.list(authentication, PatientQueryRequest.fromQueryParameters(query));
     }
 
     @GetMapping("/{id}")

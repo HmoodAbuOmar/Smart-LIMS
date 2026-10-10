@@ -1,5 +1,6 @@
 package com.smartlims.patients.dto;
 
+import com.smartlims.patients.entity.PatientGender;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import tools.jackson.core.JsonParser;
@@ -33,6 +34,21 @@ public final class PatientJson {
                 catch (DateTimeParseException ignored) { /* Report the same sanitized body error. */ }
             }
             return (LocalDate) context.handleWeirdStringValue(LocalDate.class, value, "Expected a valid ISO date.");
+        }
+    }
+
+    public static class Gender extends ValueDeserializer<PatientGender> {
+        @Override
+        public PatientGender deserialize(JsonParser parser, DeserializationContext context) {
+            if (!parser.hasToken(JsonToken.VALUE_STRING)) {
+                return (PatientGender) context.handleUnexpectedToken(PatientGender.class, parser);
+            }
+            String value = parser.getString();
+            try { return PatientGender.valueOf(value); }
+            catch (IllegalArgumentException error) {
+                return (PatientGender) context.handleWeirdStringValue(PatientGender.class, value,
+                        "Gender must be an uppercase enum string.");
+            }
         }
     }
 }

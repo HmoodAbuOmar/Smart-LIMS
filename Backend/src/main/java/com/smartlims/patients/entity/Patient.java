@@ -8,6 +8,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -28,19 +29,24 @@ public class Patient {
     private UserAccount user;
 
     @Column(name = "full_name", nullable = false, length = 120)
+    @Setter
     private String fullName;
 
     @Column(name = "date_of_birth", nullable = false)
+    @Setter
     private LocalDate dateOfBirth;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
+    @Setter
     private PatientGender gender;
 
     @Column(name = "phone_number", nullable = false, length = 20)
+    @Setter
     private String phoneNumber;
 
     @Column(columnDefinition = "text")
+    @Setter
     private String address;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -53,25 +59,12 @@ public class Patient {
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
+    // The service sets this to make an identical successful PUT dirty before Hibernate flushes.
+    @Setter
     private Instant updatedAt;
 
-    public static Patient create(String patientNumber, UserAccount creator, String fullName,
-            LocalDate dateOfBirth, PatientGender gender, String phoneNumber, String address) {
-        Patient patient = new Patient();
-        patient.patientNumber = patientNumber;
-        patient.createdBy = creator;
-        patient.replaceProfile(fullName, dateOfBirth, gender, phoneNumber, address);
-        return patient;
-    }
-
-    public void replaceProfile(String fullName, LocalDate dateOfBirth, PatientGender gender,
-            String phoneNumber, String address) {
-        this.fullName = fullName;
-        this.dateOfBirth = dateOfBirth;
-        this.gender = gender;
-        this.phoneNumber = phoneNumber;
-        this.address = address;
-        // Ensure even an otherwise identical successful PUT updates its timestamp.
-        this.updatedAt = Instant.now();
+    public Patient(String patientNumber, UserAccount createdBy) {
+        this.patientNumber = patientNumber;
+        this.createdBy = createdBy;
     }
 }
