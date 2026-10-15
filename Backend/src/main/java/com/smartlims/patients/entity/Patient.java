@@ -2,9 +2,11 @@ package com.smartlims.patients.entity;
 
 import com.smartlims.auth.entity.UserAccount;
 import jakarta.persistence.*;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,6 +19,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Patient {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -59,12 +62,16 @@ public class Patient {
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    // The service sets this to make an identical successful PUT dirty before Hibernate flushes.
     @Setter
     private Instant updatedAt;
 
-    public Patient(String patientNumber, UserAccount createdBy) {
+    public Patient(String patientNumber, UserAccount createdBy, String fullName, LocalDate dateOfBirth, PatientGender gender, String phoneNumber, String address) {
         this.patientNumber = patientNumber;
         this.createdBy = createdBy;
+        this.fullName = fullName;
+        this.dateOfBirth = dateOfBirth;
+        this.gender = gender;
+        this.phoneNumber = phoneNumber;
+        this.address = address;
     }
 }
