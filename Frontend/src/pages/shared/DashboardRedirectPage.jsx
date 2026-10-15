@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { dashboardPathForRole } from '../../lib/constants/roles'
-import { useRouter } from '../../lib/router/RouterContext'
 import { LoadingState } from '../../components/feedback/LoadingState'
 
 export function DashboardRedirectPage() {
   const { user, isAuthenticated } = useAuth()
-  const { navigate } = useRouter()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!isAuthenticated || !user) {

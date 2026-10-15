@@ -1,13 +1,13 @@
-import { useRouter } from '../../lib/router/RouterContext'
+import { useParams } from 'react-router-dom'
+import { useMockData } from '../../mock-data/MockDataProvider'
 import { EntityDetailPage } from '../../components/pages/EntityDetailPage'
-import { findById, mockUsers } from '../../mocks/fixtures'
 import { NotFoundPage } from '../shared/NotFoundPage'
 
 export function AdminUserDetailPage() {
-  const { params } = useRouter()
-  const user = findById(mockUsers, params.id)
+  const { id } = useParams()
+  const { state } = useMockData()
+  const user = state.users.find((u) => u.id === id)
   if (!user) return <NotFoundPage />
-
   return (
     <EntityDetailPage
       title={user.fullName}

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link } from '../../lib/router/RouterContext'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { AuthLayout } from '../../components/layout/AuthLayout'
 import { FormField } from '../../components/ui/FormField'
 import { TextInput } from '../../components/ui/TextInput'
 import { Button } from '../../components/ui/Button'
 import { DEMO_ACCOUNTS } from '../../mocks/demoAccounts'
+import { ROLE_LABELS } from '../../lib/constants/roles'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -14,21 +15,29 @@ export function LoginPage() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  const signInAs = async (accountEmail) => {
+    setEmail(accountEmail)
+    setPassword('demo')
+    setLoading(true)
+    setError(null)
+    const result = await login({ email: accountEmail, password: 'demo' })
+    if (!result.ok) setError(result.message)
+    setLoading(false)
+  }
+
   const onSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     const result = await login({ email, password })
-    if (!result.ok) {
-      setError(result.message)
-    }
+    if (!result.ok) setError(result.message)
     setLoading(false)
   }
 
   return (
     <AuthLayout
       title="Sign in"
-      subtitle="Mock authentication for UI review. Backend `/api/auth/login` is not connected."
+      subtitle="Demo login for UI preview only — not real authentication or security."
     >
       {error ? <div className="sl-form-error-summary">{error}</div> : null}
       <form onSubmit={onSubmit}>
@@ -64,10 +73,27 @@ export function LoginPage() {
       </p>
       <div className="sl-alert sl-alert--info" style={{ marginTop: 24 }}>
         <strong>Demo accounts</strong> (password: <code>demo</code>)
-        <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+        <p style={{ margin: '8px 0', fontSize: 'var(--sl-text-sm)' }}>
+          Lab dashboard updates appear under <strong>Lab technician</strong> — not on the public home page.
+        </p>
+        <div className="sl-row" style={{ marginTop: 12 }}>
           {DEMO_ACCOUNTS.map((a) => (
-            <li key={a.email}>
-              {a.role}: {a.email}
+            <Button
+              key={a.email}
+              type="button"
+              variant={a.role === 'LAB_TECHNICIAN' ? 'primary' : 'secondary'}
+              size="sm"
+              disabled={loading}
+              onClick={() => signInAs(a.email)}
+            >
+              {ROLE_LABELS[a.role] ?? a.role}
+            </Button>
+          ))}
+        </div>
+        <ul style={{ margin: '12px 0 0', paddingLeft: 20, fontSize: 'var(--sl-text-sm)' }}>
+          {DEMO_ACCOUNTS.map((a) => (
+            <li key={`${a.email}-line`}>
+              {a.email}
             </li>
           ))}
         </ul>

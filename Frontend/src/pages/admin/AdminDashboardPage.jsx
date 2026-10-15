@@ -1,35 +1,46 @@
-import { MockBanner } from '../../components/feedback/MockBanner'
+import { Link } from 'react-router-dom'
+import { useMockData } from '../../mock-data/MockDataProvider'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { DashboardStats } from '../../components/pages/DashboardStats'
 import { Card } from '../../components/ui/Card'
-import { mockAuditLogs, mockUsers } from '../../mocks/fixtures'
+import { Button } from '../../components/ui/Button'
 
 export function AdminDashboardPage() {
+  const { state, resetDemo } = useMockData()
+
   return (
     <>
       <PageHeader
         title="Admin dashboard"
-        description="Overview of users, catalog configuration, and audit activity (mock)."
+        description="Operational overview with demo metrics."
+        actions={
+          <Button variant="secondary" onClick={resetDemo}>
+            Reset demo data
+          </Button>
+        }
       />
-      <MockBanner />
       <DashboardStats
         stats={[
-          { label: 'Active users', value: mockUsers.length },
-          { label: 'Laboratory tests', value: 3 },
-          { label: 'Audit events (24h)', value: mockAuditLogs.length },
-          { label: 'Open slots today', value: 2 },
+          { label: 'Users', value: state.users.length },
+          { label: 'Patients', value: state.patients.length },
+          { label: 'Open orders', value: state.orders.filter((o) => o.status === 'PENDING').length },
+          { label: 'Audit events', value: state.auditLogs.length },
         ]}
       />
       <div style={{ marginTop: 'var(--sl-space-6)' }}>
-      <Card title="Recent audit events">
-        <ul style={{ margin: 0, paddingLeft: 20 }}>
-          {mockAuditLogs.map((log) => (
-            <li key={log.id}>
-              {log.timestamp}: {log.action} — {log.actor}
-            </li>
-          ))}
-        </ul>
-      </Card>
+        <Card title="Quick links">
+          <div className="sl-row">
+            <Link to="/app/admin/users">
+              <Button variant="secondary">Manage users</Button>
+            </Link>
+            <Link to="/app/admin/tests">
+              <Button variant="secondary">Test catalog</Button>
+            </Link>
+            <Link to="/app/admin/audit-logs">
+              <Button variant="secondary">Audit logs</Button>
+            </Link>
+          </div>
+        </Card>
       </div>
     </>
   )

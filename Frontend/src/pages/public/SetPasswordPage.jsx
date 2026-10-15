@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from '../../lib/router/RouterContext'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { AuthLayout } from '../../components/layout/AuthLayout'
 import { FormField } from '../../components/ui/FormField'

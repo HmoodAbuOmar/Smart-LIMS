@@ -1,8 +1,7 @@
-import { MockBanner } from '../feedback/MockBanner'
+import { Link } from 'react-router-dom'
 import { PageHeader } from '../layout/PageHeader'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
-import { Link } from '../../lib/router/RouterContext'
 
 export function EntityDetailPage({
   title,
@@ -11,6 +10,7 @@ export function EntityDetailPage({
   backTo,
   editTo,
   children,
+  className = '',
 }) {
   return (
     <>
@@ -32,8 +32,7 @@ export function EntityDetailPage({
           </>
         }
       />
-      <MockBanner />
-      <Card>
+      <Card className={className}>
         {fields ? (
           <dl style={{ margin: 0, display: 'grid', gap: 12 }}>
             {fields.map(({ label, value }) => (

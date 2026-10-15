@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useRouter } from '../../lib/router/RouterContext'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { AuthLayout } from '../../components/layout/AuthLayout'
 import { FormField } from '../../components/ui/FormField'
@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button'
 
 export function ResetPasswordPage() {
   const { resetPassword } = useAuth()
-  const { pathname } = useRouter()
+  const { pathname } = useLocation()
   const token = new URLSearchParams(window.location.search).get('token')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')

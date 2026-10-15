@@ -1,13 +1,13 @@
 import { useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthContext'
-import { Link, useRouter } from '../../lib/router/RouterContext'
 import { ROLE_LABELS } from '../../lib/constants/roles'
 import { Button } from '../ui/Button'
+import { MockBanner } from '../feedback/MockBanner'
 import { NAV_BY_ROLE } from './navConfig'
 
 export function AppShell({ children }) {
   const { user, logout } = useAuth()
-  const { pathname } = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const navItems = NAV_BY_ROLE[user?.role] ?? []
@@ -17,32 +17,34 @@ export function AppShell({ children }) {
       <aside className="sl-sidebar" aria-label="Main navigation">
         <div className="sl-sidebar__brand">Smart-LIMS</div>
         <nav className="sl-sidebar__nav">
-          {navItems.map((item) => {
-            const active =
-              pathname === item.to || pathname.startsWith(`${item.to}/`)
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`sl-sidebar__link${active ? ' sl-sidebar__link--active' : ''}`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
-          <Link
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `sl-sidebar__link${isActive ? ' sl-sidebar__link--active' : ''}`
+              }
+              onClick={() => setSidebarOpen(false)}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+          <NavLink
             to="/app/profile"
-            className={`sl-sidebar__link${pathname === '/app/profile' ? ' sl-sidebar__link--active' : ''}`}
+            className={({ isActive }) =>
+              `sl-sidebar__link${isActive ? ' sl-sidebar__link--active' : ''}`
+            }
             onClick={() => setSidebarOpen(false)}
           >
             Profile
-          </Link>
+          </NavLink>
         </nav>
         <div className="sl-sidebar__footer">
           {user?.fullName}
           <br />
           {ROLE_LABELS[user?.role] ?? user?.role}
+          <br />
+          <span style={{ color: 'var(--sl-warning)' }}>Demo session</span>
         </div>
       </aside>
 
@@ -60,13 +62,16 @@ export function AppShell({ children }) {
             Smart-LIMS
           </span>
           <div className="sl-row">
-            <Link to="/app/profile">{user?.email}</Link>
+            <NavLink to="/app/profile">{user?.email}</NavLink>
             <Button variant="secondary" size="sm" onClick={logout}>
               Log out
             </Button>
           </div>
         </header>
-        <div className="sl-page">{children}</div>
+        <div className="sl-page">
+          <MockBanner />
+          {children}
+        </div>
       </div>
     </div>
   )
