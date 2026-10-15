@@ -1,0 +1,46 @@
+import { ROLES } from '../../lib/constants/roles'
+
+export const NAV_BY_ROLE = {
+  [ROLES.ADMIN]: [
+    { to: '/app/admin/dashboard', label: 'Dashboard' },
+    { to: '/app/admin/users', label: 'Users' },
+    { to: '/app/admin/patients', label: 'Patients' },
+    { to: '/app/admin/tests', label: 'Laboratory tests' },
+    { to: '/app/admin/test-parameters', label: 'Test parameters' },
+    { to: '/app/admin/reference-ranges', label: 'Reference ranges' },
+    { to: '/app/admin/appointment-slots', label: 'Appointment slots' },
+    { to: '/app/admin/orders', label: 'Orders' },
+    { to: '/app/admin/payments', label: 'Payments' },
+    { to: '/app/admin/audit-logs', label: 'Audit logs' },
+  ],
+  [ROLES.PATIENT]: [
+    { to: '/app/patient/dashboard', label: 'Dashboard' },
+    { to: '/app/patient/profile', label: 'My profile' },
+    { to: '/app/patient/appointments', label: 'My appointments' },
+    { to: '/app/patient/appointments/book', label: 'Book appointment' },
+    { to: '/app/patient/orders', label: 'My lab orders' },
+    { to: '/app/patient/results', label: 'My results' },
+    { to: '/app/patient/payments', label: 'Payments' },
+    { to: '/app/patient/notifications', label: 'Notifications' },
+  ],
+  [ROLES.RECEPTIONIST]: [
+    { to: '/app/reception/dashboard', label: 'Dashboard' },
+    { to: '/app/reception/patients', label: 'Patients' },
+    { to: '/app/reception/orders/new', label: 'Create order' },
+    { to: '/app/reception/orders', label: 'Orders' },
+    { to: '/app/reception/appointments', label: 'Appointments' },
+    { to: '/app/reception/check-in', label: 'Check-in' },
+    { to: '/app/reception/payments', label: 'Payments' },
+    { to: '/app/reception/refunds', label: 'Refunds' },
+  ],
+  [ROLES.LAB_TECHNICIAN]: [
+    { to: '/app/lab/dashboard', label: 'Dashboard' },
+    { to: '/app/lab/worklist', label: 'Worklist' },
+    { to: '/app/lab/samples', label: 'Samples' },
+    { to: '/app/lab/sample-tests', label: 'Sample tests' },
+    { to: '/app/lab/results/entry', label: 'Result entry' },
+    { to: '/app/lab/results/drafts', label: 'Draft results' },
+    { to: '/app/lab/results/publish', label: 'Publish results' },
+    { to: '/app/lab/results/corrections', label: 'Result corrections' },
+  ],
+}
