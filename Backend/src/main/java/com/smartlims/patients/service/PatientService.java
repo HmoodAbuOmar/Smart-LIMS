@@ -45,12 +45,8 @@ public class PatientService {
         requireRole(actor, "ADMIN", "RECEPTIONIST");
         validateBirthDate(request.dateOfBirth());
         String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
-        Patient patient = new Patient(number, users.getReferenceById(actorId(actor)));
-        patient.setFullName(request.fullName());
-        patient.setDateOfBirth(request.dateOfBirth());
-        patient.setGender(request.gender());
-        patient.setPhoneNumber(request.phoneNumber());
-        patient.setAddress(request.address());
+        Patient patient = new Patient(number, users.getReferenceById(actorId(actor)), request.fullName(),
+                request.dateOfBirth(), request.gender(), request.phoneNumber(), request.address());
         return mapper.toResponse(patients.saveAndFlush(patient));
     }
 
@@ -92,7 +88,6 @@ public class PatientService {
         patient.setGender(request.gender());
         patient.setPhoneNumber(request.phoneNumber());
         patient.setAddress(request.address());
-        // Force a write even when all submitted demographic/contact values are unchanged.
         patient.setUpdatedAt(Instant.now());
         patients.flush();
         return mapper.toResponse(patient);
