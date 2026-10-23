@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users/5fc2b403-890d-4ed2-9771-0a02d5e19522/block"
+method: PATCH
+auth:
+  type: bearer
+  credentials:
+    token: eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQURNSU4iLCJpc3MiOiJzbWFydC1saW1zLWFwaSIsInN1YiI6ImE0YmQ2MTlmLWZhYzctNGFkMy04ZTlhLTI3MTM0MzM4YTFlZSIsImF1ZCI6InNtYXJ0LWxpbXMtY2xpZW50IiwiZXhwIjoxNzkwODgwNzU0LCJpYXQiOjE3OTA4NzcxNTR9.c0qZ-WY1z142VTBXmsXuCk3FOvKE7sv3NhFRqynkGFI
+settings: {}
+order: 4000

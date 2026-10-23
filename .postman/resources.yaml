@@ -1,0 +1,11 @@
+workspace:
+  id: 86c94ce6-e272-464e-adc8-f3c4c2b699a5
+cloudResources:
+  collections:
+    ../postman/collections/Smart-LIMS API: 50742279-2e703687-f70e-46b1-bcf5-55db0d345512
+  environments:
+    ../postman/environments/Smart-LIMS Local.environment.yaml: 50742279-c977915f-e635-4fa6-9707-411c3bfe1f12
+  globals:
+    ../postman/globals/workspace.globals.yaml: 17402aad-2421-4eb7-8fc3-e26bdcfaa8a6
+  documents:
+    ../postman/documents/secret.md: eb6de109-d1d0-415d-8540-ac585632d213

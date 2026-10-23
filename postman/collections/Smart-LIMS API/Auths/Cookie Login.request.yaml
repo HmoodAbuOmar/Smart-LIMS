@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/api/auth/cookie-login"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"emailOrUserName\": \"hmoodabuomar@gmail.com\",\r
+
+    \  \"password\": \"hmood12345\"\r
+
+    }"
+settings: {}
+order: 8000

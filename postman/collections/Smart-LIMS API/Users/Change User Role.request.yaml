@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users/7ff3783e-898d-4690-a791-124c3fb1fa41/role"
+method: PUT
+body:
+  type: json
+  content: "{\r
+
+    \  \"role\": \"RECEPTIONIST\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQURNSU4iLCJpc3MiOiJzbWFydC1saW1zLWFwaSIsInN1YiI6ImE0YmQ2MTlmLWZhYzctNGFkMy04ZTlhLTI3MTM0MzM4YTFlZSIsImF1ZCI6InNtYXJ0LWxpbXMtY2xpZW50IiwiZXhwIjoxNzkwODgxMjc1LCJpYXQiOjE3OTA4Nzc2NzV9.XcLbgrfPeKUk4lj5CygsDoviftOamWmHVMNl9EpjDYk
+settings: {}
+order: 8000

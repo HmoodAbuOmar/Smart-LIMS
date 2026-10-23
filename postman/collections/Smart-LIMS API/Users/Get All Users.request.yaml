@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQURNSU4iLCJpc3MiOiJzbWFydC1saW1zLWFwaSIsInN1YiI6ImE0YmQ2MTlmLWZhYzctNGFkMy04ZTlhLTI3MTM0MzM4YTFlZSIsImF1ZCI6InNtYXJ0LWxpbXMtY2xpZW50IiwiZXhwIjoxNzkwODkwNzg1LCJpYXQiOjE3OTA4ODcxODV9.rHoobKvGAmwH4ZTRDhbbAP1gcy99B3osnXxjAXGnSSg
+settings: {}
+order: 1000

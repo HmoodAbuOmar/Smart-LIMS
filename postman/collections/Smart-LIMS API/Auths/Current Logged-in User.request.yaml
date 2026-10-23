@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{baseUrl}}/api/auth/me"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_1ejp}}"
+settings: {}
+order: 4000

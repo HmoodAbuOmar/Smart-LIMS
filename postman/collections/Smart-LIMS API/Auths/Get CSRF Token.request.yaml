@@ -1,0 +1,5 @@
+$kind: http-request
+url: "{{baseUrl}}/api/auth/csrf-token"
+method: GET
+settings: {}
+order: 7000

@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{baseUrl}}/api/auth/confirm-email?userId=e40cf6d6-f130-405f-83e8-de579d7cb150&token=lnekqG-sMy2JWQd7uiPlUc1TSEfS5zRg0cE70BTIhEA"
+method: GET
+queryParams:
+  userId: e40cf6d6-f130-405f-83e8-de579d7cb150
+  token: lnekqG-sMy2JWQd7uiPlUc1TSEfS5zRg0cE70BTIhEA
+settings: {}
+order: 2000

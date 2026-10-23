@@ -1,0 +1,24 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"fullName\": \"Test Lab Technician\",\r
+
+    \  \"email\": \"hmoodabuomar4@gmail.com\",\r
+
+    \  \"userName\": \"lab_test\",\r
+
+    \  \"phoneNumber\": \"0590000000\",\r
+
+    \  \"role\": \"LAB_TECHNICIAN\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQURNSU4iLCJpc3MiOiJzbWFydC1saW1zLWFwaSIsInN1YiI6ImE0YmQ2MTlmLWZhYzctNGFkMy04ZTlhLTI3MTM0MzM4YTFlZSIsImF1ZCI6InNtYXJ0LWxpbXMtY2xpZW50IiwiZXhwIjoxNzkwODgwMDI5LCJpYXQiOjE3OTA4NzY0Mjl9.cHPElszuoYTKjsmIFpZUvT3shPF8LGayS0oFdCn2pUQ
+settings: {}
+order: 3000

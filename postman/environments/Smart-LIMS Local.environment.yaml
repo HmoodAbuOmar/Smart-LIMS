@@ -1,0 +1,4 @@
+name: Smart-LIMS Local
+values:
+  - key: baseUrl
+    value: ""
