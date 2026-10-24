@@ -8,6 +8,27 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BrowserSecurityTest {
     @Test
+    void corsExposesCatalogHeadersOnlyToConfiguredOrigins() throws Exception {
+        var source = new SecurityConfiguration().corsConfigurationSource("https://lab.example.invalid");
+        var filter = new org.springframework.web.filter.CorsFilter(source);
+        var request = new MockHttpServletRequest("GET", "/api/lab-tests");
+        request.addHeader("Origin", "https://lab.example.invalid");
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request, response, new org.springframework.mock.web.MockFilterChain());
+        assertEquals("https://lab.example.invalid", response.getHeader("Access-Control-Allow-Origin"));
+        assertEquals("true", response.getHeader("Access-Control-Allow-Credentials"));
+        assertEquals("Location, X-Request-Id", response.getHeader("Access-Control-Expose-Headers"));
+
+        var rejected = new MockHttpServletRequest("GET", "/api/lab-tests");
+        rejected.addHeader("Origin", "https://untrusted.example.invalid");
+        var denied = new MockHttpServletResponse();
+        filter.doFilter(rejected, denied, new org.springframework.mock.web.MockFilterChain());
+        assertEquals(403, denied.getStatus());
+        assertNull(denied.getHeader("Access-Control-Allow-Origin"));
+        assertNull(denied.getHeader("Access-Control-Expose-Headers"));
+    }
+
+    @Test
     void cookieIssuingAndClearingUseCompatibleFlags() {
         for (boolean secure : new boolean[] {true, false}) {
             var factory = new AccessCookieFactory(secure, 60);

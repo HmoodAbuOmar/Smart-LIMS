@@ -67,6 +67,11 @@ public class SecurityConfiguration {
                                 "/api/auth/confirm-email").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/lab-tests", "/api/lab-tests/{id}")
+                                .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/patients").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.PUT, "/api/patients/{id}").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/patients")
@@ -114,6 +119,7 @@ public class SecurityConfiguration {
             configuration.setAllowCredentials(true);
             configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
             configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Authorization"));
+            configuration.setExposedHeaders(List.of("Location", "X-Request-Id"));
         }
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
