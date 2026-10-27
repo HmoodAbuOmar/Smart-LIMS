@@ -29,11 +29,10 @@ public class RegistrationService {
     private final PasswordPolicy passwordPolicy;
     private final VerificationTokens verificationTokens;
     private final PasswordEncoder passwordEncoder;
-    private final UserNames userNames;
 
     public RegistrationService(UserAccountRepository users, EmailActionTokenRepository tokens,
             VerificationEmailSender emailSender, EmailIdentity emailIdentity, PasswordPolicy passwordPolicy,
-            VerificationTokens verificationTokens, PasswordEncoder passwordEncoder, UserNames userNames) {
+            VerificationTokens verificationTokens, PasswordEncoder passwordEncoder) {
         this.users = users;
         this.tokens = tokens;
         this.emailSender = emailSender;
@@ -41,11 +40,14 @@ public class RegistrationService {
         this.passwordPolicy = passwordPolicy;
         this.verificationTokens = verificationTokens;
         this.passwordEncoder = passwordEncoder;
-        this.userNames = userNames;
     }
 
     @Transactional
     public RegistrationResponse register(RegistrationRequest request, HttpServletRequest httpRequest) {
+        if (request.confirmPassword() == null || !request.confirmPassword().equals(request.password())) {
+            throw new AuthRequestException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Please correct the request fields.", "confirmPassword");
+        }
         String email = emailIdentity.canonicalize(request.email());
         passwordPolicy.validate(request.password());
         String fullName = request.fullName().strip();
@@ -56,12 +58,8 @@ public class RegistrationService {
         if (users.existsByEmail(email)) {
             throw duplicateEmail();
         }
-        String userName = userNames.normalize(request.userName());
-        if (users.existsByUserNameIgnoreCase(userName)) {
-            throw UserNames.conflict();
-        }
-        UserAccount user = UserAccount.registerPatient(fullName, email, userName,
-                request.phoneNumber().strip(), passwordEncoder.encode(request.password()));
+        UserAccount user = UserAccount.registerPatient(fullName, email,
+                passwordEncoder.encode(request.password()));
         try {
             users.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {

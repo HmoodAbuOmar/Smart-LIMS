@@ -101,6 +101,8 @@ Implementation status: existing; preserve supplied schema and current behavior.
 - Origins: PUBLIC_REGISTRATION, ADMIN_INVITATION, FIRST_ADMIN_INVITATION.
 - Email is NOT NULL and UNIQUE. The existing canonical-email CHECK requires email = lower(btrim(email)) and octet_length(email) = char_length(email).
 - Preserve users_user_name_ci_unique: UNIQUE INDEX ON users(lower(user_name)) WHERE user_name IS NOT NULL. user_name is nullable.
+- Public registration requires fullName, email, password, and matching confirmPassword. It stores user_name and phone_number as NULL using the existing schema; no placeholders are generated. confirmPassword is validation-only and is never persisted or logged. See [Registration contract](AUTH_API.md).
+- users.full_name and patients.full_name are independent required values. Account/profile changes never automatically synchronize names. Patient-profile phone_number remains required.
 - enabled defaults to FALSE; failed_login_attempts defaults to 0. reset_code_failed_attempts defaults to 0 and must be BETWEEN 0 AND 5.
 - password_hash may be NULL before invitation acceptance. Do not expose password hashes, reset hashes, or tokens in response DTOs.
 - Phone numbers are not unique. Preserve the existing login, lockout, reset, registration, invitation, and token flows.

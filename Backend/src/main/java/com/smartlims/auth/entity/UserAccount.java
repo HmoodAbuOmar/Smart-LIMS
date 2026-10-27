@@ -82,13 +82,11 @@ public class UserAccount {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public static UserAccount registerPatient(String fullName, String canonicalEmail, String userName,
-            String phoneNumber, String passwordHash) {
+    public static UserAccount registerPatient(String fullName, String canonicalEmail, String passwordHash) {
         UserAccount account = new UserAccount();
         account.fullName = fullName;
         account.email = canonicalEmail;
-        account.userName = userName;
-        account.phoneNumber = phoneNumber;
+        // Public registration leaves the optional username and account phone number null.
         account.passwordHash = passwordHash;
         account.role = Role.PATIENT;
         account.origin = AccountOrigin.PUBLIC_REGISTRATION;

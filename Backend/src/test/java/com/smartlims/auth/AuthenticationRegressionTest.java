@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AuthenticationRegressionTest extends IsolatedPostgresTest {
     @Autowired MockMvc mvc;
     @MockitoSpyBean UserAccountRepository users;
@@ -46,7 +47,6 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     @Autowired PasswordEncoder passwords;
     @Autowired PasswordRecoveryService recovery;
     @Autowired AccountManagementService accounts;
-    @Autowired RegistrationService registration;
     @Autowired LoginService login;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate transactions;
@@ -149,16 +149,11 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     }
 
     @Test
-    void usernamesAreTrimmedValidatedAndConflictsAreSpecificInAllFlows() {
-        registration.register(new RegistrationRequest("Regression Patient", "registered@example.invalid",
-                " registered ", "0000000000", "abcdefgh"), null);
-        assertTrue(users.existsByUserNameIgnoreCase("registered"));
+    void usernamesAreTrimmedValidatedAndConflictsAreSpecificInAdministrativeFlows() {
+        active("registered", Role.PATIENT);
         AccountResponse created = accounts.create(new CreateAccountRequest("Regression Staff", "staff@example.invalid",
                 " staff ", "0000000000", Role.RECEPTIONIST));
         assertEquals("staff", created.userName());
-        assertEquals("USERNAME_IN_USE", assertThrows(AuthRequestException.class, () -> registration.register(
-                new RegistrationRequest("Regression Patient", "other@example.invalid", " REGISTERED ",
-                        "0000000000", "abcdefgh"), null)).getCode());
         assertEquals("USERNAME_IN_USE", assertThrows(AuthRequestException.class, () -> accounts.create(
                 new CreateAccountRequest("Regression Staff", "other@example.invalid", " STAFF ",
                         "0000000000", Role.RECEPTIONIST))).getCode());
@@ -166,8 +161,6 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
                 new UpdateAccountRequest("Regression Staff", "staff@example.invalid", " REGISTERED ", "0000000000"))).getCode());
         assertEquals("VALIDATION_ERROR", assertThrows(AuthRequestException.class, () -> accounts.update(created.id(),
                 new UpdateAccountRequest("Regression Staff", "staff@example.invalid", " a ", "0000000000"))).getCode());
-        assertThrows(AuthRequestException.class, () -> registration.register(new RegistrationRequest("Regression Patient",
-                "other@example.invalid", " a ", "0000000000", "abcdefgh"), null));
         assertThrows(AuthRequestException.class, () -> accounts.create(new CreateAccountRequest("Regression Staff",
                 "other@example.invalid", " a ", "0000000000", Role.RECEPTIONIST)));
     }
@@ -231,8 +224,9 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"registration", "creation", "update"})
+    @ValueSource(strings = {"creation", "update"})
     void concurrentUsernameUniquenessViolationsReturnUsernameConflict(String competingFlow) throws Exception {
+        UserAccount firstAccount = active("first", Role.PATIENT);
         UserAccount existing = active("existing", Role.PATIENT);
         CyclicBarrier checks = new CyclicBarrier(2);
         // Force both service prechecks to complete before either writes; PostgreSQL decides the winner.
@@ -241,11 +235,10 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
             checks.await(10, TimeUnit.SECONDS);
             return found;
         }).when(users).existsByUserNameIgnoreCase("race");
-        Supplier<String> first = () -> registerRace("one@example.invalid");
+        Supplier<String> first = () -> updateUsernameRace(firstAccount);
         Supplier<String> second = () -> {
             try {
                 switch (competingFlow) {
-                    case "registration" -> { return registerRace("two@example.invalid"); }
                     case "creation" -> accounts.create(new CreateAccountRequest("Regression Staff", "two@example.invalid",
                             " race ", "0000000000", Role.RECEPTIONIST));
                     case "update" -> accounts.update(existing.getId(), new UpdateAccountRequest("Regression Patient",
@@ -261,9 +254,10 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM users WHERE lower(user_name) = 'race'", Integer.class));
     }
 
-    private String registerRace(String address) {
+    private String updateUsernameRace(UserAccount account) {
         try {
-            registration.register(new RegistrationRequest("Regression Patient", address, " race ", "0000000000", "abcdefgh"), null);
+            accounts.update(account.getId(), new UpdateAccountRequest("Regression Patient",
+                    account.getEmail(), " race ", "0000000000"));
             return "ok";
         } catch (AuthRequestException failure) { return failure.getCode(); }
     }

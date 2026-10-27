@@ -9,7 +9,9 @@ Database reference: `Backend/docs/DATABASE_DESIGN.md`.
 
 A user account authenticates a person and assigns their role. A patient profile is the laboratory record to which future orders and results will belong.
 
-Existing patient registration creates a `users` account with role PATIENT. Registration/login remain unchanged and do not automatically create/link a patient profile. Phase 2 adds explicit authenticated self-creation and token-based linking.
+Public registration creates only a `users` account with role PATIENT and requires `fullName`, `email`, `password`, and matching `confirmPassword`; account username and phone are left null. See [Registration contract](AUTH_API.md). Registration/login do not automatically create/link a patient profile. Phase 2 adds explicit authenticated self-creation and token-based linking.
+
+Account and patient-profile `fullName` values are independent and never automatically synchronized. Patient-profile creation still requires its own `fullName`, date of birth, gender, and `phoneNumber`, even when the account has no phone number.
 
 Phase 1 supports staff-created, unlinked patient profiles, staff search, profile retrieval, and staff updates. It also defines ownership-protected retrieval for an account that already has a legitimate profile link.
 
