@@ -21,6 +21,30 @@ public class PatientController {
         this.patients = patients;
     }
 
+    @GetMapping("/me")
+    public PatientResponse getMe(JwtAuthenticationToken authentication) {
+        return patients.getMe(authentication);
+    }
+
+    @PostMapping(path = "/me", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PatientResponse> createMe(@Valid @RequestBody CreatePatientRequest request,
+            JwtAuthenticationToken authentication) {
+        PatientResponse patient = patients.createMe(authentication, request);
+        return ResponseEntity.created(URI.create("/api/patients/" + patient.id())).body(patient);
+    }
+
+    @PostMapping("/{id}/link-tokens")
+    public ResponseEntity<PatientLinkTokenResponse> issueLinkToken(@PathVariable String id,
+            JwtAuthenticationToken authentication) {
+        return ResponseEntity.status(201).header("Cache-Control", "no-store").header("Pragma", "no-cache")
+                .body(patients.issueLinkToken(authentication, id));
+    }
+
+    @PostMapping(path = "/me/link", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public PatientResponse linkMe(@Valid @RequestBody LinkPatientRequest request, JwtAuthenticationToken authentication) {
+        return patients.linkMe(authentication, request);
+    }
+
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<PatientResponse> create(@Valid @RequestBody CreatePatientRequest request, JwtAuthenticationToken authentication) {
         PatientResponse patient = patients.create(authentication, request);

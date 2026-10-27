@@ -16,6 +16,11 @@ import org.springframework.web.ErrorResponse;
 
 @RestControllerAdvice(basePackageClasses = PatientController.class)
 public class PatientErrorHandler {
+    @ExceptionHandler(PatientProfileException.class)
+    ResponseEntity<ApiError> profile(PatientProfileException error, HttpServletResponse response) {
+        return respond(error.getStatus(), error.getCode(), error.getMessage(), Map.of(), response);
+    }
+
     @ExceptionHandler(PatientValidationException.class)
     ResponseEntity<ApiError> invalid(PatientValidationException error, HttpServletResponse response) {
         return respond(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", error.getMessage(),

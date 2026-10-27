@@ -17,7 +17,10 @@ public abstract class IsolatedPostgresTest {
     static void isolatedProperties(DynamicPropertyRegistry properties) {
         String url = System.getenv("SMARTLIMS_TEST_DATABASE_URL");
         if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/smartlims_auth_regression")) {
-            throw new IllegalStateException("An explicitly isolated regression database is required.");
+            throw new IllegalStateException("SMARTLIMS_TEST_DATABASE_URL is missing or invalid. "
+                    + "Set it to jdbc:postgresql://127.0.0.1:<port>/smartlims_auth_regression "
+                    + "for an explicitly disposable PostgreSQL instance before running tests. "
+                    + "The application datasource is never used as a fallback.");
         }
         byte[] key = new byte[32];
         new SecureRandom().nextBytes(key);

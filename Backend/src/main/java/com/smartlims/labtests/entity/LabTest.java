@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
@@ -27,6 +28,7 @@ public class LabTest {
     @Setter @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
     @Column(nullable = false, columnDefinition = "char(3)", length = 3)
+    @JdbcTypeCode(java.sql.Types.CHAR)
     private String currency = "ILS";
     @Setter @Column(name = "sample_type", nullable = false, length = 40)
     private String sampleType;

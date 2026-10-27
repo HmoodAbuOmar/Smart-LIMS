@@ -2,7 +2,8 @@
 
 Status: agreed implementation baseline for the scope described below.
 Review note: draft measurements may remain unfilled; required-parameter snapshots are persisted per result version.
-Updated: 2026-10-08.
+Updated: 2026-10-26 (patient phase 2).
+Migration integration note: main is merged; V4__lab_tests.sql is unchanged and patient linking is prepared as V5__patient_link_tokens.sql with unchanged SQL. The previously audited development database still has the legacy V4 linking identity and requires a separately authorized manual reconciliation before startup. This source preparation did not connect to or modify it. See PATIENTS_API.md section 15.9 and PATIENT_LINKING_V5_RECONCILIATION.md.
 Intended repository path: `Backend/docs/DATABASE_DESIGN.md`.
 
 ## 1. Scope and implementation status
@@ -17,8 +18,8 @@ This document defines the database target for Smart-LIMS. It is a design contrac
 - Patient name, birth date, gender, and phone are required; address is optional; phone numbers are not unique.
 - Initial monetary currency: ILS.
 - Payments are recorded manually or by external transaction reference; no payment gateway is included in this baseline.
-- The target contains 20 application tables. `flyway_schema_history` is technical and excluded from that count.
-- `users` and `email_action_tokens` already exist according to the supplied SQL. The remaining tables are implementation targets.
+- The target contains 21 application tables, including the phase-2 `patient_link_tokens` addition. `flyway_schema_history` is technical and excluded from that count.
+- `users`, `email_action_tokens`, `patients`, `lab_tests`, and `patient_link_tokens` are implemented through V1-V5. Other application tables remain implementation targets.
 - The supplied SQL also adds `users.reset_code_failed_attempts`; it is included here.
 - Preserve existing authentication behavior. Do not recreate existing authentication tables or rewrite an applied migration.
 - Symptom-based suggestions are scheduled for a later AI phase. Further AI result-analysis persistence is outside this baseline and requires a separate scope decision.
@@ -62,6 +63,7 @@ This document defines the database target for Smart-LIMS. It is a design contrac
 | 18 | `audit_logs` | Append-only records of important business actions. |
 | 19 | `symptom_assessments` | Patient symptom-analysis sessions for the later test-suggestion feature. |
 | 20 | `suggested_tests` | Laboratory tests suggested by a symptom assessment. |
+| 21 | `patient_link_tokens` | Short-lived, single-use capabilities for verified patient account/profile linking. |
 
 ## 4. Table specifications
 
@@ -99,6 +101,8 @@ Implementation status: existing; preserve supplied schema and current behavior.
 - Origins: PUBLIC_REGISTRATION, ADMIN_INVITATION, FIRST_ADMIN_INVITATION.
 - Email is NOT NULL and UNIQUE. The existing canonical-email CHECK requires email = lower(btrim(email)) and octet_length(email) = char_length(email).
 - Preserve users_user_name_ci_unique: UNIQUE INDEX ON users(lower(user_name)) WHERE user_name IS NOT NULL. user_name is nullable.
+- Public registration requires fullName, email, password, and matching confirmPassword. It stores user_name and phone_number as NULL using the existing schema; no placeholders are generated. confirmPassword is validation-only and is never persisted or logged. See [Registration contract](AUTH_API.md).
+- users.full_name and patients.full_name are independent required values. Account/profile changes never automatically synchronize names. Patient-profile phone_number remains required.
 - enabled defaults to FALSE; failed_login_attempts defaults to 0. reset_code_failed_attempts defaults to 0 and must be BETWEEN 0 AND 5.
 - password_hash may be NULL before invitation acceptance. Do not expose password hashes, reset hashes, or tokens in response DTOs.
 - Phone numbers are not unique. Preserve the existing login, lockout, reset, registration, invitation, and token flows.
@@ -132,7 +136,7 @@ Implementation status: existing; preserve supplied schema and current behavior.
 
 Laboratory patient profiles. A profile may exist without a login account.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: implemented in V3; phase-2 self-profile creation and verified linking use the same schema and sequence. V1-V3 remain unchanged.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -155,15 +159,38 @@ Implementation status: target schema; implement incrementally.
 - Name, date of birth, gender, and phone number are required. Address is optional. No national identity number or blood_type is included.
 - gender values: MALE, FEMALE, UNKNOWN. Reject future birth dates in the service. Do not infer sex-specific reference ranges for UNKNOWN.
 - Phone numbers may repeat; a child may use a guardian phone number. Do not automatically link profiles based only on name or phone.
-- created_by comes from the authenticated actor, including the patient when self-profile creation is implemented.
-- Patient profile fields are the laboratory record; account fields are login/account data. Updates must follow an explicit synchronization policy.
-- Initial implementation: staff creates unlinked profiles. Patient self-profile creation and verified account linking are a separate subsequent task.
+- created_by comes from the authenticated actor: staff for a walk-in profile, or the PATIENT account for self-profile creation. Linking preserves the original creator.
+- Patient profile fields are the laboratory record; account fields are login/account data. Profile creation, linking, and staff updates never synchronize demographics into users. Profile updates remain ADMIN/RECEPTIONIST only.
+- Staff creates unlinked profiles. A verified, eligible PATIENT can create one profile for their own authenticated account or claim an existing unlinked profile using a staff-issued linking token. Neither path matches or merges by name, phone, or patient number.
+- Self-create and claim transactions lock the current account row before checking its link. Claims then lock the target profile and token. Staff profile updates also lock the profile to preserve concurrent links. The unique patients.user_id constraint remains the database backstop. Profiles are never reassigned.
+
+### 4.3a. `patient_link_tokens`
+
+Implementation status: implemented by `V5__patient_link_tokens.sql`; separate from authentication/email tokens. Its SQL is byte-identical to the original linking V4. The legacy development V4 history is not modified by this source rename; use the separately reviewed recovery runbook. V4__lab_tests.sql remains unchanged.
+
+| Column | PostgreSQL type | Nullable | Key / default | Meaning |
+|---|---|---|---|---|
+| `id` | `UUID` | No | PK | Server-generated record identifier |
+| `token_hash` | `VARCHAR(64)` | No | UNIQUE; lowercase SHA-256 hex CHECK | Hash only; never raw token |
+| `patient_id` | `UUID` | No | FK patients.id; NO ACTION | Target laboratory profile |
+| `issued_by` | `UUID` | No | FK users.id; NO ACTION | Authenticated issuing ADMIN/RECEPTIONIST |
+| `expires_at` | `TIMESTAMPTZ` | No | - | Exclusive expiry, ten minutes after issue |
+| `consumed_at` | `TIMESTAMPTZ` | Yes | - | Successful linking consumption time |
+| `revoked_at` | `TIMESTAMPTZ` | Yes | - | Revocation on reissue |
+
+- Generate 32 cryptographically random bytes and encode as 43 URL-safe unpadded Base64 characters using existing VerificationTokens; persist only SHA-256. The raw value is returned once in a non-cacheable issuance response.
+- A partial unique index on patient_id WHERE consumed_at IS NULL AND revoked_at IS NULL allows one outstanding token per profile, including an expired token. Issuance locks the profile, revokes any outstanding token (including expired ones), then inserts its replacement in one transaction.
+- A CHECK disallows simultaneous consumed_at/revoked_at states. Issuer and expiry indexes support FK access and expiry queries. No cascading deletion is introduced.
+- Claim lock order is account -> profile -> token. The initial hash lookup retrieves only a profile ID; validity is rechecked after locking. Expiry is checked against application time after lock acquisition; expires_at equal to now is invalid. Consumption and the profile's user_id assignment commit or roll back together.
+- Invalid, expired, revoked, or reused tokens share one sanitized response. Conflicting links do not consume a still-valid token. Successful linking creates no profile and preserves its number, original creator, creation time, and demographics.
+- QR/link content must contain only the opaque capability, with no patient data. Transfer it through a trusted staff-to-patient handoff; a patient number alone is never proof. Do not log raw tokens, serialize them into audit details, or put them in URL query strings or server access logs. DTO string representations redact token values.
+- Eligibility reuses current account login eligibility (enabled, verified email, password present, accepted invitation where applicable) and requires the current database role PATIENT. Authentication/JWT/cookie/CSRF behavior is unchanged.
 
 ### 4.4. `lab_tests`
 
 Orderable laboratory tests, their current prices, and preparation instructions.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: implemented in main's unchanged V4__lab_tests.sql. The currency entity field explicitly uses JDBC CHAR to match its existing CHAR(3) column during Hibernate validation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -655,6 +682,8 @@ Implementation status: target schema; implement incrementally.
 |---|---|---|
 | users | email_action_tokens | One account to many action tokens |
 | users | patients | Optional one-to-one; unlinked patient profiles allowed |
+| patients | patient_link_tokens | Multiple historical tokens; at most one outstanding token per profile |
+| users | patient_link_tokens | Authenticated staff issuer; retained non-cascading reference |
 | patients | test_orders | One patient to many orders |
 | lab_tests | test_parameters | One test to one or more parameters |
 | test_parameters | reference_ranges | One parameter to multiple demographic/time ranges |
@@ -720,7 +749,7 @@ Concurrency controls must cover every write path:
 - Admin manages catalog tests, parameters, reference ranges, booking slots, and audit access.
 - Preserve the existing CORS, CSRF, JWT, and cookie-security configuration.
 - Deactivate catalogs and cancel orders/items instead of deleting referenced history.
-- Initial profile linking must not be automated using names or phone numbers alone. A controlled authenticated/verified linking workflow is implemented separately.
+- Profile linking must not be automated using names or phone numbers alone. Phase 2 implements the controlled authenticated/verified token workflow described in section 4.3a and PATIENTS_API.md section 15.
 
 ## 8. End-to-end example
 
@@ -741,7 +770,7 @@ The short IDs below illustrate relationships; actual identifiers are UUIDs. No m
 
 1. Preserve and verify existing authentication entities/migrations.
 2. Implement patient management: migration, entity, repository, DTOs, service, controller, validation, and authorization tests.
-3. Implement patient self-profile creation and controlled account/profile linking without duplicating existing profiles.
+3. Implemented patient self-profile creation and controlled account/profile linking in phase 2. Concurrent operations cannot give an account a second profile; matching/merging by demographics remains out of scope.
 4. Implement laboratory catalog, parameters, and reference ranges.
 5. Implement orders and items.
 6. Implement booking slots and appointments.
@@ -769,7 +798,7 @@ Do not add a delete endpoint. Do not accept patient_number, user_id, created_by,
 
 ## 10. Official technical references
 
-The sources support design principles; table names, lengths, and the 20-table structure are project decisions. This document does not claim FHIR or ISO certification.
+The sources support design principles; table names, lengths, and the 21-table structure are project decisions. This document does not claim FHIR or ISO certification.
 
 - [S1] PostgreSQL 16 - Constraints: https://www.postgresql.org/docs/16/ddl-constraints.html
 - [S2] PostgreSQL 16 - Numeric Types: https://www.postgresql.org/docs/16/datatype-numeric.html
