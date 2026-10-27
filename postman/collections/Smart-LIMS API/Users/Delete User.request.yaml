@@ -1,5 +1,0 @@
-$kind: http-request
-url: "{{baseUrl}}/api/users/{{userId}}"
-method: DELETE
-settings: {}
-order: 10000

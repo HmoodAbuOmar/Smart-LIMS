@@ -1,9 +1,0 @@
-$kind: http-request
-url: "{{baseUrl}}/api/users/e40cf6d6-f130-405f-83e8-de579d7cb150"
-method: GET
-auth:
-  type: bearer
-  credentials:
-    token: eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQURNSU4iLCJpc3MiOiJzbWFydC1saW1zLWFwaSIsInN1YiI6ImE0YmQ2MTlmLWZhYzctNGFkMy04ZTlhLTI3MTM0MzM4YTFlZSIsImF1ZCI6InNtYXJ0LWxpbXMtY2xpZW50IiwiZXhwIjoxNzkwODgwMDI5LCJpYXQiOjE3OTA4NzY0Mjl9.cHPElszuoYTKjsmIFpZUvT3shPF8LGayS0oFdCn2pUQ
-settings: {}
-order: 2000
