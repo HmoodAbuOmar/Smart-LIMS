@@ -53,7 +53,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE lab_tests, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE lab_test_categories, lab_tests, patient_link_tokens, patients, email_action_tokens, users");
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Catalog Test Account", role.name().toLowerCase(Locale.ROOT)
                     + "@example.invalid", null, "000001", role);
@@ -75,7 +75,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
     private String create(String body) throws Exception {
         var result = mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isCreated()).andExpect(header().exists("Location")).andReturn();
+                .andExpect(status().isCreated()).andExpect(header().exists("Location"))
+                .andExpect(jsonPath("$.categories").doesNotExist()).andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("id").asString();
     }
 
@@ -85,7 +86,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         mvc.perform(bearer(get("/api/lab-tests/" + id), Role.PATIENT)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("CBC")).andExpect(jsonPath("$.currency").value("ILS"))
                 .andExpect(jsonPath("$.price").value(25.5)).andExpect(jsonPath("$.active").value(true))
-                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.categories").doesNotExist());
         mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAB_TEST_CODE_IN_USE"))
                 .andExpect(jsonPath("$.fieldErrors.code").exists())

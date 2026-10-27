@@ -3,6 +3,8 @@ package com.smartlims.labtests.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -36,6 +38,11 @@ public class LabTest {
     private String preparationInstructions;
     @Setter @Column(nullable = false)
     private boolean active = true;
+    @ElementCollection
+    @CollectionTable(name = "lab_test_categories", joinColumns = @JoinColumn(name = "lab_test_id", nullable = false))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false, length = 30)
+    private Set<LabTestCategory> categories = new HashSet<>();
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @Setter @UpdateTimestamp @Column(name = "updated_at", nullable = false)
