@@ -758,7 +758,7 @@ Changes for this preparation:
 - Renumber linking to V5; assert versions 1-5 and exact V4/V5 script identities in PatientManagementTest.
 - Include patient_link_tokens in LabTestManagementTest's isolated cleanup, because its retained foreign keys reference the same users/patients fixtures.
 - Add the JDBC CHAR annotation to LabTest.currency. Combined Hibernate validation exposed a Java VARCHAR expectation against main's existing CHAR(3) column; this mapping-only correction preserves V4 SQL and the API.
-- Add PatientMigrationCompatibilityTest and the guarded manual SQL file scripts/db/reconcile-patient-linking-v4-to-v5.sql. The SQL file is outside Flyway locations and never runs automatically.
+- Add PatientMigrationCompatibilityTest and the guarded SQL fixture [src/test/resources/db/fixtures/reconcile-patient-linking-v4-to-v5.sql](../src/test/resources/db/fixtures/reconcile-patient-linking-v4-to-v5.sql). Compatibility tests load it from the test classpath; it is outside Flyway migration locations and never runs automatically at application startup.
 - Add [the exact backup and reconciliation runbook](PATIENT_LINKING_V5_RECONCILIATION.md). It requires stopping writers, a verified backup/restore rehearsal, explicit approval for database writes, guarded single-row history reclassification, a one-time out-of-order V4 lab migration, and normal-order validation.
 
 Actual checks:

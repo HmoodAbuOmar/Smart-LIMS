@@ -111,11 +111,11 @@ Verify that the restored history matches the saved preflight history. A full arc
 ```powershell
 & "$PgBin\psql.exe" -X --host $DbHost --port $DbPort --username $DbOwner --password `
   --dbname $DbName --set ON_ERROR_STOP=1 --set "expected_database=$DbName" `
-  --single-transaction --file '.\scripts\db\reconcile-patient-linking-v4-to-v5.sql'
+  --single-transaction --file '.\src\test\resources\db\fixtures\reconcile-patient-linking-v4-to-v5.sql'
 if ($LASTEXITCODE -ne 0) { throw 'Reconciliation aborted/rolled back; keep the application stopped.' }
 ```
 
-The [reviewable SQL script](../scripts/db/reconcile-patient-linking-v4-to-v5.sql) uses transaction-local timeouts, locks the history table and patient tables, checks the database name, checks other connected clients, requires the exact four original identities/checksums, and refuses an existing lab table or V5 history. It changes exactly one row:
+The [reviewable SQL fixture](../src/test/resources/db/fixtures/reconcile-patient-linking-v4-to-v5.sql) is kept outside Flyway migration locations and is never run automatically at application startup. It uses transaction-local timeouts, locks the history table and patient tables, checks the database name, checks other connected clients, requires the exact four original identities/checksums, and refuses an existing lab table or V5 history. It changes exactly one row:
 
 ```sql
 UPDATE public.flyway_schema_history

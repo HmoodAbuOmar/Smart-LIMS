@@ -28,6 +28,7 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <smartlims.test.database.url>${env.SMARTLIMS_TEST_DATABASE_URL}</smartlims.test.database.url>
     </properties>
     <dependencies>
         <dependency>
@@ -108,6 +109,15 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <SMARTLIMS_TEST_DATABASE_URL>${smartlims.test.database.url}</SMARTLIMS_TEST_DATABASE_URL>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

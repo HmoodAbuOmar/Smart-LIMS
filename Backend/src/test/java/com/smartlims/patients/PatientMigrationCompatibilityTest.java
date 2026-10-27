@@ -107,8 +107,12 @@ class PatientMigrationCompatibilityTest {
 
     private void runReviewedReconciliation(String expectedDatabase) throws IOException, SQLException {
         if (!expectedDatabase.matches("[a-z0-9_]+")) throw new IllegalArgumentException();
-        String sql = Files.readString(Path.of("scripts/db/reconcile-patient-linking-v4-to-v5.sql"), StandardCharsets.UTF_8)
-                .replace(":'expected_database'", "'" + expectedDatabase + "'");
+        String sql;
+        try (var source = getClass().getResourceAsStream("/db/fixtures/reconcile-patient-linking-v4-to-v5.sql")) {
+            assertNotNull(source, "Reconciliation SQL fixture");
+            sql = new String(source.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace(":'expected_database'", "'" + expectedDatabase + "'");
+        }
         try (Connection connection = connection()) {
             connection.setAutoCommit(false);
             try (Statement statement = connection.createStatement()) {
