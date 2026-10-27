@@ -1,0 +1,26 @@
+/* Product vision sizing stays scoped to the team section. */
+main .testimonial-section {
+  width: min(1080px, calc(100% - 48px));
+  padding-block: clamp(44px, 4.5vw, 64px);
+  gap: clamp(24px, 3vw, 40px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+main .testimonial-section > * { min-width: 0; }
+main .testimonial-photo {
+  width: 100%; height: auto; aspect-ratio: 4 / 3; max-height: 340px;
+  border: 1px solid var(--border-dark);
+}
+main .testimonial-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 55% center; }
+main .testimonial-copy h2 { margin-block: 12px 0; font-size: clamp(26px, 2.4vw, 32px); }
+main .quote-mark { margin-block-start: 14px; height: 32px; font-size: 44px; line-height: 1.2; opacity: .8; }
+main .testimonial-copy blockquote { font-size: clamp(15px, 1.3vw, 17px); font-weight: var(--weight-body); line-height: var(--lp-leading-body); letter-spacing: 0; text-wrap: pretty; }
+main .quote-person { margin-block-start: 18px; gap: 10px; align-items: center; }
+main .quote-person .avatar { width: 36px; height: 36px; flex-shrink: 0; }
+main .quote-person strong { font-size: var(--lp-type-small); font-weight: var(--weight-ui); line-height: 1.8; }
+@media (max-width: 800px) {
+  main .testimonial-section { grid-template-columns: minmax(0, 1fr); }
+  main .testimonial-photo { max-width: 540px; max-height: 300px; aspect-ratio: 16 / 10; justify-self: center; }
+}
+@media (max-width: 580px) {
+  main .testimonial-section { width: calc(100% - 40px); }
+}

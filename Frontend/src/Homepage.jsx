@@ -1,0 +1,80 @@
+import { useTranslation } from 'react-i18next'
+import Navbar from './components/Navbar.jsx'
+import ProductShowcase from './components/ProductShowcase.jsx'
+import { Activity, ArrowRight, CalendarDays, Check, ClipboardCheck, FlaskConical, Heart, LayoutDashboard, LockKeyhole, Mail, Microscope, ShieldCheck, TestTubes, Users } from 'lucide-react'
+import BrandLogo from './components/BrandLogo.jsx'
+import HomepageHealthChart from './components/HomepageHealthChart.jsx'
+
+function Logo() {
+  const { t } = useTranslation('common')
+  return <a href="#home" className="brand" lang="en" dir="ltr" aria-label={t('common:homeLabel')}><BrandLogo className="landing-brand-logo" /></a>
+}
+function Button({ children, onClick }) {
+  return <button className="button button-primary" onClick={onClick}>{children}<ArrowRight size={17} /></button>
+}
+export default function Homepage() {
+  const { t, i18n } = useTranslation(['landing', 'common'])
+  const number = value => new Intl.NumberFormat(i18n.resolvedLanguage).format(value)
+const steps = [
+  { icon: CalendarDays, title: t('landing:steps.book.title'), text: t('landing:steps.book.text'), detail: t('landing:steps.book.detail') },
+  { icon: TestTubes, title: t('landing:steps.track.title'), text: t('landing:steps.track.text'), detail: t('landing:steps.track.detail') },
+  { icon: ClipboardCheck, title: t('landing:steps.results.title'), text: t('landing:steps.results.text'), detail: t('landing:steps.results.detail') },
+]
+const roles = [
+  { icon: Heart, name: t('landing:roles.patient.name'), title: t('landing:roles.patient.title'), text: t('landing:roles.patient.text'), tags: [t('landing:roles.patient.tag1'), t('landing:roles.patient.tag2')] },
+  { icon: LayoutDashboard, name: t('landing:roles.admin.name'), title: t('landing:roles.admin.title'), text: t('landing:roles.admin.text'), tags: [t('landing:roles.admin.tag1'), t('landing:roles.admin.tag2')] },
+  { icon: Users, name: t('landing:roles.reception.name'), title: t('landing:roles.reception.title'), text: t('landing:roles.reception.text'), tags: [t('landing:roles.reception.tag1'), t('landing:roles.reception.tag2')] },
+  { icon: Microscope, name: t('landing:roles.technician.name'), title: t('landing:roles.technician.title'), text: t('landing:roles.technician.text'), tags: [t('landing:roles.technician.tag1'), t('landing:roles.technician.tag2')] },
+]
+
+  const openAuth = (mode = 'signup') => { window.location.hash = `/${mode}` }
+  return <>
+    <Navbar logo={<Logo />} onOpenAuth={openAuth} />
+    <main>
+      <section className="tech-hero" id="home" aria-labelledby="hero-title">
+        <div className="tech-hero__particles" aria-hidden="true" />
+        <div className="tech-hero__inner">
+          <div className="tech-hero__copy">
+            <h1 id="hero-title" className="tech-hero__title">
+              <span>{t('landing:hero.title1')}</span>
+              <span>{t('landing:hero.title2')}</span>
+              <span className="tech-hero__accent">{t('landing:hero.title3')}</span>
+            </h1>
+            <p className="tech-hero__description">{t('landing:hero.description')}</p>
+            <div className="tech-hero__actions">
+              <button type="button" className="tech-hero__button tech-hero__button--primary" onClick={() => openAuth('signup')}>
+                {t('common:getStarted')}<ArrowRight size={18} aria-hidden="true" />
+              </button>
+              <a className="tech-hero__button tech-hero__button--outline" href="#features">
+                {t('landing:hero.exploreFeatures')}<ArrowRight size={18} aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+          <div className="tech-hero__visual">
+            <div className="tech-hero__glow" aria-hidden="true" />
+            <div className="tech-hero__tube-entrance">
+              <img
+                className="tech-hero__tube"
+                src="/images/lims-tube.png.PNG"
+                alt={t('landing:hero.imageAlt')}
+                width="1536"
+                height="1024"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+      <div className="trust-strip"><div className="container trust-inner"><span>{t('landing:trust.intro')}<br /><strong>{t('landing:trust.everySide')}</strong></span><div><Heart />{t('landing:trust.patients')}</div><div><FlaskConical />{t('landing:trust.labs')}</div><div><ShieldCheck />{t('landing:trust.privacy')}</div><div><Activity />{t('landing:trust.insights')}</div></div></div>
+      <section className="section container" id="how-it-works"><div className="section-heading centered"><div className="eyebrow">{t('landing:steps.eyebrow')}</div><h2>{t('landing:steps.title')}</h2><p>{t('landing:steps.description')}</p></div><div className="steps-grid">{steps.map(({ icon: Icon, title, text, detail }, i) => <article className="step-card" key={title}><div className="step-top"><span className="icon-box"><Icon size={24} /></span><span className="step-number">{number(i + 1).padStart(2, number(0))}</span></div><h3>{title}</h3><p>{text}</p><div className="step-detail"><span />{detail}</div></article>)}</div></section>
+      <section className="platform-section" id="features"><div className="container section"><div className="section-heading split-heading"><div><h2>{t('landing:platform.title')}</h2></div><p>{t('landing:platform.description')}</p></div><div className="roles-grid">{roles.map(({ icon: Icon, name, title, text, tags }) => <article className="role-card" key={name}><div className="role-label"><Icon size={20} />{name}<ArrowRight size={18} className="role-arrow" /></div><h3>{title}</h3><p>{text}</p><div className="role-tags">{tags.map(tag => <span key={tag}><Check size={12} />{tag}</span>)}</div></article>)}</div></div></section>
+      <ProductShowcase />
+      <section className="section container insights-section" id="insights"><div className="insights-copy"><div className="eyebrow">{t('landing:insights.eyebrow')}</div><h2>{t('landing:insights.title1')}<br /><span>{t('landing:insights.title2')}</span></h2><p>{t('landing:insights.description')}</p><ul className="check-list"><li><Check />{t('landing:insights.check1')}</li><li><Check />{t('landing:insights.check2')}</li><li><Check />{t('landing:insights.check3')}</li></ul><a className="text-link teal-link" href="#features">{t('landing:insights.discover')}<ArrowRight size={17} /></a></div><HomepageHealthChart /></section>
+      <section className="security-section" id="security"><div className="container security-inner"><div className="security-copy"><div className="eyebrow">{t('landing:security.eyebrow')}</div><h2>{t('landing:security.title1')}<br />{t('landing:security.title2')}</h2><p>{t('landing:security.description')}</p><a href="mailto:privacy@smart-lims.com" className="text-link">{t('landing:security.contact')}<ArrowRight size={17} /></a></div><div className="security-features">{[{ icon: LockKeyhole, title: t('landing:security.private.title'), text: t('landing:security.private.text') }, { icon: ShieldCheck, title: t('landing:security.access.title'), text: t('landing:security.access.text') }, { icon: ClipboardCheck, title: t('landing:security.accountability.title'), text: t('landing:security.accountability.text') }].map(({ icon: Icon, title, text }) => <div className="security-feature" key={title}><span><Icon size={23} /></span><div><h3>{title}</h3><p>{text}</p></div></div>)}</div></div></section>
+      <section className="section container testimonial-section" id="vision"><div className="testimonial-photo"><img src="/images/lab-team.png" alt={t('landing:testimonial.imageAlt')} loading="lazy" /></div><div className="testimonial-copy"><div className="eyebrow">{t('landing:testimonial.eyebrow')}</div><h2>{t('landing:testimonial.title1')}<br />{t('landing:testimonial.title2')}</h2><span className="quote-mark">“</span><blockquote>{t('landing:testimonial.quote')}</blockquote><div className="quote-person"><span className="avatar"><Heart size={20} /></span><div><strong>{t('landing:testimonial.person')}</strong></div></div></div></section>
+      <div className="final-cta-section"><section id="final-cta" className="final-cta container"><span className="cta-decoration" aria-hidden="true"><Activity /></span><div className="eyebrow">{t('landing:cta.eyebrow')}</div><h2>{t('landing:cta.title1')}<br />{t('landing:cta.title2')}</h2><p>{t('landing:cta.description')}</p><Button onClick={() => openAuth('signup')}>{t('landing:cta.button')}</Button><span className="cta-footnote">{t('landing:cta.footnote')}</span></section></div>
+    </main>
+    <footer className="site-footer container"><div className="footer-top"><div className="footer-brand"><Logo /><p>{t('landing:footer.tagline1')}<br />{t('landing:footer.tagline2')}</p></div><div><h3>{t('landing:footer.explore')}</h3><a href="#home">{t('common:home')}</a><a href="#features">{t('landing:footer.features')}</a><a href="#how-it-works">{t('common:howItWorks')}</a></div><div><h3>{t('landing:footer.trust')}</h3><a href="#security">{t('landing:footer.security')}</a><a href="#insights">{t('landing:footer.insights')}</a><button onClick={() => openAuth('signup')}>{t('common:getStarted')}</button></div><div><h3>{t('landing:footer.connect')}</h3><a href="mailto:smart-lims@gmail.com"><Mail size={14} /><bdi lang="en">smart-lims@gmail.com</bdi></a><p>{t('landing:footer.future')}<br />{t('landing:footer.partOfYours')}</p></div></div><div className="footer-bottom"><span>{t('landing:footer.copyright', { year: number(new Date().getFullYear()).replace(/[٬,]/g, '') })}</span><span>{t('landing:footer.designed')}</span></div></footer>
+  </>
+}

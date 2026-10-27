@@ -1,0 +1,50 @@
+{
+  "heading": "تعرّف على المنصة عن قرب",
+  "description": "إدارة العينات والتقارير وسجلات المرضى، كلّها في مكان واحد.",
+  "illustrative": "نظرة على المنصة",
+  "tabsLabel": "إجراءات المختبر",
+  "tabs": {
+    "samples": "العينات",
+    "reports": "التقارير",
+    "patients": "المرضى"
+  },
+  "records": "{{total}} سجلات",
+  "tableLabel": "سجلات {{type}}. يمكن التمرير أفقياً على الشاشات الصغيرة.",
+  "columns": {
+    "sampleId": "معرّف العينة",
+    "testType": "نوع الفحص",
+    "reportId": "معرّف التقرير",
+    "reportType": "نوع التقرير",
+    "patientId": "رقم الملف",
+    "recordLabel": "اسم المريض",
+    "status": "الحالة",
+    "recordStatus": "حالة الملف"
+  },
+  "types": {
+    "cbc": "تعداد الدم الكامل",
+    "lipid": "فحص الدهون",
+    "thyroid": "فحص الغدة الدرقية"
+  },
+  "patients": {
+    "first": "المريض",
+    "second": "المريض",
+    "third": "المريض"
+  },
+  "statuses": {
+    "collected": "تم جمع العينة",
+    "analysis": "قيد التحليل",
+    "review": "بانتظار المراجعة",
+    "reviewed": "تمت المراجعة",
+    "draft": "قيد الانتظار",
+    "active": "نشط",
+    "awaitingResults": "بانتظار النتائج",
+    "completed": "مكتمل"
+  },
+  "disclaimer": "نظّم معلوماتك المخبرية في مكان واحد.",
+  "panelTitles": {
+    "samples": "إدارة العينات",
+    "reports": "إدارة التقارير",
+    "patients": "سجلات المرضى"
+  },
+  "empty": "لا توجد سجلات لعرضها."
+}

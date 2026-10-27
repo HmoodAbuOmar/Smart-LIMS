@@ -1,0 +1,12 @@
+/* Each import is an independently reversible refinement stage.
+   Disable one import to restore that section's original presentation. */
+@import './tokens.css';
+@import './01-typography.css';
+@import './02-feature-cards.css';
+@import './03-role-cards.css';
+@import './04-analytics.css';
+@import './05-security.css';
+@import './06-laboratory-team.css';
+@import './07-cta.css';
+@import './08-footer.css';
+@import './09-hero-balance.css';
