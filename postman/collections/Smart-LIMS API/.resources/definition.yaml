@@ -1,7 +1,0 @@
-$kind: collection
-description: ""
-variables:
-  - key: json_web_token_107r
-    secret: true
-  - key: json_web_token_1ejp
-    secret: true

@@ -1,9 +1,0 @@
-$kind: http-request
-url: "{{baseUrl}}/api/users/5fc2b403-890d-4ed2-9771-0a02d5e19522/isblocked"
-method: GET
-auth:
-  type: bearer
-  credentials:
-    token: eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQURNSU4iLCJpc3MiOiJzbWFydC1saW1zLWFwaSIsInN1YiI6ImE0YmQ2MTlmLWZhYzctNGFkMy04ZTlhLTI3MTM0MzM4YTFlZSIsImF1ZCI6InNtYXJ0LWxpbXMtY2xpZW50IiwiZXhwIjoxNzkwODgwOTEyLCJpYXQiOjE3OTA4NzczMTJ9.BMZ0FRRt-mBZNfTOGqtbTb1GMW19SfywtADD8_RdkNI
-settings: {}
-order: 6000
