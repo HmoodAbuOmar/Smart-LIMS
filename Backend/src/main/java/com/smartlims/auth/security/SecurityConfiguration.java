@@ -1,6 +1,7 @@
 package com.smartlims.auth.security;
 
 import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,14 +35,15 @@ public class SecurityConfiguration {
     @Bean
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain securityFilterChain(HttpSecurity http, JsonSecurityErrorHandler errors,
-            CookieCsrfTokenRepository csrfRepository, RequestTokenResolver tokenResolver,
-            CurrentAccountAuthenticationConverter accountConverter) throws Exception {
+                                            CookieCsrfTokenRepository csrfRepository, RequestTokenResolver tokenResolver,
+                                            CurrentAccountAuthenticationConverter accountConverter) throws Exception {
         http
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .logout(logout -> logout.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .cors(cors -> {})
+                .cors(cors -> {
+                })
                 .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository)
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                         .requireCsrfProtectionMatcher(tokenResolver::requiresCsrf)
@@ -68,16 +70,22 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests", "/api/lab-tests/{id}")
-                                .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
+                        .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/patients/me").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/patients/me", "/api/patients/me/link")
+                        .hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/patients/{id}/link-tokens")
+                        .hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/patients").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.PUT, "/api/patients/{id}").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/patients")
-                                .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
+                        .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/patients/{id}")
-                                .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
+                        .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/auth/register",
                                 "/api/auth/login", "/api/auth/cookie-login",
                                 "/api/auth/logout", "/api/auth/forgot-password",

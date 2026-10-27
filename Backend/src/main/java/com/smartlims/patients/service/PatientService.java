@@ -1,14 +1,21 @@
 package com.smartlims.patients.service;
 
 import com.smartlims.auth.repository.UserAccountRepository;
+import com.smartlims.auth.entity.Role;
+import com.smartlims.auth.entity.UserAccount;
+import com.smartlims.auth.security.LoginEligibility;
+import com.smartlims.auth.service.VerificationTokens;
 import com.smartlims.patients.dto.*;
 import com.smartlims.patients.entity.Patient;
+import com.smartlims.patients.entity.PatientLinkToken;
+import com.smartlims.patients.exception.PatientProfileException;
 import com.smartlims.patients.exception.PatientAuthenticationException;
 import com.smartlims.patients.exception.PatientForbiddenException;
 import com.smartlims.patients.exception.PatientNotFoundException;
 import com.smartlims.patients.exception.PatientValidationException;
 import com.smartlims.patients.mapper.PatientMapper;
 import com.smartlims.patients.repository.PatientRepository;
+import com.smartlims.patients.repository.PatientLinkTokenRepository;
 import com.smartlims.patients.specification.PatientSpecifications;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -33,11 +40,78 @@ public class PatientService {
     private final PatientRepository patients;
     private final UserAccountRepository users;
     private final PatientMapper mapper;
+    private final PatientLinkTokenRepository linkTokens;
+    private final VerificationTokens tokenValues;
 
-    public PatientService(PatientRepository patients, UserAccountRepository users, PatientMapper mapper) {
+    public PatientService(PatientRepository patients, UserAccountRepository users, PatientMapper mapper,
+            PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues) {
         this.patients = patients;
         this.users = users;
         this.mapper = mapper;
+        this.linkTokens = linkTokens;
+        this.tokenValues = tokenValues;
+    }
+
+    @Transactional(readOnly = true)
+    public PatientResponse getMe(Authentication actor) {
+        UserAccount account = currentAccount(actor, false, "PATIENT");
+        return mapper.toResponse(patients.findByUser_Id(account.getId())
+                .orElseThrow(PatientProfileException::notLinked));
+    }
+
+    @Transactional
+    public PatientResponse createMe(Authentication actor, @Valid CreatePatientRequest request) {
+        UserAccount account = currentAccount(actor, true, "PATIENT");
+        if (patients.existsByUser_Id(account.getId())) throw PatientProfileException.conflict();
+        validateBirthDate(request.dateOfBirth());
+        String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
+        Patient patient = new Patient(number, account, request.fullName(), request.dateOfBirth(),
+                request.gender(), request.phoneNumber(), request.address());
+        patient.linkAccount(account);
+        return mapper.toResponse(patients.saveAndFlush(patient));
+    }
+
+    @Transactional
+    public PatientLinkTokenResponse issueLinkToken(Authentication actor, String id) {
+        UserAccount issuer = currentAccount(actor, true, "ADMIN", "RECEPTIONIST");
+        Patient patient = patients.findWithLockById(profileId(id)).orElseThrow(PatientNotFoundException::new);
+        if (patient.getUser() != null) throw PatientProfileException.conflict();
+        Instant now = Instant.now();
+        linkTokens.revokeOutstanding(patient.getId(), now);
+        String rawToken = tokenValues.create();
+        PatientLinkToken token = linkTokens.saveAndFlush(new PatientLinkToken(
+                tokenValues.hash(rawToken), patient, issuer, now.plusSeconds(600)));
+        return new PatientLinkTokenResponse(rawToken, token.getExpiresAt());
+    }
+
+    @Transactional
+    public PatientResponse linkMe(Authentication actor, @Valid LinkPatientRequest request) {
+        UserAccount account = currentAccount(actor, true, "PATIENT");
+        if (!request.token().matches("[A-Za-z0-9_-]{43}")) throw PatientProfileException.invalidToken();
+        String hash = tokenValues.hash(request.token());
+        UUID id = linkTokens.findPatientIdByTokenHash(hash).orElseThrow(PatientProfileException::invalidToken);
+        // All claim/reissue paths lock the profile before token rows, preventing lock-order inversions.
+        Patient patient = patients.findWithLockById(id).orElseThrow(PatientProfileException::invalidToken);
+        PatientLinkToken token = linkTokens.findWithLockByTokenHash(hash).orElseThrow(PatientProfileException::invalidToken);
+        Instant now = Instant.now();
+        if (!token.usableAt(now)) throw PatientProfileException.invalidToken();
+        if (patient.getUser() != null || patients.existsByUser_Id(account.getId())) {
+            throw PatientProfileException.conflict();
+        }
+        patient.linkAccount(account);
+        patient.setUpdatedAt(now);
+        token.consume(now);
+        patients.flush();
+        return mapper.toResponse(patient);
+    }
+
+    private UserAccount currentAccount(Authentication actor, boolean lock, String... roles) {
+        requireRole(actor, roles);
+        UserAccount account = (lock ? users.findWithLockById(actorId(actor)) : users.findById(actorId(actor)))
+                .orElseThrow(PatientAuthenticationException::new);
+        if (!LoginEligibility.eligible(account)) throw new PatientAuthenticationException();
+        for (String role : roles) if (account.getRole() == Role.valueOf(role)) return account;
+        throw new PatientForbiddenException();
     }
 
     @Transactional
@@ -82,7 +156,7 @@ public class PatientService {
         requireRole(actor, "ADMIN", "RECEPTIONIST");
         UUID patientId = profileId(id);
         validateBirthDate(request.dateOfBirth());
-        Patient patient = patients.findById(patientId).orElseThrow(PatientNotFoundException::new);
+        Patient patient = patients.findWithLockById(patientId).orElseThrow(PatientNotFoundException::new);
         patient.setFullName(request.fullName());
         patient.setDateOfBirth(request.dateOfBirth());
         patient.setGender(request.gender());

@@ -65,7 +65,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
     @BeforeEach
     void fixtures() {
         // IsolatedPostgresTest refuses any URL outside the dedicated regression database.
-        jdbc.execute("TRUNCATE TABLE patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE patient_link_tokens, patients, email_action_tokens, users");
         reset(patients);
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Synthetic Test Account", role.name().toLowerCase(Locale.ROOT)
@@ -112,7 +112,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
         assertNull(patients.findById(UUID.fromString(id)).orElseThrow().getUser());
         assertEquals(actors.get(Role.ADMIN).getId(), jdbc.queryForObject(
                 "SELECT created_by FROM patients WHERE id = ?", UUID.class, UUID.fromString(id)));
-        // A controlled fixture represents an existing legitimate link; no linking API is introduced.
+        // A controlled fixture represents an existing legitimate link for phase-1 regression coverage.
         jdbc.update("UPDATE patients SET user_id = ? WHERE id = ?", actors.get(Role.PATIENT).getId(), UUID.fromString(id));
         String replacement = BODY.replace("Example Patient", "Updated Patient").replace("000001", "000002")
                 .replace("\"address\":\" Example Address \"", "\"address\":\" \"");
@@ -321,8 +321,12 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 () -> jdbc.update("DELETE FROM users WHERE id = ?", actors.get(Role.ADMIN).getId()));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE patients SET created_by = ? WHERE id = ?", UUID.randomUUID(), second));
-        assertEquals(List.of("1", "2", "3"), jdbc.queryForList(
+        assertEquals(List.of("1", "2", "3", "4", "5"), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
+        assertEquals("V4__lab_tests.sql", jdbc.queryForObject(
+                "SELECT script FROM flyway_schema_history WHERE version = '4'", String.class));
+        assertEquals("V5__patient_link_tokens.sql", jdbc.queryForObject(
+                "SELECT script FROM flyway_schema_history WHERE version = '5'", String.class));
     }
 
     @Test

@@ -1,5 +1,0 @@
-$kind: http-request
-url: "{{baseUrl}}/api/auth/logout"
-method: POST
-settings: {}
-order: 9000

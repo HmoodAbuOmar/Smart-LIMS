@@ -28,7 +28,7 @@ public class Patient {
     private String patientNumber;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", unique = true, updatable = false)
+    @JoinColumn(name = "user_id", unique = true)
     private UserAccount user;
 
     @Column(name = "full_name", nullable = false, length = 120)
@@ -73,5 +73,11 @@ public class Patient {
         this.gender = gender;
         this.phoneNumber = phoneNumber;
         this.address = address;
+    }
+
+    // Only the verified creation/linking service calls this after locking and checking both sides.
+    public void linkAccount(UserAccount account) {
+        if (user != null) throw new IllegalStateException("Patient profile is already linked.");
+        this.user = java.util.Objects.requireNonNull(account);
     }
 }
