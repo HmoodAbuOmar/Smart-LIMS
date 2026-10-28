@@ -60,7 +60,7 @@ class RegistrationTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(email);
         verification.set(null);
         doAnswer(call -> { verification.set(call.getArgument(2)); return null; })

@@ -14,4 +14,9 @@ public interface LabTestRepository extends JpaRepository<LabTest, UUID>, JpaSpec
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from LabTest t where t.id = :id")
     Optional<LabTest> findForUpdate(@Param("id") UUID id);
+
+    // Order creation acquires these locks in ascending UUID order before copying snapshots.
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select t from LabTest t where t.id = :id")
+    Optional<LabTest> findForSnapshot(@Param("id") UUID id);
 }

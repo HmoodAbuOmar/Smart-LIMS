@@ -502,3 +502,86 @@ live network HTTP server/client integration, development/production migration or
 deployment readiness. No development data was accessed or clinical mapping inferred.
 No Postman artifacts, future workflow modules, new migrations or applied migration
 changes. Committing is intentionally pending; no future stage was started.
+
+## Task 7 order persistence verification (2026-10-28)
+
+Scope: Stage 2 Task 7, R-ORD-01/R-NFR-01; storage support for S2-ORD-R03/R04/R05
+under ORDERS_API.md and DATABASE_DESIGN.md sections 4.7-4.8. Reviewed the linked
+my-orders.jpeg reference. Added V7__orders.sql, TestOrder/OrderItem/OrderStatus,
+TestOrderRepository and the catalog shared snapshot-lock lookup. No order
+controller/service/DTO or new HTTP behavior is implemented.
+
+Before database execution, independently confirmed PostgreSQL 16.15 using psql,
+the loopback listener, process command line, and the saved disposable data path:
+
+- Target: jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression,
+  user postgres, empty test-only password.
+- Listener 127.0.0.1:55432, postgres PID 17864; actual data_directory and its
+  process -D both matched
+  C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df.
+- The development Windows service was separate (PID 5788), using
+  C:/Program Files/PostgreSQL/16/data; it was not a test target.
+- Migration cases created/dropped only their own guarded
+  smartlims_migration_<32 lowercase hex> databases on that disposable instance.
+  Fixtures were synthetic; external email was mocked. Maven's local URL mapping,
+  Surefire mapping and IsolatedPostgresTest guard were preserved.
+
+Commands ran directly from Backend on branch backend-hmood:
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderMigrationTest,OrderPersistenceTest' test
+```
+
+**14 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 2026-10-28 21:56:01 +02:00, Maven time 48.157 seconds.
+OrderMigrationTest: 7; OrderPersistenceTest: 7, including three enum cases.
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestCategoryMigrationTest,PatientMigrationCompatibilityTest,PatientManagementTest' test
+```
+
+**37 tests, 0 failures, 27 fixture errors, 0 skips; BUILD FAILURE**, exit 1,
+finished 2026-10-28 21:57:41 +02:00, Maven time 35.764 seconds.
+Both migration suites passed (4 category + 6 patient compatibility cases).
+PatientManagementTest's 27 errors all originated before the test bodies:
+PostgreSQL rejected TRUNCATE of patients/users because test_orders now references
+them (SQLSTATE 0A000). Updated the explicit fixture table lists in the five
+affected authentication/patient/catalog suites to include order_items/test_orders.
+No CASCADE, assertion removal, isolation-guard change or production behavior
+change was used. Existing exact migration-history/count assertions now include V7
+and its script name; earlier checksum and preservation assertions remain.
+
+```powershell
+.\mvnw.cmd '-Dtest=RegistrationTest,AuthenticationRegressionTest,PatientManagementTest,PatientProfileLinkingTest,LabTestManagementTest' test
+```
+
+**117 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 2026-10-28 21:59:17 +02:00, Maven time 54.077 seconds.
+Counts: registration 26, authentication regression 20, patient management 27,
+patient linking 26, catalog management 18. The earlier fixture errors are resolved.
+
+Task 7 acceptance evidence:
+
+| Criterion | Current execution evidence |
+|---|---|
+| Orders/items persist and reload | JPA flush/clear/reload verifies IDs, lazy relationships, unlinked profile support, PENDING defaults, timestamps, CHAR hash/currency, retry lookup, all four stored states and cancellation metadata. Hibernate ddl-auto=validate passes. |
+| Constraints enforce the design | Direct SQL verifies NOT NULL, number/hash/state/currency checks, cancellation consistency/reason/time, item code/name/finite nonnegative price bounds, unique numbers/actor keys/item membership and retained FKs. Nine order/item indexes and the independent BIGINT sequence are inspected. Concurrent same-actor/key writes leave one winner. |
+| Fresh migration and upgrade preserve data | Fresh V1-V7 migration/validation and no-op rerun pass. V6-to-V7 compares complete JSON rows from all six preexisting application tables and complete prior Flyway metadata unchanged; existing patient sequence value is preserved. New order tables start empty and the order sequence starts at 1. Earlier V4/legacy compatibility cases also pass through V7. |
+| Focused migration/persistence tests pass | Both new suites pass all 14 cases on the independently verified isolated target. Catalog changes and cancellation retain snapshots/items/keys; 100 maximum prices sum exactly to 999999999999.00 in Java and JPQL. Failed item insertion rolls back the header/items/key, permitting a subsequent retry. Repository lock modes are exercised. |
+
+Current evidence covers **141 distinct passing tests across nine suites** from
+the three scoped invocations above, with the failed fixture invocation and its
+correction explicitly retained. This is not a complete-suite run. Git diff review
+and git diff --check passed. V1-V6, dependencies, security, Maven configuration,
+the test isolation guard and local exclusions are unchanged. The preexisting
+order-contract/database-design work is retained and updated for persistence status.
+The local plan remains excluded; no files were staged or committed.
+
+Task 7 is DONE. Tasks 8-11 remain TODO: service-level bounded/nonempty aggregate
+validation, active catalog admission, authorization/ownership, canonical request
+hash construction, retry recovery in fresh transactions, cancellation semantics
+and HTTP/query behavior remain later work. SQL rollback/uniqueness and mapped
+lock modes do not establish those service behaviors or full concurrency handling.
+The complete suite, live HTTP, development/production migrations and deployment
+were not run or claimed. No frontend, Postman artifacts, future workflow or AI
+work was added.

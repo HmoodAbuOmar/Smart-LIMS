@@ -65,7 +65,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
     @BeforeEach
     void fixtures() {
         // IsolatedPostgresTest refuses any URL outside the dedicated regression database.
-        jdbc.execute("TRUNCATE TABLE patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(patients);
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Synthetic Test Account", role.name().toLowerCase(Locale.ROOT)
@@ -321,7 +321,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 () -> jdbc.update("DELETE FROM users WHERE id = ?", actors.get(Role.ADMIN).getId()));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE patients SET created_by = ? WHERE id = ?", UUID.randomUUID(), second));
-        assertEquals(List.of("1", "2", "3", "4", "5", "6"), jdbc.queryForList(
+        assertEquals(List.of("1", "2", "3", "4", "5", "6", "7"), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals("V4__lab_tests.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '4'", String.class));
@@ -329,6 +329,8 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 "SELECT script FROM flyway_schema_history WHERE version = '5'", String.class));
         assertEquals("V6__lab_test_categories.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '6'", String.class));
+        assertEquals("V7__orders.sql", jdbc.queryForObject(
+                "SELECT script FROM flyway_schema_history WHERE version = '7'", String.class));
     }
 
     @Test

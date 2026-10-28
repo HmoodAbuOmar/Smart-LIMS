@@ -2,10 +2,12 @@
 
 Status: implemented-schema inventory plus carried-forward design for unimplemented features.
 Updated: 2026-10-27 (documentation-only SDLC review).
+Stage 2 Task 7 persistence update: 2026-10-28; V7 adds order storage and JPA mappings. Focused isolated execution is recorded in [TESTING.md](TESTING.md#task-7-order-persistence-verification-2026-10-28); order services/endpoints and deployment remain unverified.
+Stage 2 Task 6 design review: 2026-10-28; ORDERS_API.md and sections 4.7-4.8 reconcile order states, retry identity, snapshots and cancellation; no code, migration, test or database operation.
 Task 2 source update: 2026-10-28; V6 adds category persistence/mapping only. Verification is recorded separately in [TESTING.md](TESTING.md#task-2-category-persistence-verification-2026-10-28); this does not establish development/production migration status or future category API behavior.
 Requirements, decisions, task IDs and completion evidence: [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). The scope is confirmed; unimplemented column/state/workflow proposals still require the applicable decision and API contract before coding. This design is not evidence of deployed functionality.
 Planned results allow unfilled draft measurements and preserve required-parameter snapshots per version; results are not implemented yet.
-Migration integration: canonical source is V1-V6. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. V6 source/test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
+Migration integration: canonical source is V1-V7. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. V6/V7 source/test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
 Intended repository path: `Backend/docs/DATABASE_DESIGN.md`.
 
 ## 1. Scope and implementation status
@@ -20,8 +22,8 @@ This document inventories the current schema and preserves the proposed database
 - Patient name, birth date, gender, and phone are required; address is optional; phone numbers are not unique.
 - Initial monetary currency: ILS.
 - Payments are recorded manually or by external transaction reference; no payment gateway is included in this baseline.
-- The inventory lists 22 application tables: six implemented in source migrations, fourteen planned for the core workflow, and two deferred for AI. `flyway_schema_history` and `patient_number_seq` are technical objects, not additional application tables. Category migration verification uses only the isolated test cluster; development/production application of V6 is not established.
-- `users`, `email_action_tokens`, `patients`, `lab_tests`, `patient_link_tokens`, and `lab_test_categories` are implemented through V1-V6. Other application tables remain implementation targets.
+- The inventory lists 22 application tables: eight implemented in source migrations, twelve planned for the core workflow, and two deferred for AI. `flyway_schema_history`, `patient_number_seq`, and `order_number_seq` are technical objects, not additional application tables. V6/V7 verification uses only the isolated test cluster; development/production application is not established.
+- `users`, `email_action_tokens`, `patients`, `lab_tests`, `patient_link_tokens`, `lab_test_categories`, `test_orders`, and `order_items` are implemented through V1-V7. Other application tables remain implementation targets.
 - The supplied SQL also adds `users.reset_code_failed_attempts`; it is included here.
 - Preserve existing authentication behavior. Do not recreate existing authentication tables or rewrite an applied migration.
 - Symptom-based suggestions are scheduled for a later AI phase. Further AI result-analysis persistence is outside this baseline and requires a separate scope decision.
@@ -36,6 +38,7 @@ This document inventories the current schema and preserves the proposed database
 | V4__lab_tests.sql | lab_tests, price/currency/code checks and indexes | R-CAT-01; T-CAT-00 |
 | V5__patient_link_tokens.sql | patient_link_tokens, outstanding-token uniqueness and state/hash checks | R-PAT-02; T-PAT-01 |
 | V6__lab_test_categories.sql | Empty category assignment table; composite PK, catalog FK, seven-value CHECK, reverse membership index | R-CAT-01/R-NFR-01; Stage 1 Task 2; isolated-test evidence in TESTING.md |
+| V7__orders.sql | Order sequence, headers/items, retry uniqueness, snapshot/cancellation checks, retained FKs and lookup indexes | R-ORD-01/R-NFR-01; Stage 2 Task 7; isolated-test evidence in TESTING.md |
 
 The private `Smart-LIMS-DB-Backups` directory retains `reconciliation-result-20261026-221059.json`, `flyway-before-20261026-221059.csv`, `flyway-after-20261026-221059.csv`, `validation-normal-20261026-221059.log`, and the backup archive. These are historical operator artifacts, inspected as files only in this review:
 
@@ -71,8 +74,8 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 4 | `lab_tests` | Implemented V4 | Orderable laboratory tests, their current prices, and preparation instructions. |
 | 5 | `test_parameters` | Planned; T-CAT-02/03 | Individual measurements within a test, such as WBC or HGB within CBC. |
 | 6 | `reference_ranges` | Planned; T-REF-02/03 | Approved numeric or textual reference ranges by parameter, age, sex, and validity period. |
-| 7 | `test_orders` | Planned; T-ORD-02/03 | The main laboratory order belonging to a patient. |
-| 8 | `order_items` | Planned; T-ORD-02/03 | The individual tests selected within an order, including historical name and price snapshots. |
+| 7 | `test_orders` | Implemented V7; Stage 2 Task 7 persistence only | The main laboratory order belonging to a patient. |
+| 8 | `order_items` | Implemented V7; Stage 2 Task 7 persistence only | The individual tests selected within an order, including historical name and price snapshots. |
 | 9 | `appointment_slots` | Planned; T-APT-02 | Available booking periods and the maximum number of appointments for each period. |
 | 10 | `appointments` | Planned; T-APT-03/04 | An optional appointment for a laboratory order. |
 | 11 | `payments` | Planned; T-PAY-02/03 | Payment and refund records. This design does not integrate a payment gateway. |
@@ -235,7 +238,7 @@ Implementation status: implemented in main's unchanged V4__lab_tests.sql. The cu
 - Planned R-CAT-02: a simple test has one parameter; a panel has multiple parameters. The current basic catalog does not enforce a parameter count because parameters are not implemented.
 - price must be >= 0. Use NUMERIC(12,2) and Java BigDecimal for money. Initial currency is ILS. [S2]
 - sample_type is the default sample description; multiple required specimen types are handled by laboratory workflow in the initial scope.
-- Current catalog supports deactivation and has no order references yet. Planned R-ORD-01: snapshot prices/names so future catalog changes cannot alter historical orders.
+- Current catalog supports deactivation. V7 order items retain catalog references and code/name/price snapshots; the order creation service remains Task 8.
 
 ### 4.4a. Stage 1 category design (Task 1)
 
@@ -327,60 +330,56 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 
 ### 4.7. `test_orders`
 
-The main laboratory order belonging to a patient.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Stage 2 Task 6 reviewed design (2026-10-28), implemented in V7 by Task 7 with TestOrder/OrderStatus mappings and TestOrderRepository. The single detailed HTTP/validation/retry contract is [ORDERS_API.md](ORDERS_API.md). Confirmed Stage 2 rules and S2-ORD-D01/D02 replace the earlier NEW/payment-coupled proposal for this slice. V1-V6 are preserved. Task 7 verifies persistence; service transactions and HTTP behavior remain Tasks 8-10.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
-| `id` | `UUID` | No | PK | Record identifier |
-| `order_number` | `VARCHAR(30)` | No | UNIQUE | Server-generated visible order number |
-| `patient_id` | `UUID` | No | FK patients.id | Patient profile |
-| `created_by` | `UUID` | No | FK users.id | Authenticated creator |
-| `source` | `VARCHAR(10)` | No | CHECK | ONLINE or WALK_IN |
-| `status` | `VARCHAR(20)` | No | DEFAULT NEW | Business workflow state |
-| `currency` | `CHAR(3)` | No | DEFAULT ILS | Currency code |
-| `notes` | `TEXT` | Yes | - | Optional notes |
-| `cancelled_at` | `TIMESTAMPTZ` | Yes | - | Cancellation time |
-| `cancellation_reason` | `TEXT` | Yes | - | Cancellation reason |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
-| `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Last modification time |
+| `id` | `UUID` | No | PK; existing application UUID generation convention | Internal order identity |
+| `order_number` | `VARCHAR(30)` | No | UNIQUE; format CHECK | Sequence-generated visible number, immutable |
+| `patient_id` | `UUID` | No | FK patients.id; NO ACTION | Existing laboratory profile, immutable |
+| `created_by` | `UUID` | No | FK users.id; NO ACTION | Authenticated creator, immutable |
+| `idempotency_key` | `UUID` | No | UNIQUE with created_by | Normalized required create retry key, immutable |
+| `request_hash` | `CHAR(64)` | No | Lowercase SHA-256 hex CHECK | Canonical operation/profile/selection fingerprint, immutable |
+| `status` | `VARCHAR(20)` | No | DEFAULT PENDING; four-value CHECK | PENDING, IN_PROGRESS, COMPLETED, CANCELLED |
+| `currency` | `CHAR(3)` | No | DEFAULT ILS; CHECK ILS | One order/snapshot currency, immutable |
+| `cancelled_by` | `UUID` | Yes | FK users.id; NO ACTION | Original cancellation actor; server-derived |
+| `cancelled_at` | `TIMESTAMPTZ` | Yes | Conditional state CHECK | Original cancellation time |
+| `cancellation_reason` | `TEXT` | Yes | Nonblank trimmed text when present; length <= 1000 | Required by service for staff cancellation; optional for patient |
+| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time, immutable |
+| `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Application-maintained modification time |
 
-**Rules and relationships**
+Storage and transaction requirements:
 
-- source values: ONLINE, WALK_IN. status values: NEW, IN_PROGRESS, COMPLETED, CANCELLED. Initial status is NEW and currency is ILS.
-- Create the order and its initial items in one transaction. A non-cancelled order must contain at least one non-cancelled item.
-- PATIENT may create an order only for their own linked profile; staff may act for a patient. The server selects catalog prices and identifies created_by.
-- Total due is computed from non-cancelled item prices. Net paid is computed from confirmed payments minus confirmed refunds. Do not maintain a competing mutable total.
-- Freeze ordinary item/price editing after collection of payment or start of laboratory processing. Cancellations require payment/refund reconciliation.
-- COMPLETED means every non-cancelled item has a current published result. Cancellation records its timestamp and reason.
+- Add technical BIGINT `order_number_seq`, START 1/INCREMENT 1, independent of patient_number_seq. Format ORD- plus at least six digits without truncating larger numbers; VARCHAR(30) accommodates BIGINT. CHECK `^ORD-[0-9]{6,19}$`; UNIQUE is authoritative. Gaps are acceptable, no reuse/reset/MAX+1. This is a technical sequence, not a new application table; the 22-table inventory is unchanged.
+- UNIQUE(created_by, idempotency_key), NOT NULL on both, with request_hash CHECK `^[0-9a-f]{64}$`. Owner-confirmed retry semantics require durable identity retained with the order, including after cancellation. No expiry/cache-only policy and no separate idempotency table are needed. Canonical fingerprint details are in ORDERS_API.md section 5.
+- CHECK status in the four approved values. This stage only creates PENDING and writes PENDING to CANCELLED. IN_PROGRESS/COMPLETED describe future workflow states; do not infer processing/publication authority or expose arbitrary transitions. NEW is not retained as an alias: these are unapplied proposals, not an existing data migration.
+- Cancellation consistency: CANCELLED requires both cancelled_by and cancelled_at; all other states require cancelled_by, cancelled_at and cancellation_reason NULL. A present reason must be stripped, nonblank and at most 1000 characters; cancelled_at cannot precede created_at. Service enforces the staff reason requirement against the authenticated current role; a cross-table role CHECK is not valid. Repeated authorized cancellation preserves the first metadata and updated_at.
+- No source=ONLINE/WALK_IN or notes field is introduced in Stage 2. Authenticated creation is not proof of physical attendance, and neither request field is part of the approved interface. Future source/visit/notes requirements need a reviewed contract. No appointment, payment, visit, sample or result row is created by an order operation.
+- Create the header and 1-100 unique items atomically. Resolve existing patient identity through the current profile/account link; staff can select an unlinked existing profile. No automatic profile creation, matching or linking. A child-count/parent-currency/active-admission invariant cannot be expressed as an ordinary CHECK over another table: enforce nonempty, bounded, complete aggregates and catalog availability in the order service transaction. Maintain the composite item uniqueness/FKs as database backstops. No zero-item or partially persisted order may commit through the application.
+- No mutable header total/test count. Compute count and exact SUM of all immutable price_at_order values. A cancelled order retains the original value/items; this is historical order amount, not balance/net payment. SUM/BigDecimal must accommodate 100 maximum catalog prices (999999999999.00), rather than narrowing the aggregate to per-item NUMERIC(12,2).
+- Use the existing account-then-patient locking order for new creation/current eligibility and linking safety; same-actor creations serialize on the user row. Check successful retry identity before fresh catalog availability. Lock selected catalog rows with shared/pessimistic-read locks in UUID order until snapshot commit; current catalog writes use exclusive row locks. Replays never reprice. The unique-key fallback must roll back before winner lookup in a new transaction.
+- Cancellation takes an order row lock, then rechecks ownership/state and writes all metadata atomically. It does not acquire account/patient locks after the order lock; future processing must lock that order row too. No independent item update/cancellation, reopening, refund, appointment cancellation or payment-driven edit freeze is implemented in this stage. Future integrations must approve/reconcile those transitions before writing related records.
+- Ownership queries join patient_id to patients.user_id (not created_by). Patient list filters/counts/page operate over unique orders; aggregate item count/value without multiplying outer rows. Preserve current DTO/page/error/security conventions, including the large-offset count path and UUID sort tie-breaker. Task 7 uses matching CHAR mappings for currency/hash and passes Hibernate schema validation; ownership queries and service behavior remain later tasks.
+- TestOrder owns a lazy item collection with cascade PERSIST only, exposed as an unmodifiable list; persisted aggregates reject adding items. OrderItem is Hibernate-immutable with no setters and non-updatable snapshot columns. No cascade remove/orphan removal is configured. Repository methods provide sequence allocation, actor/key lookup and an order write lock; LabTestRepository provides a shared snapshot lock. Services must apply the transaction/authorization/lock-order rules above in Tasks 8-10; repository methods alone do not implement them.
 
 ### 4.8. `order_items`
 
-The individual tests selected within an order, including historical name and price snapshots.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Stage 2 Task 6 reviewed design, implemented in V7 by Task 7 with the OrderItem mapping. Original ordered tests are immutable historical snapshots; order-level status/cancellation is sufficient for this stage.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
-| `id` | `UUID` | No | PK | Record identifier |
-| `order_id` | `UUID` | No | FK test_orders.id | Parent laboratory order |
-| `lab_test_id` | `UUID` | No | FK lab_tests.id | Parent or selected catalog test |
-| `test_code_snapshot` | `VARCHAR(30)` | No | - | Test code at order creation |
-| `test_name_snapshot` | `VARCHAR(150)` | No | - | Test name at order creation |
-| `price_at_order` | `NUMERIC(12,2)` | No | CHECK >= 0 | Historical test price |
-| `status` | `VARCHAR(20)` | No | DEFAULT NEW | Business workflow state |
-| `cancelled_at` | `TIMESTAMPTZ` | Yes | - | Cancellation time |
-| `cancellation_reason` | `TEXT` | Yes | - | Cancellation reason |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
-| `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Last modification time |
+| `id` | `UUID` | No | PK; existing application UUID convention | Item identity |
+| `order_id` | `UUID` | No | FK test_orders.id; NO ACTION | Retained parent order |
+| `lab_test_id` | `UUID` | No | FK lab_tests.id; NO ACTION | Stable selected catalog identity |
+| `test_code_snapshot` | `VARCHAR(30)` | No | Same code-format CHECK as catalog | Code at creation, immutable |
+| `test_name_snapshot` | `VARCHAR(150)` | No | Trimmed nonblank CHECK | Name at creation, immutable |
+| `price_at_order` | `NUMERIC(12,2)` | No | Finite and >= 0 CHECK, as current catalog | Server-selected historical price, immutable |
+| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time, immutable |
 
-**Rules and relationships**
-
-- UNIQUE(order_id, lab_test_id). One test appears once per order in the initial scope; a later repeat is a new order.
-- status values: NEW, IN_PROGRESS, COMPLETED, CANCELLED. Initial status is NEW; price_at_order must be >= 0.
-- The server copies catalog code, name, and price at order creation. Catalog changes must not rewrite historical snapshots.
-- Items referenced by a payment, sample, or result are retained rather than physically deleted. When cancellation is allowed, record its time and reason.
+- UNIQUE(order_id, lab_test_id); one occurrence/implicit quantity one. API validation rejects duplicates before converting input to a set. A deliberate later repeat is a new order with a new key.
+- Retained FK references prevent orphan items and deletion of referenced orders/catalog tests. No cascade deletion/orphan-removal history path. Copy code/name/price under catalog locks once; never read current names/prices to reconstruct historical responses. Order currency is ILS and every admitted catalog row must match it.
+- The earlier proposed item status=NEW/cancellation fields and updated_at are deferred: Stage 2 has no independent item lifecycle or edit API, and whole-order cancellation preserves every item. Future sample/processing/result contracts may add their own required state via new migrations, without redefining these snapshots or inventing clinical rules.
+- Categories/specimen/preparation/report snapshots are not silently added to these historical fields. Parameter/reference ranges, measurements and published results remain separate future modules.
 
 ### 4.9. `appointment_slots`
 
@@ -432,7 +431,7 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 - status values: BOOKED, CHECKED_IN, COMPLETED, CANCELLED, NO_SHOW. Initial status is BOOKED.
 - Check-in records checked_in_at. Cancellation records cancelled_at and a reason.
 - Reschedule by locking the old and new slots in a stable order, checking capacity, and updating slot_id; record the change in audit_logs.
-- Cancelling an appointment does not implicitly cancel the order. Cancelling an order cancels its active appointment in the same transaction.
+- Cancelling an appointment does not implicitly cancel the order. Future appointment integration must define atomic order/appointment cancellation before enabling that coupling; Stage 2 order cancellation has no appointment side effect.
 
 ### 4.11. `payments`
 
@@ -772,8 +771,8 @@ Preserve the existing authentication indexes. Add indexes for frequently queried
 Additional recommended indexes:
 
 - `lab_test_categories(lab_test_id, category)` PK and `lab_test_categories(category, lab_test_id)` are implemented in V6; development/production application is unverified.
-- `test_orders(patient_id, created_at)` and `test_orders(created_by)`.
-- `order_items(order_id, lab_test_id)` UNIQUE.
+- Stage 2 implemented V7: `test_orders(patient_id, created_at DESC, id ASC)`, `test_orders(patient_id, status, created_at DESC, id ASC)`, UNIQUE(order_number), UNIQUE(created_by, idempotency_key), and an index on cancelled_by. The composite retry index covers created_by; filtered order-number substring search is a normal literal search initially, with further indexing only if measured.
+- Stage 2 implemented V7: `order_items(order_id, lab_test_id)` UNIQUE, covering order_id FK/loading, plus `order_items(lab_test_id)` for its retained catalog FK.
 - `test_parameters(lab_test_id, code)` UNIQUE.
 - `reference_ranges(parameter_id, gender, valid_from)`.
 - `appointments(order_id)` UNIQUE and `appointments(slot_id, status)`.
@@ -790,11 +789,12 @@ Additional recommended indexes:
 
 Concurrency controls must cover every write path:
 
-1. Lock slot rows before capacity checks and appointment writes.
-2. Lock order/payment rows before payment or refund amount checks.
-3. Lock ordered test items before allocating result revisions or publishing.
-4. Lock parameters before reference-range overlap checks and writes.
-5. Use stable lock ordering when a transaction touches several records.
+1. Stage 2 creation: current account, patient, then selected catalog rows in stable UUID order; successful retry lookup precedes fresh catalog admission. Cancellation locks its order and never takes account/patient locks afterward. See section 4.7 and ORDERS_API.md.
+2. Future booking: lock slot rows before capacity checks and appointment writes.
+3. Lock order/payment rows before payment or refund amount checks.
+4. Lock ordered test items before allocating result revisions or publishing.
+5. Lock parameters before reference-range overlap checks and writes.
+6. Use stable lock ordering when a transaction touches several records.
 
 ## 7. Authorization and lifecycle rules
 
@@ -830,9 +830,9 @@ The short IDs below illustrate relationships; actual identifiers are UUIDs. No m
 
 ## 9. Incremental implementation plan
 
-The current [implementation plan](../IMPLEMENTATION_PLAN.md) selects Stage 1 patient catalog work. Authentication, patient profiles/linking and basic catalog already have source and historical test evidence; references, orders and the remaining workflow do not. Older R-/T- identifiers elsewhere in this design are carried-forward traceability, not the numbering of the current Stage 1 tasks.
+The current [implementation plan](../IMPLEMENTATION_PLAN.md) records completed Stage 1 catalog work and selects Stage 2 patient orders; Task 6 is contract/design review only. Authentication, patient profiles/linking and catalog have source/test evidence; Task 7 adds verified order persistence only. References and the remaining workflow stay unimplemented. Older R-/T- identifiers elsewhere in this design are carried-forward traceability, not current task numbering.
 
-Stage 1 Task 1 is DONE: section 4.4a and LAB_TESTS_API.md define the accepted optional multiple-category contract. Task 2 implements only the V6 schema and JPA collection, with focused verification recorded in the plan/TESTING.md. Task 3 adds category assignment/response DTOs through the existing transaction/mapping; focused evidence is recorded separately. Task 4 implements membership queries and patient list visibility with focused evidence in TESTING.md/the plan. Task 5 implements detail visibility and records final catalog/full-suite evidence. No remaining functional catalog gap was identified; the plan's commit criterion remains pending and deployment readiness is unverified. Parameter/reference contracts and the remaining workflow stay separate future slices; AI stays deferred.
+Stage 1 Task 1 is DONE: section 4.4a and LAB_TESTS_API.md define the accepted optional multiple-category contract. Task 2 implements only the V6 schema and JPA collection, with focused verification recorded in the plan/TESTING.md. Task 3 adds category assignment/response DTOs through the existing transaction/mapping; focused evidence is recorded separately. Task 4 implements membership queries and patient list visibility with focused evidence in TESTING.md/the plan. Task 5 implements detail visibility and records final catalog/full-suite evidence. No remaining functional catalog gap was identified; the catalog commit criterion was subsequently satisfied (verified c7deaa7 in the plan); deployment readiness remains unverified. Stage 2 Task 6 finalizes the [single order API contract](ORDERS_API.md); Task 7 implements the storage/mappings in sections 4.7-4.8. Order services/endpoints and stage verification remain Tasks 8-11. Parameter/reference contracts and the remaining workflow stay separate future slices; AI stays deferred.
 
 Use the next available Flyway migration version at implementation time. Never rewrite an applied migration, delete history, or reset a team database as a shortcut. Each slice requires requirement IDs, contract, transaction/ownership rules and scoped acceptance evidence before DONE.
 
