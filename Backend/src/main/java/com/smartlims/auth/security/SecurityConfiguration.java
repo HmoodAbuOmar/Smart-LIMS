@@ -75,6 +75,11 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
 
+                        .requestMatchers(HttpMethod.POST, "/api/orders/me").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/orders/me", "/api/orders/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/orders/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+
                         .requestMatchers(HttpMethod.GET, "/api/patients/me").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/patients/me", "/api/patients/me/link")
                         .hasRole("PATIENT")
@@ -126,7 +131,7 @@ public class SecurityConfiguration {
             configuration.setAllowedOrigins(origins);
             configuration.setAllowCredentials(true);
             configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-            configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Authorization"));
+            configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Authorization", "Idempotency-Key"));
             configuration.setExposedHeaders(List.of("Location", "X-Request-Id"));
         }
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

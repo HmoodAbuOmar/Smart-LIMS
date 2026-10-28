@@ -585,3 +585,382 @@ lock modes do not establish those service behaviors or full concurrency handling
 The complete suite, live HTTP, development/production migrations and deployment
 were not run or claimed. No frontend, Postman artifacts, future workflow or AI
 work was added.
+
+## Task 8 order creation verification (2026-10-28)
+
+Scope: Stage 2 Task 8; R-ORD-01/R-NFR-01, S2-ORD-R01/R04/R05 and
+ORDERS_API.md sections 3-6/8-9. Reviewed the linked my-orders.jpeg reference,
+patient identity/linking contract, catalog contract and storage/transaction design.
+Implemented only POST /api/orders/me and POST /api/orders, validated DTOs, detail
+mapping, scoped error advice, transactional creation/replay, exact security
+matchers and the Idempotency-Key CORS header. V1-V7 and Task 7 mappings/repositories
+are unchanged. No patient GET or cancellation endpoint is implemented.
+
+Before execution, independently reconfirmed the disposable PostgreSQL 16.15 target
+with psql, the listener, process command line and saved cluster directory:
+
+- jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression; test-only postgres
+  user and empty password. Listener 127.0.0.1:55432 belongs to postgres PID 17864.
+- Actual data_directory and process -D match the saved SMARTLIMS_TEST_POSTGRES_DATA:
+  C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df.
+- The separate development service uses PID 5788 and
+  C:/Program Files/PostgreSQL/16/data; it was not accessed by tests.
+- Existing machine-local Maven/Surefire URL mapping and IsolatedPostgresTest guard
+  remain unchanged. All data is synthetic; external email is mocked. Rollback
+  injection uses a test-owned trigger/function in this isolated database only,
+  removed in finally. The order sequence expansion fixture also uses this target.
+
+All commands ran directly from Backend on backend-hmood. Initial compilation
+attempts exposed a checked UnsupportedEncodingException in the new response test
+helper; no tests ran in those attempts. Reading response bytes fixed the helper.
+
+| Preliminary command | Finished (+02:00) | Maven time | Outcome |
+|---|---|---|---|
+| .\mvnw.cmd '-Dtest=OrderRequestTest' test | 22:55:40 | 14.928 s | exit 1, test compilation failed |
+| .\mvnw.cmd '-Dtest=OrderRequestTest' test | 22:56:14 | 14.261 s | exit 1, test compilation failed; the Charset overload also declared the checked exception |
+| .\mvnw.cmd '-Dtest=OrderCreationTest' test | 22:57:02 | 9.487 s | exit 1, same helper compilation error before the byte-based correction |
+
+Focused request/creation execution:
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderRequestTest,OrderCreationTest' test
+```
+
+**26 tests, 0 failures, 2 errors, 0 skips; BUILD FAILURE**, exit 1,
+finished 2026-10-28 22:57:53 +02:00, Maven time 38.437 seconds.
+OrderRequestTest passed all 4 cases; OrderCreationTest passed 20 of 22 cases.
+Both errors were new test setup: the CSRF endpoint returns its token in the
+XSRF-TOKEN cookie, not a JSON token property; the derived Spring Data query is
+abstract and cannot be used with Mockito doCallRealMethod. Corrected the cookie
+lookup and forced-missed-precheck fixture. No production code or assertions were
+weakened. Added one current-eligibility case for disabled, unverified, passwordless
+and unaccepted-invitation accounts through both HTTP and direct service calls.
+
+Reran only the two affected cases and the new eligibility case:
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderCreationTest#cookieWritesRequireCsrfAndBearerTakesPrecedence+uniqueCollisionRollsBackBeforeWinnerLookupInANewTransaction+creationRejectsEveryIneligibleAccountStateUsingCurrentStoredData' test
+```
+
+**3 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 2026-10-28 23:00:34 +02:00, Maven time 29.184 seconds.
+The collision test forces one missed precheck, then executes the real PostgreSQL
+unique violation/rollback and a real winner read in the fresh replay transaction.
+It verifies both proxied transaction names and the unchanged complete winner.
+The query precheck is spied for this case only; normal/concurrent request tests
+use the real repository. Current evidence is **27 distinct passing new cases**
+(23 creation + 4 request), accumulated across the initial run and targeted rerun;
+no single green 27-case invocation is claimed. The latest creation XML contains
+only the targeted three cases; it does not represent the earlier twenty passes.
+
+Affected regression execution:
+
+```powershell
+.\mvnw.cmd '-Dtest=AuthenticationRegressionTest,BrowserSecurityTest,PatientProfileLinkingTest,LabTestManagementTest' test
+```
+
+**67 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 2026-10-28 23:02:20 +02:00, Maven time 40.134 seconds.
+Counts: authentication 20, browser security 3, patient linking 26, catalog 18.
+Existing tests were not edited. Total current Task 8 evidence is **94 distinct
+passing cases across six suites** from scoped invocations, not a full-suite run.
+
+Task 8 acceptance evidence:
+
+| Criterion | Execution evidence |
+|---|---|
+| Complete orders without partial writes | Patient and both staff roles create PENDING aggregates for linked/unlinked existing profiles with retained actors, IDs, exact item count and snapshots. Missing/inactive selections leave no header/items. A forced failure on the final item rolls back earlier items, header and retry key, then the original key successfully retries. |
+| No trusted client identity, prices or status | Separate self/staff DTOs reject unknown patientId/userId, price/currency/total/status/actor and future-workflow fields. Strict JSON rejects scalar coercion and incorrect containers/elements. Self creation uses the authenticated account's locked profile; absence yields PATIENT_PROFILE_NOT_LINKED with no automatic creation/link. Staff must select an existing profile. |
+| Validation and authorization | Real signed JWTs exercise both role matrices; direct service calls recheck stored roles/eligibility rather than trusting authorities alone. Required/null/blank/malformed UUIDs, duplicates including case variants, 1-100 bounds, missing/padded/comma/repeated retry headers and wrong JSON types return the documented field/error envelope. Cookie writes require CSRF, bearer precedence is retained, anonymous requests reaching authentication return 401, and CORS allows the retry header only for configured origins. Future read/cancel routes stay denied. |
+| Transactions and retries | Same actor/key/intent replays 200 without repricing or timestamp/item changes; different intent conflicts, new keys create intentional repeats and different actors have independent namespaces. Canonical SHA-256 bytes are checked against the documented JSON shape. Replays return stored processing/completed/cancelled state while retaining cancellation history. Role/eligibility/link changes are rechecked. Concurrent matching requests produce one created order and one identical replay; conflicting requests produce one complete winner/conflict; distinct keys/actors get distinct numbers. A catalog writer blocks snapshot admission until its commit, then the new availability is honored. The real uniqueness rollback/fresh winner lookup passes. |
+| Totals and response contract | Zero-priced uncategorized active tests are admitted; 100 maximum prices sum exactly to 999999999999.00. Numbering expands beyond six digits. Detail contains only documented fields, sorted snapshot items, UTC instants, ILS, canCancel and visitDetailsAvailable=false; self gets Location and staff does not. |
+
+Reviewed the diff and passed git diff --check. All changes remain inside Backend.
+No applied migration, dependency, authentication strategy, isolation guard or
+local exclusion was changed; local planning files remain excluded. No Postman
+artifacts, frontend changes, commit, push or deployment were made.
+
+Task 8 is DONE with no remaining acceptance gap. Tasks 9-11 remain TODO for
+patient list/detail, cancellation and complete-stage verification. Historical
+Task 7 migration/persistence checks were not rerun. The complete suite, live
+network HTTP server, manual Postman checks and development/production execution
+were not run or claimed; HTTP evidence is MockMvc with real security and the
+verified isolated PostgreSQL database.
+
+## Task 9 patient order read verification (2026-10-28)
+
+Scope: R-ORD-01/R-NFR-01; S2-ORD-R02/R04. Implemented patient-only
+GET /api/orders/me and GET /api/orders/me/{id}, validated query DTOs, ownership
+specification/lookup, page summaries, batched grouped item totals and read-only
+service mapping. Reviewed ORDERS_API.md, DATABASE_DESIGN.md sections 4.7-4.8,
+patient identity/catalog contracts and my-orders.jpeg. Prior Task 8 working-tree
+changes were preserved. Task 10 had not started during this verification.
+
+Independently reconfirmed the isolated PostgreSQL 16.15 instance before testing:
+jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression, test-only postgres
+user/empty password. The listener belongs to PID 17864; psql data_directory,
+the process -D and saved SMARTLIMS_TEST_POSTGRES_DATA agree on
+C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df.
+The development service remains separate, PID 5788, using
+C:/Program Files/PostgreSQL/16/data. No development database was tested.
+Synthetic fixtures and mocked email only; existing Maven URL mapping, Surefire
+mapping and isolation guard are unchanged.
+
+Commands executed directly from Backend on backend-hmood:
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderQueryRequestTest,OrderReadTest,OrderCreationTest#creationAndPatientReadsHaveExactRolesWhileOtherRoutesStayDenied' test
+```
+
+Result: **15 tests, 1 failure, 0 errors, 0 skips; BUILD FAILURE**, exit 1,
+finished 23:35:02 +02:00, Maven time 53.121 seconds. Query validation (4) and
+updated creation/read role boundary (1) passed; reads passed 9 of 10 cases.
+The maximum-page case found Spring Page.isLast overflow at page 2147483647.
+Order page mapping now computes last using long arithmetic; totals/content
+were already correct. No assertion was weakened.
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderReadTest' test
+```
+
+First rerun: **10 tests, 0 failures, 10 errors, 0 skips; BUILD FAILURE**,
+exit 1, finished 23:36:26 +02:00, Maven time 42.355 seconds. Before test bodies,
+Spring's classpath scan reported NoSuchFileException for generated
+target/classes/com/smartlims/orders/mapper and scanned only five repositories,
+so TestOrderRepository could not be injected. An IntelliJ build process was
+active; concurrent generated-output rebuilding is the inferred cause. The
+mapper/repository classes were present again before retry. No generated file,
+IDE setting or build configuration was manually changed.
+
+Same focused command retried: **10 tests, 0 failures, 0 errors, 0 skips;
+BUILD SUCCESS**, exit 0, finished 23:37:25 +02:00, Maven time 32.259 seconds.
+Together with the four query cases and role case from the first run, all
+**15 distinct focused cases pass cumulatively**; no single green 15-case run
+is claimed. Latest read reports contain the ten corrected passing cases.
+
+Acceptance evidence:
+
+- Unique owned results/counts and original item totals pass with multiple items
+  per order and other-patient/unlinked orders excluded. All four statuses combine
+  with literal case-insensitive order-number-only search before paging/counts;
+  percent, underscore and backslash remain literal. Every supported query's
+  repetition/syntax/bounds and every documented sort/direction are checked.
+- UUID ascending ties, page navigation, empty pages/filters, page 2147483647 and
+  filtered totals/first/last metadata pass. One hundred maximum-price snapshots
+  retain exact 999999999999.00 totals in summary and detail.
+- Patient ownership uses the profile/account link even for staff-created orders;
+  another patient's orders/missing/unlinked detail all use ORDER_NOT_FOUND.
+  Query patientId/userId cannot override ownership. Newly linked historical staff
+  orders become visible. Empty linked list differs from an unlinked profile.
+- Catalog rename/reprice/deactivation and cancelled stored state retain item
+  IDs/snapshots, prices, count and amount. Detail/summary field sets, ordering,
+  cancellation metadata, canCancel and visitDetailsAvailable=false pass.
+- Roles, anonymous/invalid JWT, cookie reads, bearer precedence and current stored
+  role/eligibility checks pass. Exact GET matchers leave staff browsing denied.
+
+Diff review/git diff --check passed. Task 9 is DONE; all four acceptance criteria
+pass. Task 10 remains TODO at this record and will be implemented next under the
+same user request. Task 11 is not started. No complete suite, deployment, live
+network HTTP, manual Postman, commit or push was performed; HTTP evidence is
+MockMvc with real signed JWT/security and the verified isolated PostgreSQL target.
+
+## Task 10 order cancellation verification (2026-10-28)
+
+Scope: R-ORD-01/R-NFR-01; S2-ORD-R03/R04/R05 and ORDERS_API.md section 7.
+Task 9 was verified and marked DONE before Task 10 implementation began. Added
+only POST /api/orders/{id}/cancel, a strict validated reason DTO and a service
+transaction using the existing V7 cancellation fields/order write lock. Reviewed
+the linked contract/design and my-orders.jpeg; no clinical or processing policy
+was inferred. The same independently verified disposable PostgreSQL 16.15 cluster
+from the Task 9 record was used throughout (loopback 127.0.0.1:55432,
+smartlims_auth_regression; separate temporary data directory/PID 17864).
+Application datasource defaults/development data were never fallback targets.
+Fixtures are synthetic; external email is mocked. A test-owned failure trigger
+and function are created only on that target and removed in finally.
+
+Executed directly from Backend on backend-hmood:
+
+```powershell
+.\mvnw.cmd '-Dtest=CancelOrderRequestTest,OrderCancellationTest,OrderCreationTest#creationAndPatientReadsHaveExactRolesWhileOtherRoutesStayDenied' test
+```
+
+**19 tests, 1 failure, 0 errors, 0 skips; BUILD FAILURE**, exit 1,
+finished 23:43:03 +02:00, Maven time 49.752 seconds. Reason DTO cases (3) and the
+updated exact-route case (1) passed. Cancellation passed 14 of 15 cases,
+including all concurrency/rollback tests. The failing case required updatedAt
+not to precede cancelledAt. Added exact timestamp diagnostics and investigated
+without weakening the assertion:
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderCancellationTest#patientCancellationRetainsEveryOriginalItemAndRecordsServerMetadataWithOptionalReasons' test
+```
+
+**1 test, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 23:44:45 +02:00, Maven time 40.339 seconds. The failure was intermittent;
+synthetic stored rows showed some event/update times equal to the microsecond.
+Inspected the installed Hibernate timestamp generator, which uses a clock adjusted
+to mapped precision. The inferred edge was independently rounded nanoseconds on
+the event timestamp versus the ORM precision-adjusted update clock. Cancellation
+now truncates its server event time to database microseconds before persistence,
+preventing rounding forward beyond that later update time. No entity mapping,
+schema, timestamp assertion or test isolation setting was changed.
+
+Reran the complete affected cancellation suite:
+
+```powershell
+.\mvnw.cmd '-Dtest=OrderCancellationTest' test
+```
+
+**15 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 23:46:33 +02:00, Maven time 49.277 seconds. All cancellation cases,
+including chronology, repeat equality, rollback and concurrency, passed on the
+final source. Together with the earlier DTO/route cases, Task 10 covers
+**19 distinct focused passing cases cumulatively**; no single green 19-case
+invocation is claimed. Latest cancellation reports contain all fifteen passes.
+
+Acceptance evidence:
+
+- Only eligible PATIENT owners and ADMIN/RECEPTIONIST can cancel. Stored current
+  role/eligibility, forged authorities, all four ineligible account conditions,
+  anonymous/invalid JWT, bearer precedence, cookie CSRF and repeat authentication
+  are checked. LAB_TECHNICIAN is forbidden. Existing non-cancellation status/delete
+  routes remain denied. Canonical path syntax accepts uppercase UUID hex.
+- Staff require a trimmed nonblank reason, including on repeats; patient omitted,
+  null/blank reasons become null. Strict JSON/unknown fields, missing body,
+  non-string reasons and the trimmed 1000-character bound are verified. Denied
+  reason/state/ownership requests leave headers/items unchanged.
+- Only PENDING becomes CANCELLED. Processing/completed states return 409 with
+  unchanged data; missing, unowned and unlinked patient orders return identical
+  404 semantics for all stored states. Actor and event/update times are stored;
+  creation identity/timestamp, immutable items, count, amount and currency remain.
+- Authorized repeats by patient or another staff actor return the same complete
+  original record, including first actor/time/reason/updatedAt. A patient blank
+  reason remains null even when staff later supply a valid different reason.
+  Another patient cannot replay that cancellation.
+- A forced update failure produces a sanitized 500, rolls back all cancellation
+  metadata and preserves items; a subsequent valid retry succeeds. Cancellation
+  is reflected in owned list/detail and creation retry responses with the original
+  value/snapshots and canCancel=false.
+- Concurrent patient/staff cancellation returns one identical retained record,
+  with actor matching the winning reason. Cancellation waits for a processing
+  order lock, then rejects the committed IN_PROGRESS state. It can complete while
+  another transaction holds the patient write lock, confirming no inverted
+  order-to-patient write lock path. No processing endpoint was added for the test.
+
+Diff review and git diff --check passed. Task 10 is DONE; all four acceptance
+criteria pass. Tasks 9/10 were implemented sequentially, with 15 and 19 distinct
+focused passing cases respectively (their updated route case is shared). Existing
+Task 8 working-tree work is preserved. V1-V7, dependency versions, isolation guard,
+machine-local Maven/Surefire database mapping and exclusions remain unchanged.
+No commit/push, Postman artifact, frontend, AI or unrelated workflow work was done.
+Task 11 remains TODO and was not started: no complete-suite run or stage-wide
+verification, manual Postman acceptance, deployment or production readiness is
+claimed. HTTP verification uses MockMvc with real signed JWT/security and isolated
+PostgreSQL, rather than a live network HTTP server.
+
+## Task 11 full stage verification (2026-10-28)
+
+Scope: Stage 2 patient orders, R-ORD-01/R-NFR-01 and S2-ORD-R01-R05.
+Reviewed the Task 11 acceptance criteria, ORDERS_API.md, storage/transaction
+design, final controller/DTO/service/repository/mapper/security code and focused
+Tasks 7-10 evidence before running the complete suite. The current user request
+explicitly excludes Postman, another stage and commit/push. No Postman skill,
+tool, CLI, application, resource sync or artifact generation was used. Manual
+client scenarios are documented as an unexecuted HTTP checklist below.
+
+Isolation was independently verified again before this execution, beyond the URL:
+
+- PostgreSQL 16.15, listener 127.0.0.1:55432, postgres process PID 17864.
+- psql confirmed smartlims_auth_regression, current user postgres, loopback server
+  address/port and actual data_directory. The empty password is test-only.
+- Actual data_directory, process -D and saved SMARTLIMS_TEST_POSTGRES_DATA matched
+  C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df.
+- The development service was distinct, PID 5788, using
+  C:/Program Files/PostgreSQL/16/data. It was not a test target.
+- The unchanged .mvn/maven.config/Surefire mapping supplied
+  jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression. The isolation guard
+  was preserved. Compatibility/migration tests created/dropped only their own
+  guarded smartlims_migration_* databases on this verified disposable cluster.
+- Synthetic fixtures and mocked email were used. Application datasource defaults
+  were never a fallback. No development/shared database migration was executed.
+
+After the recorded focused checks had passed, ran the complete suite directly
+from Backend, branch backend-hmood:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Result: **236 tests across 27 suites, 0 failures, 0 errors, 0 skips;
+BUILD SUCCESS**, exit 0. Finished **2026-10-28 23:55:37 +02:00**; Maven reported
+**2 minutes 13 seconds**. All 27 Surefire XML reports were freshly written by
+this invocation and independently sum to 236/0/0/0. This is **one green full
+invocation on the final code**, rather than cumulative targeted evidence.
+No failure investigation, code/test fix, targeted rerun or second complete run
+was needed. Earlier focused-run failures remain documented in their own records;
+they were not failures of this full invocation.
+
+| Suite group | Suites | Passing cases |
+|---|---:|---:|
+| Orders: creation 23, cancellation 15, reads 10, persistence 7, migration 7, request validation 4, query validation 4, cancellation DTO 3 | 8 | 73 |
+| Authentication, registration, provisioning, browser security and password/constraint policy | 7 | 55 |
+| Patient management, linking, request/token and migration compatibility | 5 | 64 |
+| Catalog API/service/validation/errors, category persistence and migration | 6 | 43 |
+| Application context | 1 | 1 |
+| Total | 27 | 236 |
+
+Stage acceptance review:
+
+| Acceptance | Outcome and evidence |
+|---|---|
+| Creation, reads, filtering, ownership and cancellation verified | PASS. All 73 order cases pass in the full invocation: patient/staff identity and role checks, linked/unlinked profiles, strict input/header validation, exact totals/snapshots, query combinations and counts, deterministic paging/sorts including maximum offsets, ownership privacy, atomic rollback, durable retry identity/recovery and cancellation concurrency/retained metadata. |
+| Existing auth, patient linking and catalog remain functional | PASS. All 163 preexisting cases pass in this same invocation, including JWT/cookie/CSRF/CORS behavior, verified linking, catalog visibility/categories and legacy migration compatibility. |
+| Documentation matches implementation | PASS. Reviewed all five implemented method/path mappings, access rules, request/response fields, errors, retry/locking design and tests against ORDERS_API.md. Updated current status/evidence in the plan, API contract and database design; historical focused evidence is preserved. No additional functional mismatch was identified. |
+| Future workflow boundaries remain explicit | PASS. No processing/completion endpoint, arbitrary status update, staff browsing, visit link, appointment/payment/sample/result side effect or AI module is added. visitDetailsAvailable remains false; cancelled amount is historical value, not a balance/refund. |
+
+Task 11 and Stage 2 are **DONE**, with all four acceptance criteria satisfied
+by the recorded passing evidence. On 2026-10-29 the owner clarified that committing
+is a separate handoff, not an acceptance criterion; the earlier completion gate
+was corrected in the plan and linked documentation. This correction did not
+rerun tests or change any execution result recorded above.
+
+Owner handoff: working-tree changes remain uncommitted and the owner decides when
+to commit them. No Git write/publish operation or next stage was authorized or
+performed. Task/stage completion does not claim deployment readiness.
+
+Manual HTTP scenarios — documented, not executed:
+
+Use only synthetic accounts/data in an appropriate test environment. Prerequisites
+are an eligible linked patient, a second patient, eligible ADMIN/RECEPTIONIST and
+LAB_TECHNICIAN accounts, existing linked/unlinked profiles and known active test
+UUIDs. Creation writes require Content-Type: application/json and exactly one
+fixed canonical UUID Idempotency-Key. Bearer requests use the caller's JWT;
+cookie writes instead require access_token, the XSRF-TOKEN cookie from
+GET /api/auth/csrf-token and its value in X-XSRF-TOKEN. Never record raw tokens.
+
+| Scenario | HTTP action / expected outcome |
+|---|---|
+| Patient creation | POST /api/orders/me with {"testIds":["<active-test-uuid>"]}. Expect 201, own linked patient, PENDING, backend snapshot/count/ILS total and Location: /api/orders/me/{id}. No patientId, price or status input. |
+| Staff creation | POST /api/orders with {"patientId":"<existing-profile-uuid>","testIds":["<active-test-uuid>"]}. ADMIN/RECEPTIONIST may target an unlinked profile; expect 201 detail and no staff Location. PATIENT/LAB_TECHNICIAN receive 403. |
+| Retry versus new intent | Resend as the same actor with the same key/selection: 200 same order and snapshots, including current state. Different selection or staff target with that key: 409 IDEMPOTENCY_KEY_REUSED. A new key permits a deliberate new order. |
+| Input and availability | Missing/repeated/malformed key or invalid/duplicate/empty/oversized UUID selection: 400 VALIDATION_ERROR on the documented field. Client price/status/actor or other unknown properties: 400 INVALID_JSON. Missing/inactive selected tests: 409 ORDER_TEST_UNAVAILABLE with no partial order. |
+| Owned list and detail | GET /api/orders/me; combine search, exact status, page, size and permitted sort once each. Expect unique owned content/accurate totals, stable UUID ties and snapshots. GET /api/orders/me/{id} returns owned detail; unknown/unowned detail returns the same 404 ORDER_NOT_FOUND. Query patientId cannot change ownership. |
+| Literal search and identity absence | search=%25, search=_ and search=%5C remain literal rather than wildcard matches. An unlinked patient list receives 404 PATIENT_PROFILE_NOT_LINKED; an empty linked profile receives an empty 200 page. |
+| Snapshots and visit boundary | After an authorized catalog change, existing order name/code/price/count/total remain original. visitDetailsAvailable=false for every state; no visit URI is fabricated. |
+| First cancellation and repeat | POST /api/orders/{id}/cancel with {} for the owner or a trimmed nonblank reason for staff. PENDING becomes CANCELLED, retaining items/value and storing actor/time/reason. Repeat with a valid body returns the same original cancellation metadata/updatedAt; staff still require a reason. |
+| Rejected cancellation | Another patient's order: 404; LAB_TECHNICIAN: 403; invalid staff reason: 400. If legitimate existing IN_PROGRESS/COMPLETED records are available, cancellation returns 409 without mutation. There is no API to manufacture those processing states in this stage. |
+| Transport and error envelope | Cookie write without matching CSRF: 403. Invalid/ineligible bearer authentication: 401; explicit bearer takes precedence over cookies. Check {code,message,fieldErrors,requestId}, matching X-Request-Id, and Cache-Control: no-store on API errors. |
+
+These scenarios are a manual follow-up reference, not new execution evidence.
+No HTTP client or Postman was used. Automated HTTP evidence is MockMvc with real
+signed JWT/security and isolated PostgreSQL; a live network server/client flow,
+real email delivery, development/production application of V7 and deployment
+readiness were not verified by this run.
+
+Only IMPLEMENTATION_PLAN.md, docs/TESTING.md, docs/ORDERS_API.md and
+docs/DATABASE_DESIGN.md were edited for Task 11. Pre-task source/test/configuration
+hashes were captured to preserve existing work; final comparison and diff review
+confirm application/test code, V1-V7, POM, security, isolation guard and local Maven
+mapping are unchanged from the start of Task 11. git diff --check passes. Existing
+working-tree work and local exclusions are retained; no files were staged,
+committed, pushed or deployed.
