@@ -391,3 +391,114 @@ Not run/verified: complete backend suite, migration compatibility suites, live
 network HTTP server, Task 5 inactive-detail restrictions/final stage completion,
 and development/production deployment readiness. No smart_lims_db access, new or
 modified applied migrations, Postman files, commits, pushes or branch changes.
+
+
+## Task 5 detail and catalog completion verification (2026-10-28)
+
+Scope: Stage 1 Task 5 only, including the requested Tasks 1-4 acceptance review;
+R-CAT-01/R-NFR-01, S1-CAT-R01/R02/R03/R04, with DONE Tasks 1-4 and resolved
+S1-CAT-D01/D02. The existing detail DTO already contains all twelve documented
+fields and ordered category arrays. LabTestService now returns the existing
+LAB_TEST_NOT_FOUND error for an inactive test requested by PATIENT before mapping
+its fields/categories. Missing and inactive errors have the same message and
+empty fieldErrors, with no detail fields. Staff retain inactive access. Writes,
+list filtering, authentication, cookie CSRF and applied migrations are unchanged.
+
+Independently reverified isolation before execution: inspected the saved temporary
+data directory, postmaster files, postgresql.conf and pg_hba.conf; pg_ctl reported
+the same dedicated running cluster (PID 17864), independently matched to the
+127.0.0.1:55432 listener. Explicit psql confirmed PostgreSQL 16.15, database
+smartlims_auth_regression, postgres user, loopback server/listen_addresses and
+matching temporary data_directory ending in
+smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df. The unchanged excluded
+local Maven configuration/Surefire mapping selected that guarded target. The
+existing guard and all test datasource paths were reviewed; application defaults
+were never a fallback. No startup/configuration change or smart_lims_db access.
+Fixtures use synthetic data and fake email. Compatibility suites create/drop only
+their own smartlims_migration_<32 hex characters> databases on that same cluster.
+There were zero owned migration databases before and after execution. Post-run
+read-only checks confirmed all regression database migrations successful through V6.
+
+Focused command, from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestServiceTest,LabTestManagementTest,LabTestErrorHandlerTest' test
+```
+
+Result: **30 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished **2026-10-28 18:37:07 +02:00**, Maven time **46.891 seconds**.
+Service 8, management 18, error-handler 4. New coverage verifies all twelve detail
+fields, UTC timestamps matching persistence, omitted/null optional text, zero/one/
+multiple ordered categories, exact field allowlist, all roles via bearer/cookie,
+active uncategorized detail access, patient inactive categorized/uncategorized
+404 indistinguishable from missing (except request ID), query-key bypass attempts,
+staff inactive access, reactivation visibility, missing/malformed/noncanonical IDs,
+uppercase canonical UUIDs, authentication precedence and missing/invalid tokens.
+The service unit check verifies rejection before mapper interaction. Existing
+create/update/status, ADMIN-only writes, list filters and cookie CSRF regressions
+pass. The existing cookie test now expects patient 404 if its prior ADMIN iteration
+deactivated that fixture. A subsequent type-only test cleanup removed an unchecked
+Map assignment; no production behavior changed after this focused run.
+
+After focused checks passed, executed the complete suite exactly once:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Result: **163 tests across 19 suites, 1 failure, 0 errors, 0 skips; BUILD FAILURE**,
+exit 1, finished **2026-10-28 18:38:58 +02:00**, reported time **1 minute 12 seconds**.
+All six catalog suites (43 cases) and both migration compatibility suites (10 cases,
+including the four catalog migration cases) passed. The only failure was
+PatientManagementTest.databaseEnforcesUniqueNumbersLinksGenderAndRetainedUserReferences:
+its exact history expectation still ended at V5, while Task 2 correctly introduced
+V6__lab_test_categories.sql. This was a Stage 1 verification-maintenance gap,
+not a patient behavior failure. Updated that exact expected version list to V1-V6
+and added an exact V6 script-name assertion; all existing patient uniqueness,
+gender and retained-reference assertions remain. No production or applied migration
+file changed to resolve the failure. No unrelated failure was found.
+
+Reran only the affected suite:
+
+```powershell
+.\mvnw.cmd '-Dtest=PatientManagementTest' test
+```
+
+Result: **27 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished **2026-10-28 18:40:07 +02:00**, Maven time **29.220 seconds**.
+The other 136 cases passed in the single full invocation. Final evidence therefore
+covers **163 distinct passing cases across the full run and targeted rerun**.
+The latest per-suite reports aggregate to 163/0/0/0 but originate from those two
+invocations; this is not a single green complete-suite result. The complete suite
+was not rerun after the history assertion fix, honoring the requested one full run.
+
+| Final suite group | Passing cases | Evidence origin |
+|---|---:|---|
+| Six catalog suites | 43 | Single full run: request 6, service 8, error-handler 4, management 18, category persistence 3, category migration 4 |
+| Authentication/provisioning/security/password suites | 55 | Single full run |
+| Patient management | 27 | Targeted rerun after strict V6 history correction |
+| Other patient/linking/request/migration suites | 37 | Single full run; includes all six patient migration compatibility cases |
+| Application context | 1 | Single full run |
+
+Tasks 1-4 acceptance review: the finalized fixed vocabulary/static discovery,
+optional category/legacy handling, V6 integrity/index/mapping design, array
+validation/replacement/status semantics, unique membership filtering with combined
+literal search/pagination/counts, patient list policy and staff access are retained.
+Fresh/upgrade/preservation and category constraint/concurrency checks passed in
+the full run. The sole stale history assertion was corrected as above. No remaining
+functional catalog gap or unresolved clinical/product decision was identified.
+
+Task 5 implementation/verification is DONE. Stage technical acceptance is DONE
+with the cumulative evidence above. Overall stage status remains IN_PROGRESS
+solely because the plan separately requires a commit and the user explicitly
+instructed not to commit. No commit, push or branch switch was performed.
+Documentation, git diff --check and all seven catalog JSON examples were checked;
+pre-task hashes preserve unrelated files, V1-V6, security, controller/repository/
+DTO/mapper/query code, POM, isolation guard, machine-local Maven mapping and local
+exclusions. The local implementation plan remains excluded/untracked.
+
+Not verified: one green combined full invocation after the history assertion fix,
+live network HTTP server/client integration, development/production migration or
+deployment readiness. No development data was accessed or clinical mapping inferred.
+No Postman artifacts, future workflow modules, new migrations or applied migration
+changes. Committing is intentionally pending; no future stage was started.

@@ -321,12 +321,14 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 () -> jdbc.update("DELETE FROM users WHERE id = ?", actors.get(Role.ADMIN).getId()));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE patients SET created_by = ? WHERE id = ?", UUID.randomUUID(), second));
-        assertEquals(List.of("1", "2", "3", "4", "5"), jdbc.queryForList(
+        assertEquals(List.of("1", "2", "3", "4", "5", "6"), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals("V4__lab_tests.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '4'", String.class));
         assertEquals("V5__patient_link_tokens.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '5'", String.class));
+        assertEquals("V6__lab_test_categories.sql", jdbc.queryForObject(
+                "SELECT script FROM flyway_schema_history WHERE version = '6'", String.class));
     }
 
     @Test

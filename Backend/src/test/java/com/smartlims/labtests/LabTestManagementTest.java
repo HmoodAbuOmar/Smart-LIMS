@@ -99,6 +99,113 @@ class LabTestManagementTest extends IsolatedPostgresTest {
     }
 
     @Test
+    void detailReturnsOnlyDocumentedFieldsAndCompleteOptionalCategorySetsForEveryRole() throws Exception {
+        List<List<String>> categories = List.of(List.of(), List.of("BLOOD_TESTS"), List.of("THYROID", "BLOOD_TESTS"));
+        for (int i = 0; i < categories.size(); i++) {
+            Map<String, Object> body = new HashMap<>(Map.of("code", "DETAIL_" + i, "name", "Synthetic detail " + i,
+                    "price", new BigDecimal("12.34"), "currency", "ILS", "sampleType", "SYNTHETIC",
+                    "categories", categories.get(i)));
+            if (i > 0) {
+                body.put("description", i == 1 ? null : "Synthetic description");
+                body.put("preparationInstructions", i == 1 ? null : "Synthetic preparation");
+            }
+            String id = create(json.writeValueAsString(body));
+            var row = jdbc.queryForMap("SELECT * FROM lab_tests WHERE id = ?", UUID.fromString(id));
+            List<String> expectedCategories = i == 2 ? List.of("BLOOD_TESTS", "THYROID") : categories.get(i);
+            for (Role role : Role.values()) {
+                for (boolean cookie : List.of(false, true)) {
+                    var request = get("/api/lab-tests/" + id);
+                    if (cookie) request.cookie(new Cookie("access_token", tokens.get(role)));
+                    else bearer(request, role);
+                    var response = mvc.perform(request).andExpect(status().isOk())
+                            .andExpect(jsonPath("$.id").value(id)).andExpect(jsonPath("$.code").value("DETAIL_" + i))
+                            .andExpect(jsonPath("$.name").value("Synthetic detail " + i))
+                            .andExpect(jsonPath("$.price").value(12.34)).andExpect(jsonPath("$.currency").value("ILS"))
+                            .andExpect(jsonPath("$.sampleType").value("SYNTHETIC")).andExpect(jsonPath("$.active").value(true))
+                            .andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expectedCategories)))
+                            .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.is(body.get("description"))))
+                            .andExpect(jsonPath("$.preparationInstructions").value(org.hamcrest.Matchers.is(body.get("preparationInstructions"))))
+                            .andReturn().getResponse();
+                    Map<?, ?> fields = json.readValue(response.getContentAsString(), Map.class);
+                    assertEquals(Set.of("id", "code", "name", "description", "price", "currency", "sampleType",
+                            "preparationInstructions", "active", "createdAt", "updatedAt", "categories"), fields.keySet());
+                    assertEquals(((java.sql.Timestamp) row.get("created_at")).toInstant(), Instant.parse((String) fields.get("createdAt")));
+                    assertEquals(((java.sql.Timestamp) row.get("updated_at")).toInstant(), Instant.parse((String) fields.get("updatedAt")));
+                }
+            }
+        }
+    }
+
+    @Test
+    void inactiveDetailsAreIndistinguishableFromMissingForPatientsAndVisibleToStaff() throws Exception {
+        for (boolean categorized : List.of(false, true)) {
+            String id = catalogTest(categorized ? "HIDDEN_CAT" : "HIDDEN_EMPTY", "Synthetic hidden details", false,
+                    categorized ? new String[]{"THYROID", "BLOOD_TESTS"} : new String[]{});
+            Map<?, ?> firstError = null;
+            for (Role role : Role.values()) {
+                for (boolean cookie : List.of(false, true)) {
+                    var request = get("/api/lab-tests/" + id).param("active", "true").param("role", "ADMIN");
+                    if (cookie) request.cookie(new Cookie("access_token", tokens.get(role)));
+                    else bearer(request, role);
+                    if (role == Role.PATIENT) {
+                        for (String requestedId : List.of(id, UUID.randomUUID().toString())) {
+                            var hiddenRequest = get("/api/lab-tests/" + requestedId).param("active", "true").param("role", "ADMIN");
+                            if (cookie) hiddenRequest.cookie(new Cookie("access_token", tokens.get(role)));
+                            else bearer(hiddenRequest, role);
+                            var response = mvc.perform(hiddenRequest).andExpect(status().isNotFound())
+                                    .andExpect(jsonPath("$.code").value("LAB_TEST_NOT_FOUND"))
+                                    .andExpect(jsonPath("$.message").value("Laboratory test not found."))
+                                    .andExpect(jsonPath("$.fieldErrors").isEmpty())
+                                    .andExpect(header().string("Cache-Control", "no-store"))
+                                    .andExpect(header().exists("X-Request-Id")).andReturn().getResponse();
+                            Map<?, ?> error = json.readValue(response.getContentAsString(), Map.class);
+                            assertEquals(Set.of("code", "message", "fieldErrors", "requestId"), error.keySet());
+                            assertEquals(response.getHeader("X-Request-Id"), error.remove("requestId"));
+                            if (firstError == null) firstError = error;
+                            else assertEquals(firstError, error);
+                        }
+                    } else {
+                        mvc.perform(request).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id))
+                                .andExpect(jsonPath("$.active").value(false))
+                                .andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(
+                                        categorized ? List.of("BLOOD_TESTS", "THYROID") : List.of())));
+                    }
+                }
+            }
+            mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}"))
+                    .andExpect(status().isOk());
+            mvc.perform(bearer(get("/api/lab-tests/" + id), Role.PATIENT))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
+        }
+    }
+
+    @Test
+    void detailIdentifierErrorsAndAuthenticationKeepExistingEnvelopesAndStatuses() throws Exception {
+        String id = catalogTest("DETAIL_AUTH", "Synthetic authentication test", true);
+        String missing = UUID.randomUUID().toString();
+        for (Role role : Role.values()) {
+            for (String invalid : List.of("invalid", "1-1-1-1-1", "00000000-0000-0000-0000-00000000000G")) {
+                mvc.perform(bearer(get("/api/lab-tests/" + invalid), role)).andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                        .andExpect(jsonPath("$.fieldErrors.id").value("Invalid value."));
+            }
+            mvc.perform(bearer(get("/api/lab-tests/" + missing), role)).andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("LAB_TEST_NOT_FOUND"))
+                    .andExpect(jsonPath("$.fieldErrors").isEmpty());
+            mvc.perform(bearer(get("/api/lab-tests/" + id.toUpperCase(Locale.ROOT)), role))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id));
+        }
+        for (String requestedId : List.of(id, missing, "invalid")) {
+            mvc.perform(get("/api/lab-tests/" + requestedId)).andExpect(status().isUnauthorized());
+            mvc.perform(get("/api/lab-tests/" + requestedId).header("Authorization", "Bearer invalid"))
+                    .andExpect(status().isUnauthorized());
+            mvc.perform(get("/api/lab-tests/" + requestedId).cookie(new Cookie("access_token", "invalid")))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
     void categoryMembershipReturnsUniqueTestsWithAllAssignmentsAndAllIncludesUncategorized() throws Exception {
         String multi = catalogTest("MULTI", "A synthetic", true, "THYROID", "BLOOD_TESTS");
         String blood = catalogTest("BLOOD", "B synthetic", true, "BLOOD_TESTS");
@@ -475,7 +582,10 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         for (Role role : Role.values()) {
             Cookie access = new Cookie("access_token", tokens.get(role));
             mvc.perform(get("/api/lab-tests").cookie(access)).andExpect(status().isOk());
-            mvc.perform(get("/api/lab-tests/" + id).cookie(access)).andExpect(status().isOk());
+            // The ADMIN iteration deactivates this test; later PATIENT detail reads must now be hidden.
+            boolean hidden = role == Role.PATIENT && !jdbc.queryForObject(
+                    "SELECT active FROM lab_tests WHERE id = ?", Boolean.class, UUID.fromString(id));
+            mvc.perform(get("/api/lab-tests/" + id).cookie(access)).andExpect(status().is(hidden ? 404 : 200));
             for (int operation = 0; operation < 3; operation++) {
                 for (String protection : List.of("missing", "mismatched", "valid")) {
                     var request = switch (operation) {

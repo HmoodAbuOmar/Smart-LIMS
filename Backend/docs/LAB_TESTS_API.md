@@ -4,9 +4,9 @@ Traceability: R-CAT-01 and R-NFR-01; existing slice T-CAT-00 in the [backend SDL
 
 Implemented catalog endpoints use `/api/lab-tests` and JSON. Test Parameters and Reference Ranges are separate modules. Schema names follow `DATABASE_DESIGN.md` (`active`, not `is_active`). Flyway V4 defines the base catalog and remains unchanged.
 
-Task 3 implementation update (2026-10-28): POST/PUT accept category arrays persisted through the Task 2 `LabTest.categories` mapping and V6 table. PUT replaces the complete set; PATCH status preserves assignments. Every test response includes the full array in contract order, or `[]`. V1-V6 are unchanged. Task 4 adds singular category membership filtering and patient active-only list visibility. Task 5 inactive-detail restrictions remain unimplemented. Storage, assignment, and list verification are recorded separately in [TESTING.md](TESTING.md).
+Stage 1 catalog implementation (2026-10-28): POST/PUT accept category arrays persisted through the Task 2 `LabTest.categories` mapping and V6 table. PUT replaces the complete set; PATCH status preserves assignments. Every test response includes the full array in contract order, or `[]`. V1-V6 are unchanged. Task 4 adds singular category membership filtering and patient active-only list visibility. Task 5 enforces patient active-only details, returning the same 404 as a missing test for inactive records while retaining staff access. Storage, assignment, list, and final detail/regression verification are recorded separately in [TESTING.md](TESTING.md).
 
-All endpoints require an eligible authenticated account using the existing bearer token or access cookie. Cookie writes also require the existing CSRF token. ADMIN, RECEPTIONIST, and LAB_TECHNICIAN may list either availability state. PATIENT lists return active tests only; a well-formed `active=false` is forbidden. Detail access is currently unchanged for all four roles, including inactive entries; patient inactive-detail 404 is deferred to Task 5. Only ADMIN can write. No delete endpoint exists: deactivate records to retain their identity for historical references.
+All endpoints require an eligible authenticated account using the existing bearer token or access cookie. Cookie writes also require the existing CSRF token. ADMIN, RECEPTIONIST, and LAB_TECHNICIAN may list either availability state. PATIENT lists return active tests only; a well-formed `active=false` is forbidden. Staff may read active or inactive details. PATIENT may read active details only; inactive details return the same 404 as a missing test. Only ADMIN can write. No delete endpoint exists: deactivate records to retain their identity for historical references.
 
 | Method | Path | Purpose | Success |
 |---|---|---|---|
@@ -43,6 +43,10 @@ The status request is `{"active":false}` or `{"active":true}`. The field is requ
 
 Create, detail, replace, and status return `id`, `code`, `name`, `description`, `price`, `currency`, `sampleType`, `preparationInstructions`, `active`, `createdAt`, `updatedAt`, and `categories`. List content uses the same DTO. `categories` always contains every assigned identifier in the vocabulary-table order and is `[]` when empty, never null. IDs are UUIDs and timestamps are UTC ISO instants. Internal JPA entities are never returned.
 
+`GET /api/lab-tests/{id}` returns the complete DTO above for an authorized visible test. This includes nullable description/preparation text, price/currency, sample type, both UTC timestamps, and the full ordered categories array (`[]` when unassigned); no persistence/internal fields are exposed. Active uncategorized tests remain readable. Reads require no patient-profile ownership or creation.
+
+The service checks detail visibility before mapping: PATIENT receives 404 `LAB_TEST_NOT_FOUND`, message `Laboratory test not found.`, and empty `fieldErrors` for both inactive and missing valid UUIDs. No test fields are included in either error, and query parameters cannot override this policy. Staff retain inactive details. Malformed/noncanonical UUIDs return 400 `VALIDATION_ERROR` on `id`; canonical UUIDs may use either letter case. Missing/invalid authentication retains 401 and precedes detail validation. Error responses retain matching `X-Request-Id` and `Cache-Control: no-store`.
+
 List accepts these optional parameters, each at most once:
 
 | Parameter | Default | Validation |
@@ -70,7 +74,7 @@ Errors follow the existing `{code,message,fieldErrors,requestId}` format, with `
 | 400 | INVALID_JSON | Malformed body or incorrect JSON type, including category containers/elements |
 | 401 | UNAUTHORIZED | Missing or invalid authentication |
 | 403 | FORBIDDEN | Wrong role, patient explicit inactive-list request, or invalid/missing cookie CSRF protection |
-| 404 | LAB_TEST_NOT_FOUND | Valid UUID with no catalog test |
+| 404 | LAB_TEST_NOT_FOUND | Valid UUID missing, or inactive when requested by PATIENT |
 | 405 | Framework response | Unsupported method when the request reaches MVC; the security filter can reject unconfigured methods with 403 first |
 | 409 | LAB_TEST_CODE_IN_USE | Normalized code already exists |
 | 415 | Framework response or INVALID_REQUEST | Unsupported Content-Type on POST, PUT, or PATCH after authentication and CSRF checks |
@@ -80,7 +84,7 @@ Errors follow the existing `{code,message,fieldErrors,requestId}` format, with `
 
 ## Stage 1 Task 1: patient catalog target contract
 
-Reviewed 2026-10-27 against the existing `labtests` controller, DTOs, service, mapper, repository, specifications, error handlers, security matchers, and Flyway V1-V5 sources; persistence updated in Task 2 on 2026-10-28 with V6. This section retains the finalized Stage 1 contract. Category storage/mapping and Task 3 category assignment/response arrays are implemented. Task 4 implements membership filtering and patient active-only list behavior. Patient inactive-detail restrictions remain **not implemented** (Task 5). The preceding sections describe current HTTP behavior; the inactive-detail 404 rule/example below remains a target. Each task has separate verification evidence.
+Reviewed 2026-10-27 against the existing `labtests` controller, DTOs, service, mapper, repository, specifications, error handlers, security matchers, and Flyway V1-V5 sources; persistence updated in Task 2 on 2026-10-28 with V6. This section retains the finalized Stage 1 contract. Category storage/mapping and Task 3 category assignment/response arrays are implemented. Task 4 implements membership filtering and patient active-only list behavior. Task 5 implements patient inactive-detail 404 and completes the catalog implementation. The finalized Stage 1 contract below now describes implemented behavior. Each task has separate verification evidence; final focused/full-suite results are recorded in TESTING.md. The plan separately records the unperformed commit criterion and unverified deployment readiness.
 
 Traceability: Stage 1 Task 1 in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md#task-1--catalog-requirements-and-api-contract), extending existing R-CAT-01 and R-NFR-01. Stage 1 Task 1 is distinct from the older parameter task identifier T-CAT-01. Local acceptance IDs: S1-CAT-R01 (fields/categories), S1-CAT-R02 (queries/discovery), S1-CAT-R03 (permissions), and S1-CAT-R04 (legacy-data compatibility).
 
@@ -125,7 +129,7 @@ Clients obtain the supported values and labels from this versioned contract and 
 | S1-CAT-D01: category cardinality | A test may belong to multiple categories; categories may contain multiple tests. | Zero-to-many fixed identifiers per test, stored as assignment rows; array DTO field. |
 | S1-CAT-D02: category requirement and uncategorized visibility | Categories are optional for existing and new tests. Active tests with no categories remain visible in "All". | No required assignment or automatic backfill; unassigned active tests also retain direct detail access. |
 
-These decisions replace the earlier single-category proposal. Technical choices below finalize the target contract; Task 2 storage/mapping and Task 3 assignment/response arrays are implemented. No clinical test-to-category mapping has been approved, and none may be inferred from names or sample types. Task 1 was documentation only; Task 4 adds membership queries and list availability policy. Task 5 remains TODO and unexecuted.
+These decisions replace the earlier single-category proposal. Technical choices below finalize the target contract; Task 2 storage/mapping and Task 3 assignment/response arrays are implemented. No clinical test-to-category mapping has been approved, and none may be inferred from names or sample types. Task 1 was documentation only; Task 4 adds membership queries and list availability policy. Task 5 adds detail visibility and final catalog regression verification; future workflow modules remain out of scope.
 
 ### Category assignment and legacy handling (S1-CAT-R04)
 
@@ -230,7 +234,7 @@ Detail/create/replace/status return the single object inside `content`, with POS
 
 Its response is the same test DTO shape above with its server-assigned UUID/timestamps, these catalog fields, `active: true` on creation, and `categories: []`. It appears in an unfiltered patient list while active, but not under `category=BLOOD_TESTS` or any other category filter. A first empty page has `content: []`, `totalElements: 0`, `totalPages: 0`, `first: true`, and `last: true`.
 
-Examples of query failures (request IDs are synthetic; the inactive-detail example remains a Task 5 target):
+Examples of catalog failures (request IDs are synthetic):
 
 ```json
 {"code":"VALIDATION_ERROR","message":"Invalid value.","fieldErrors":{"category":"Invalid value."},"requestId":"22222222-2222-4222-8222-222222222222"}
@@ -242,7 +246,7 @@ The above is 400 for `?category=All`. A body containing `"categories": ["THYROID
 {"code":"FORBIDDEN","message":"Access denied.","fieldErrors":{},"requestId":"33333333-3333-4333-8333-333333333333"}
 ```
 
-Task 5 target (not implemented): a PATIENT requesting an inactive test by valid UUID receives 404:
+A PATIENT requesting an inactive test by valid UUID receives 404:
 
 ```json
 {"code":"LAB_TEST_NOT_FOUND","message":"Laboratory test not found.","fieldErrors":{},"requestId":"44444444-4444-4444-8444-444444444444"}
@@ -250,11 +254,11 @@ Task 5 target (not implemented): a PATIENT requesting an inactive test by valid 
 
 ### Task 1 acceptance review
 
-Fields, filters, and actions were reviewed against the available catalog screenshot, written plan, and existing source. Stable identifiers/labels, static discovery, array request/response rules, membership filtering, errors, target permissions, legacy handling, and the [assignment-table design in DATABASE_DESIGN.md section 4.4a](DATABASE_DESIGN.md#44a-stage-1-category-design-task-1) are aligned. S1-CAT-D01/D02 are resolved by the owner's explicit multiple/optional category decisions. Task 1 is DONE; its documentation-only review ran no application, tests, migrations, or database operations. Task 2 subsequently implements storage/mapping with separately recorded focused verification. Task 3 implements assignment/response arrays with focused verification recorded below. Task 4 implements membership queries and patient list availability with separate focused evidence. Task 5 remains TODO; inactive-detail restrictions and final stage verification are still future work.
+Fields, filters, and actions were reviewed against the available catalog screenshot, written plan, and existing source. Stable identifiers/labels, static discovery, array request/response rules, membership filtering, errors, target permissions, legacy handling, and the [assignment-table design in DATABASE_DESIGN.md section 4.4a](DATABASE_DESIGN.md#44a-stage-1-category-design-task-1) are aligned. S1-CAT-D01/D02 are resolved by the owner's explicit multiple/optional category decisions. Task 1 is DONE; its documentation-only review ran no application, tests, migrations, or database operations. Task 2 subsequently implements storage/mapping with separately recorded focused verification. Task 3 implements assignment/response arrays with focused verification recorded below. Task 4 implements membership queries and patient list availability with separate focused evidence. Task 5 implements inactive-detail restrictions and records final focused/full-suite evidence separately. Catalog implementation/verification completion is distinct from the plan's pending commit criterion and unverified deployment readiness.
 
 ## Verification
 
-Historical full-suite evidence: [TESTING.md](TESTING.md#verification-after-launcher-removal-2026-10-27) records 141 tests across 17 suites passing on the isolated cluster on 2026-10-27, including the catalog suites. That historical documentation review performed source/document checks only. Task 3 evidence is recorded separately in [TESTING.md](TESTING.md#task-3-administrative-category-assignment-verification-2026-10-28); current Task 4 commands/results are in the [Task 4 verification record](TESTING.md#task-4-catalog-list-filtering-verification-2026-10-28). On Windows use `.\mvnw.cmd` directly as documented there.
+Historical full-suite evidence: [TESTING.md](TESTING.md#verification-after-launcher-removal-2026-10-27) records 141 tests across 17 suites passing on the isolated cluster on 2026-10-27, including the catalog suites. That historical documentation review performed source/document checks only. Task 3 evidence is recorded separately in [TESTING.md](TESTING.md#task-3-administrative-category-assignment-verification-2026-10-28); Task 4 commands/results are in the [Task 4 verification record](TESTING.md#task-4-catalog-list-filtering-verification-2026-10-28). Current Task 5 focused and single complete-suite results are recorded in the [Task 5 verification record](TESTING.md#task-5-detail-and-catalog-completion-verification-2026-10-28). On Windows use `.\mvnw.cmd` directly as documented there.
 
 Run `.\mvnw.cmd '-Dtest=LabTestRequestTest,LabTestServiceTest,LabTestErrorHandlerTest,BrowserSecurityTest' test` from Backend for database-free verification. Unit tests cover normalization, validation, strict JSON types, query limits, service authorization, status preservation, and concurrent-constraint error translation. `LabTestManagementTest` additionally covers real PostgreSQL persistence, HTTP security, literal searching, pagination, and concurrent creation. Like the existing integration suites it runs only when `SMARTLIMS_TEST_DATABASE_URL` points to `jdbc:postgresql://127.0.0.1:<port>/smartlims_auth_regression`, using user postgres and an empty password. Use only a dedicated disposable database: integration fixtures truncate its application tables.
 

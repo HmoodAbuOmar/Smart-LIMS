@@ -68,7 +68,10 @@ public class LabTestService {
     @Transactional(readOnly = true)
     public LabTestResponse get(Authentication actor, String id) {
         requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
-        return mapper.toResponse(tests.findById(identifier(id)).orElseThrow(LabTestException::missing));
+        LabTest test = tests.findById(identifier(id)).orElseThrow(LabTestException::missing);
+        if (!test.isActive() && actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT")))
+            throw LabTestException.missing();
+        return mapper.toResponse(test);
     }
 
     @Transactional
