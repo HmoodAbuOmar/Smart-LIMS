@@ -309,3 +309,50 @@ blockquote { color: var(--medical-secondary); }
     box-shadow: 0 0 0 1000px var(--field-background) inset, var(--field-focus-glow);
   }
 }
+
+/* Authentication controls: shared palette, scoped to the split card. */
+
+
+
+
+
+
+.patient-auth .auth-submit {
+  color: var(--button-primary-text);
+  background: var(--button-primary-bg);
+  border-color: var(--button-primary-bg);
+  box-shadow: none;
+  transition: background .225s ease, color .225s ease, border-color .225s ease, box-shadow .225s ease, transform .225s ease;
+}
+.patient-auth .auth-submit:not(:disabled):hover {
+  color: var(--button-primary-text);
+  background: var(--button-primary-hover-bg);
+  border-color: var(--button-primary-hover-bg);
+  box-shadow: var(--button-primary-shadow);
+}
+.patient-auth .auth-submit:focus-visible {
+  outline: 2px solid var(--medical-mint);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--medical-deep);
+}
+:root body .patient-auth :is(input:not(:where([type='button'], [type='submit'], [type='reset'], [type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='image'], [type='hidden'])), textarea, select) {
+  background: var(--field-background);
+  color: var(--medical-deep);
+  caret-color: var(--medical-deep);
+
+  &:focus {
+    background: var(--field-background);
+    outline: none;
+    box-shadow: var(--field-focus-glow);
+  }
+  &:focus:not([aria-invalid='true']) { border-color: var(--field-focus-border); }
+
+  &:is(:autofill, :-webkit-autofill) {
+    background: var(--field-background);
+    -webkit-text-fill-color: var(--medical-deep);
+    box-shadow: 0 0 0 1000px var(--field-background) inset;
+  }
+  &:is(:autofill, :-webkit-autofill):focus {
+    box-shadow: 0 0 0 1000px var(--field-background) inset, var(--field-focus-glow);
+  }
+}
