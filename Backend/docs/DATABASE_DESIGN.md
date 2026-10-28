@@ -1,14 +1,16 @@
 # Smart-LIMS Database Design
 
-Status: agreed implementation baseline for the scope described below.
-Review note: draft measurements may remain unfilled; required-parameter snapshots are persisted per result version.
-Updated: 2026-10-26 (patient phase 2).
-Migration integration note: main is merged; V4__lab_tests.sql is unchanged and patient linking is prepared as V5__patient_link_tokens.sql with unchanged SQL. The previously audited development database still has the legacy V4 linking identity and requires a separately authorized manual reconciliation before startup. This source preparation did not connect to or modify it. See PATIENTS_API.md section 15.9 and PATIENT_LINKING_V5_RECONCILIATION.md.
+Status: implemented-schema inventory plus carried-forward design for unimplemented features.
+Updated: 2026-10-27 (documentation-only SDLC review).
+Task 2 source update: 2026-10-28; V6 adds category persistence/mapping only. Verification is recorded separately in [TESTING.md](TESTING.md#task-2-category-persistence-verification-2026-10-28); this does not establish development/production migration status or future category API behavior.
+Requirements, decisions, task IDs and completion evidence: [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). The scope is confirmed; unimplemented column/state/workflow proposals still require the applicable decision and API contract before coding. This design is not evidence of deployed functionality.
+Planned results allow unfilled draft measurements and preserve required-parameter snapshots per version; results are not implemented yet.
+Migration integration: canonical source is V1-V6. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. V6 source/test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
 Intended repository path: `Backend/docs/DATABASE_DESIGN.md`.
 
 ## 1. Scope and implementation status
 
-This document defines the database target for Smart-LIMS. It is a design contract, not evidence that every table or module has already been implemented.
+This document inventories the current schema and preserves the proposed database target. Requirements and open decisions in the implementation plan govern new-feature contracts; proposed detail here must not silently settle those decisions.
 
 - PostgreSQL 16; UUID identifiers; Spring Boot/JPA backend.
 - One laboratory and one booking schedule.
@@ -18,18 +20,38 @@ This document defines the database target for Smart-LIMS. It is a design contrac
 - Patient name, birth date, gender, and phone are required; address is optional; phone numbers are not unique.
 - Initial monetary currency: ILS.
 - Payments are recorded manually or by external transaction reference; no payment gateway is included in this baseline.
-- The target contains 21 application tables, including the phase-2 `patient_link_tokens` addition. `flyway_schema_history` is technical and excluded from that count.
-- `users`, `email_action_tokens`, `patients`, `lab_tests`, and `patient_link_tokens` are implemented through V1-V5. Other application tables remain implementation targets.
+- The inventory lists 22 application tables: six implemented in source migrations, fourteen planned for the core workflow, and two deferred for AI. `flyway_schema_history` and `patient_number_seq` are technical objects, not additional application tables. Category migration verification uses only the isolated test cluster; development/production application of V6 is not established.
+- `users`, `email_action_tokens`, `patients`, `lab_tests`, `patient_link_tokens`, and `lab_test_categories` are implemented through V1-V6. Other application tables remain implementation targets.
 - The supplied SQL also adds `users.reset_code_failed_attempts`; it is included here.
 - Preserve existing authentication behavior. Do not recreate existing authentication tables or rewrite an applied migration.
 - Symptom-based suggestions are scheduled for a later AI phase. Further AI result-analysis persistence is outside this baseline and requires a separate scope decision.
+
+### 1.1. Implemented migrations and recorded reconciliation
+
+| Migration | Implemented schema change | Requirements / task evidence |
+|---|---|---|
+| V1__auth_foundation.sql | users, email_action_tokens, account/token checks and indexes | R-AUTH-01/02; T-AUTH-01 |
+| V2__password_reset_attempts.sql | users.reset_code_failed_attempts and range constraint | R-AUTH-02; T-AUTH-01 |
+| V3__patients.sql | patients, patient_number_seq, retained account/creator FKs and indexes | R-PAT-01/02; T-PAT-01 |
+| V4__lab_tests.sql | lab_tests, price/currency/code checks and indexes | R-CAT-01; T-CAT-00 |
+| V5__patient_link_tokens.sql | patient_link_tokens, outstanding-token uniqueness and state/hash checks | R-PAT-02; T-PAT-01 |
+| V6__lab_test_categories.sql | Empty category assignment table; composite PK, catalog FK, seven-value CHECK, reverse membership index | R-CAT-01/R-NFR-01; Stage 1 Task 2; isolated-test evidence in TESTING.md |
+
+The private `Smart-LIMS-DB-Backups` directory retains `reconciliation-result-20261026-221059.json`, `flyway-before-20261026-221059.csv`, `flyway-after-20261026-221059.csv`, `validation-normal-20261026-221059.log`, and the backup archive. These are historical operator artifacts, inspected as files only in this review:
+
+- The result records completion at **2026-10-26 22:16:15 +02:00**, verified backup restoration, unchanged full business rows, and successful normal-order validation for the development database.
+- Before/after history shows legacy V4 linking reclassified as V5 with checksum **504398204** and original installed rank **4** preserved. Missing lab V4, checksum **-1646872382**, was then installed at rank **5**. All five recorded migrations succeeded.
+- The normal-order log confirms five migrations validated and the schema up to date. This supports completed recovery for the recorded state; it does not establish today's database contents or any other environment's history. No database was connected to or changed during this documentation task.
+- Do not repeat recovery on a database with canonical V4 lab/V5 linking history. The [runbook](PATIENT_LINKING_V5_RECONCILIATION.md) is retained only for the exact legacy preconditions and separately authorized use. Other environments remain an inventory decision (D-OPS).
+
+Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 141 tests across 17 suites passing on 2026-10-27, including six migration compatibility cases. No tests were run now. Table presence and those historical runs do not establish clinical or production acceptance for planned modules.
 
 ## 2. Naming and data conventions
 
 - Table/column names use snake_case.
 - `Nullable: No` means NOT NULL; primary keys are inherently NOT NULL.
 - Every standalone `id` is UUID, generated following the existing application convention.
-- `result_samples` uses a composite primary key.
+- `result_samples` and `lab_test_categories` use composite primary keys.
 - All event timestamps use TIMESTAMPTZ. Display times using Asia/Jerusalem where appropriate.
 - `created_at` defaults to CURRENT_TIMESTAMP. `updated_at` defaults to CURRENT_TIMESTAMP on insertion and must be updated by the application on subsequent writes; a DEFAULT alone does not maintain it.
 - Money uses NUMERIC(12,2) and BigDecimal. Laboratory numeric values use NUMERIC; reject NaN and infinity at the input boundary.
@@ -39,31 +61,32 @@ This document defines the database target for Smart-LIMS. It is a design contrac
 - Foreign keys use RESTRICT/NO ACTION for retained business history unless explicitly stated otherwise. The existing email token FK retains ON DELETE CASCADE.
 - Foreign keys and CHECK constraints cannot alone enforce every cross-table rule below; implement the stated transaction/service validations or triggers.
 
-## 3. Complete table list
+## 3. Table inventory and proposed target
 
-| # | Table | Purpose |
-|---|---|---|
-| 1 | `users` | System accounts and authentication state. Preserve the existing implementation. |
-| 2 | `email_action_tokens` | Existing account action tokens for email verification, password reset, and invitation acceptance. |
-| 3 | `patients` | Laboratory patient profiles. A profile may exist without a login account. |
-| 4 | `lab_tests` | Orderable laboratory tests, their current prices, and preparation instructions. |
-| 5 | `test_parameters` | Individual measurements within a test, such as WBC or HGB within CBC. |
-| 6 | `reference_ranges` | Approved numeric or textual reference ranges by parameter, age, sex, and validity period. |
-| 7 | `test_orders` | The main laboratory order belonging to a patient. |
-| 8 | `order_items` | The individual tests selected within an order, including historical name and price snapshots. |
-| 9 | `appointment_slots` | Available booking periods and the maximum number of appointments for each period. |
-| 10 | `appointments` | An optional appointment for a laboratory order. |
-| 11 | `payments` | Payment and refund records. This design does not integrate a payment gateway. |
-| 12 | `samples` | Physical samples collected for an order, including receipt, rejection, and replacement tracking. |
-| 13 | `sample_tests` | Many-to-many links between physical samples and ordered tests. |
-| 14 | `test_results` | Result versions for one ordered test, with validation, publication, and correction history. |
-| 15 | `result_samples` | The exact sample-to-test links used by each result version. |
-| 16 | `result_values` | Individual measured values and historical parameter/reference snapshots within a result version. |
-| 17 | `notifications` | User notifications and delivery/retry state. |
-| 18 | `audit_logs` | Append-only records of important business actions. |
-| 19 | `symptom_assessments` | Patient symptom-analysis sessions for the later test-suggestion feature. |
-| 20 | `suggested_tests` | Laboratory tests suggested by a symptom assessment. |
-| 21 | `patient_link_tokens` | Short-lived, single-use capabilities for verified patient account/profile linking. |
+| # | Table | Status | Purpose |
+|---|---|---|---|
+| 1 | `users` | Implemented V1/V2 | System accounts and authentication state. Preserve the existing implementation. |
+| 2 | `email_action_tokens` | Implemented V1 | Account verification/invitation tokens; RESET_PASSWORD is allowed by the schema but current recovery uses users fields. |
+| 3 | `patients` | Implemented V3 | Laboratory patient profiles. A profile may exist without a login account. |
+| 4 | `lab_tests` | Implemented V4 | Orderable laboratory tests, their current prices, and preparation instructions. |
+| 5 | `test_parameters` | Planned; T-CAT-02/03 | Individual measurements within a test, such as WBC or HGB within CBC. |
+| 6 | `reference_ranges` | Planned; T-REF-02/03 | Approved numeric or textual reference ranges by parameter, age, sex, and validity period. |
+| 7 | `test_orders` | Planned; T-ORD-02/03 | The main laboratory order belonging to a patient. |
+| 8 | `order_items` | Planned; T-ORD-02/03 | The individual tests selected within an order, including historical name and price snapshots. |
+| 9 | `appointment_slots` | Planned; T-APT-02 | Available booking periods and the maximum number of appointments for each period. |
+| 10 | `appointments` | Planned; T-APT-03/04 | An optional appointment for a laboratory order. |
+| 11 | `payments` | Planned; T-PAY-02/03 | Payment and refund records. This design does not integrate a payment gateway. |
+| 12 | `samples` | Planned; T-SMP-02/03 | Physical samples collected for an order, including receipt, rejection, and replacement tracking. |
+| 13 | `sample_tests` | Planned; T-SMP-02 | Many-to-many links between physical samples and ordered tests. |
+| 14 | `test_results` | Planned; T-RES-02 to T-RES-05 | Result versions for one ordered test, with validation, publication, and correction history. |
+| 15 | `result_samples` | Planned; T-RES-02 | The exact sample-to-test links used by each result version. |
+| 16 | `result_values` | Planned; T-RES-02/03 | Individual measured values and historical parameter/reference snapshots within a result version. |
+| 17 | `notifications` | Planned; T-NTF-02/03 | User notifications and delivery/retry state. |
+| 18 | `audit_logs` | Planned; T-AUD-02/03 | Append-only records of important business actions. |
+| 19 | `symptom_assessments` | Deferred AI; T-AI-01 | Patient symptom-analysis sessions for the later test-suggestion feature. |
+| 20 | `suggested_tests` | Deferred AI; T-AI-01 | Laboratory tests suggested by a symptom assessment. |
+| 21 | `patient_link_tokens` | Implemented V5 | Short-lived, single-use capabilities for verified patient account/profile linking. |
+| 22 | `lab_test_categories` | Implemented V6; Stage 1 Task 2 | Zero-to-many fixed category assignments per test; composite key prevents duplicate membership. Task 3 implements API assignment/response arrays; filtering remains planned. |
 
 ## 4. Table specifications
 
@@ -71,7 +94,7 @@ This document defines the database target for Smart-LIMS. It is a design contrac
 
 System accounts and authentication state. Preserve the existing implementation.
 
-Implementation status: existing; preserve supplied schema and current behavior.
+Implementation status: implemented in V1/V2; preserve the actual migrations and current account behavior. T-AUTH-01 records bounded verification, not deployment readiness.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -109,9 +132,9 @@ Implementation status: existing; preserve supplied schema and current behavior.
 
 ### 4.2. `email_action_tokens`
 
-Existing account action tokens for email verification, password reset, and invitation acceptance.
+Existing account action tokens for email verification and invitation acceptance. RESET_PASSWORD is allowed by the schema; current recovery uses the users reset-code fields.
 
-Implementation status: existing; preserve supplied schema and current behavior.
+Implementation status: implemented in V1; preserve the actual migration and current token behavior.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -166,7 +189,7 @@ Implementation status: implemented in V3; phase-2 self-profile creation and veri
 
 ### 4.3a. `patient_link_tokens`
 
-Implementation status: implemented by `V5__patient_link_tokens.sql`; separate from authentication/email tokens. Its SQL is byte-identical to the original linking V4. The legacy development V4 history is not modified by this source rename; use the separately reviewed recovery runbook. V4__lab_tests.sql remains unchanged.
+Implementation status: implemented by `V5__patient_link_tokens.sql`; separate from authentication/email tokens. Its SQL is byte-identical to the original linking V4. Source renumbering and later recorded development reconciliation are separate events; section 1.1 documents completed historical recovery. V4__lab_tests.sql remains unchanged.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -208,16 +231,44 @@ Implementation status: implemented in main's unchanged V4__lab_tests.sql. The cu
 
 **Rules and relationships**
 
-- code is unique and normalized consistently. A simple test has one parameter; a panel has multiple parameters.
+- Implemented: code is trimmed/uppercased and constrained to the LAB_TESTS_API format; currency is ILS. ADMIN writes; all four authenticated roles may read, including inactive entries. PUT preserves availability; PATCH changes it. No delete endpoint exists.
+- Planned R-CAT-02: a simple test has one parameter; a panel has multiple parameters. The current basic catalog does not enforce a parameter count because parameters are not implemented.
 - price must be >= 0. Use NUMERIC(12,2) and Java BigDecimal for money. Initial currency is ILS. [S2]
 - sample_type is the default sample description; multiple required specimen types are handled by laboratory workflow in the initial scope.
-- Deactivate a test instead of deleting one referenced by historical orders. Current price changes affect new orders only.
+- Current catalog supports deactivation and has no order references yet. Planned R-ORD-01: snapshot prices/names so future catalog changes cannot alter historical orders.
+
+### 4.4a. Stage 1 category design (Task 1)
+
+Contract review: 2026-10-27; Task 2 persistence implementation: 2026-10-28. The V4 `lab_tests` table above remains unchanged. V6 adds `lab_test_categories`; V1-V5 remain byte-for-byte unchanged. The [Stage 1 catalog contract](LAB_TESTS_API.md#stage-1-task-1-patient-catalog-target-contract) remains the source for identifiers, future query/discovery rules, array examples, and target permissions. This design extends R-CAT-01/R-NFR-01; Stage 1 Task 1 is separate from the older T-CAT-01 parameter task.
+
+**Confirmed decisions:** the owner approved multiple categories per test (S1-CAT-D01), optional categories for existing/new tests, and active uncategorized tests remaining visible in "All" (S1-CAT-D02). Task 1 is DONE. Task 2 implements persistence; Task 3 adds administrative assignment and response arrays through that mapping. Tasks 4-5 remain TODO. Category membership queries and patient inactive-test restrictions remain future changes.
+
+#### `lab_test_categories` assignment table (V6)
+
+The relationship is zero-to-many categories per test and zero-to-many tests per category. V6 uses one collection/association table with fixed string category identifiers; no scalar `lab_tests.category`, standalone category lookup table, or stored label. The absence of assignment rows represents an uncategorized test. This is inventory item 22.
+
+| Column | PostgreSQL type | Nullable | Key / default | Meaning |
+|---|---|---|---|---|
+| `lab_test_id` | `UUID` | No | Composite PK; FK lab_tests.id; NO ACTION | Assigned catalog test |
+| `category` | `VARCHAR(30)` | No | Composite PK; fixed-vocabulary CHECK; no default | One stable category identifier |
+
+- `PRIMARY KEY (lab_test_id, category)` prevents duplicate assignment of the same category to the same test, including concurrent inserts. Do not add uniqueness on either column alone: a test may have multiple categories and the same category may be assigned to multiple tests. No surrogate UUID or assignment timestamp is needed.
+- `FOREIGN KEY (lab_test_id) REFERENCES lab_tests(id)` with NO ACTION prevents orphan assignments and follows retained catalog identity conventions. Catalog deletion remains unsupported; deactivation preserves assignments. Removing an assignment through ADMIN PUT deletes only the corresponding collection row, never its test.
+- The CHECK is `category IN ('BLOOD_TESTS', 'VITAMINS_MINERALS', 'THYROID', 'LIVER', 'KIDNEY', 'LIPIDS', 'DIABETES')`. Together with NOT NULL and the composite key, this bounds each test to zero through seven valid unique assignments. "All", blank, null, and arbitrary/differently cased identifiers cannot be stored. Use string-enum values, never enum ordinals; labels and display order remain contract/client mappings. A category can have no tests without requiring a placeholder row.
+- Retain existing lab_tests indexes. The composite PK covers per-test category loading and its FK. Add B-tree `lab_test_categories(category, lab_test_id)` for category membership queries. Use EXISTS (or an equivalent query preserving one row per test), then apply authorized availability/search, totals, sorting, and pagination over tests. Filtering must not duplicate content or inflate counts; return each matching test's full category set in contract order.
+- V6 creates only the empty assignment table and reverse index, without data inference, legacy backfill, or changes to lab_tests rows. V1-V5 remain unchanged. UUIDs, names, descriptions, prices, currency, sample types, preparation instructions, availability, and timestamps are preserved. No fabricated "uncategorized" row/value or automatic deactivation.
+- Implemented JPA mapping: lazy `@ElementCollection` set on LabTest, with `@Enumerated(STRING)` LabTestCategory values backed by this table; existing LabTestRepository supplies persistence. The seven enum constants match the contract/CHECK. No category entity, new repository, or independent lifecycle is needed. Task 3 validates the string-list DTO before conversion (including duplicates, exact enum values, null elements and count) and emits arrays ([] when unassigned) in enum declaration/contract order. Strict JSON parsing rejects wrong container/element types without coercion.
+- Implemented Task 3 HTTP contract: POST omission/null/empty array creates zero assignments. PUT omission/null/empty array clears all assignments; a nonempty array replaces the complete set atomically with catalog-field changes under the existing test-row lock and transaction. All failure paths roll back both field and membership writes. Category changes preserve availability; PATCH status preserves assignments. No extra assignment or category-management endpoint is introduced. Task 3 changes the Task 2 PUT behavior from preserving internally assigned categories to replacing/clearing them as specified. The lazy collection is mapped to response DTOs inside existing read/write transactions; no schema or migration change is needed.
+- Future Tasks 4-5 HTTP contract: active unassigned tests remain visible to patients in "All" and direct details. Staff retain availability-filtered access. A named-category filter includes a test when it has that membership and excludes unassigned tests. No explicit category filter means all category sets, including empty, subject to caller visibility. Membership filtering and patient inactive restrictions are not part of Tasks 2-3.
+- Target authorization remains: PATIENT list defaults to active-only, explicit `active=false` is 403, and inactive detail is indistinguishable from missing (404). Staff retain inactive access; only ADMIN may change catalog fields/membership or availability. These are application authorization rules, not new database roles or row-level security.
+
+Task 1 evidence remains the source/contract and screenshot review on 2026-10-27, with no execution in that documentation-only task. Task 2 adds separate focused migration/persistence/catalog regression execution, recorded in TESTING.md and the plan. Task 3 adds focused HTTP/category/security execution recorded separately in TESTING.md and the plan. Membership queries and patient availability rules remain unimplemented/unverified; no development/production deployment readiness is established.
 
 ### 4.5. `test_parameters`
 
 Individual measurements within a test, such as WBC or HGB within CBC.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -245,7 +296,7 @@ Implementation status: target schema; implement incrementally.
 
 Approved numeric or textual reference ranges by parameter, age, sex, and validity period.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -278,7 +329,7 @@ Implementation status: target schema; implement incrementally.
 
 The main laboratory order belonging to a patient.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -308,7 +359,7 @@ Implementation status: target schema; implement incrementally.
 
 The individual tests selected within an order, including historical name and price snapshots.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -335,7 +386,7 @@ Implementation status: target schema; implement incrementally.
 
 Available booking periods and the maximum number of appointments for each period.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -359,7 +410,7 @@ Implementation status: target schema; implement incrementally.
 
 An optional appointment for a laboratory order.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -387,7 +438,7 @@ Implementation status: target schema; implement incrementally.
 
 Payment and refund records. This design does not integrate a payment gateway.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -419,7 +470,7 @@ Implementation status: target schema; implement incrementally.
 
 Physical samples collected for an order, including receipt, rejection, and replacement tracking.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -453,7 +504,7 @@ Implementation status: target schema; implement incrementally.
 
 Many-to-many links between physical samples and ordered tests.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -472,7 +523,7 @@ Implementation status: target schema; implement incrementally.
 
 Result versions for one ordered test, with validation, publication, and correction history.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -506,7 +557,7 @@ Implementation status: target schema; implement incrementally.
 - The first version has no previous_result_id. A correction references the latest published version for the same item, records a reason, and increments the version number.
 - Lock the order item during version allocation and publication to prevent concurrent draft creation or branching corrections.
 - Validation checks required parameters, eligible received samples, reference selection, and report snapshots. Record validated_by and validated_at.
-- Editing a VALIDATED version returns it to DRAFT and clears its validation metadata. One technician may enter, validate, and publish under the current four-role scope.
+- Proposed: editing a VALIDATED version returns it to DRAFT and clears its validation metadata. Whether one technician may enter, validate, and publish must be resolved in D-RES before implementation; this proposal grants no new permission.
 - Publication requires validation. In one transaction, set the old published version is_current = FALSE and the new one TRUE. is_current implies status = PUBLISHED.
 - Published values, samples, snapshots, and publication metadata must not be overwritten. Only the current-version marker changes when superseded.
 - Patient name/number, birth date, and gender snapshots are required before publication. Validation/publication timestamps and actors are required for their respective states.
@@ -516,7 +567,7 @@ Implementation status: target schema; implement incrementally.
 
 The exact sample-to-test links used by each result version.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -533,7 +584,7 @@ Implementation status: target schema; implement incrementally.
 
 Individual measured values and historical parameter/reference snapshots within a result version.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -575,7 +626,7 @@ Implementation status: target schema; implement incrementally.
 
 User notifications and delivery/retry state.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -607,7 +658,7 @@ Implementation status: target schema; implement incrementally.
 
 Append-only records of important business actions.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -632,7 +683,7 @@ Implementation status: target schema; implement incrementally.
 
 Patient symptom-analysis sessions for the later test-suggestion feature.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: deferred AI, absent from V1-V5; outside core implementation. T-AI-01 requires a separate later-phase baseline before any schema/API work.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -658,7 +709,7 @@ Implementation status: target schema; implement incrementally.
 
 Laboratory tests suggested by a symptom assessment.
 
-Implementation status: target schema; implement incrementally.
+Implementation status: deferred AI, absent from V1-V5; outside core implementation. T-AI-01 requires a separate later-phase baseline before any schema/API work.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -678,6 +729,8 @@ Implementation status: target schema; implement incrementally.
 
 ## 5. Relationship summary
 
+Links involving planned/deferred tables below are proposed relationships, not existing foreign keys. Implemented relationships are defined by the V1-V6 inventory in section 1.1.
+
 | Parent | Child / link | Cardinality or rule |
 |---|---|---|
 | users | email_action_tokens | One account to many action tokens |
@@ -685,6 +738,8 @@ Implementation status: target schema; implement incrementally.
 | patients | patient_link_tokens | Multiple historical tokens; at most one outstanding token per profile |
 | users | patient_link_tokens | Authenticated staff issuer; retained non-cascading reference |
 | patients | test_orders | One patient to many orders |
+| lab_tests | lab_test_categories | Zero to many unique assignments per test; FK lab_test_id |
+| Fixed category vocabulary | lab_test_categories | Zero to many tests per identifier; category CHECK, no category lookup table; PK(lab_test_id, category) prevents duplicate membership |
 | lab_tests | test_parameters | One test to one or more parameters |
 | test_parameters | reference_ranges | One parameter to multiple demographic/time ranges |
 | test_orders | order_items | One order to one or more test items |
@@ -710,10 +765,13 @@ Staff actor fields also reference users as specified in each table.
 
 ## 6. Required indexes and integrity controls
 
+For planned tables these are design proposals for the relevant task/contract review, not indexes or locking already present in the application.
+
 Preserve the existing authentication indexes. Add indexes for frequently queried FK columns unless already covered by a suitable PK/UNIQUE index.
 
 Additional recommended indexes:
 
+- `lab_test_categories(lab_test_id, category)` PK and `lab_test_categories(category, lab_test_id)` are implemented in V6; development/production application is unverified.
 - `test_orders(patient_id, created_at)` and `test_orders(created_by)`.
 - `order_items(order_id, lab_test_id)` UNIQUE.
 - `test_parameters(lab_test_id, code)` UNIQUE.
@@ -740,6 +798,8 @@ Concurrency controls must cover every write path:
 
 ## 7. Authorization and lifecycle rules
 
+Existing patient/catalog/account permissions are defined by their implemented contracts. Future workflow permissions below are carried-forward proposals pending D-ROLE and feature-specific decisions; they are not deployed access policy.
+
 - Enforce both role and record ownership on the backend.
 - Do not expose JPA entities directly; use DTOs.
 - Derive created_by, entered_by, collected_by, validated_by, and other actor fields from authenticated context, not untrusted request fields.
@@ -752,6 +812,8 @@ Concurrency controls must cover every write path:
 - Profile linking must not be automated using names or phone numbers alone. Phase 2 implements the controlled authenticated/verified token workflow described in section 4.3a and PATIENTS_API.md section 15.
 
 ## 8. End-to-end example
+
+This illustrates the planned workflow only. Orders, appointments, payments, samples, results, notification persistence and audit persistence are not implemented yet.
 
 The short IDs below illustrate relationships; actual identifiers are UUIDs. No medical reference values or prices are specified.
 
@@ -768,37 +830,15 @@ The short IDs below illustrate relationships; actual identifiers are UUIDs. No m
 
 ## 9. Incremental implementation plan
 
-1. Preserve and verify existing authentication entities/migrations.
-2. Implement patient management: migration, entity, repository, DTOs, service, controller, validation, and authorization tests.
-3. Implemented patient self-profile creation and controlled account/profile linking in phase 2. Concurrent operations cannot give an account a second profile; matching/merging by demographics remains out of scope.
-4. Implement laboratory catalog, parameters, and reference ranges.
-5. Implement orders and items.
-6. Implement booking slots and appointments.
-7. Implement payment/refund recording.
-8. Implement samples and sample-to-item links.
-9. Implement results, used-sample links, values, validation, publication, and corrections.
-10. Implement notifications and append-only auditing, adding audit calls to earlier modules as needed.
-11. Implement dashboards and reports using queries/views over these tables; no independent dashboard table is needed.
-12. Implement symptom assessments and suggested tests in the AI phase.
+The current [implementation plan](../IMPLEMENTATION_PLAN.md) selects Stage 1 patient catalog work. Authentication, patient profiles/linking and basic catalog already have source and historical test evidence; references, orders and the remaining workflow do not. Older R-/T- identifiers elsewhere in this design are carried-forward traceability, not the numbering of the current Stage 1 tasks.
 
-Use the next available Flyway migration version for each change. Never rewrite an applied migration, delete migration history, or reset a team database as a shortcut.
+Stage 1 Task 1 is DONE: section 4.4a and LAB_TESTS_API.md define the accepted optional multiple-category contract. Task 2 implements only the V6 schema and JPA collection, with focused verification recorded in the plan/TESTING.md. Task 3 adds category assignment/response DTOs through the existing transaction/mapping; focused evidence is recorded separately. Tasks 4-5 remain TODO: membership queries and patient visibility have not been changed. Parameter/reference contracts and the remaining workflow stay separate future slices; AI stays deferred.
 
-### First implementation task: patient management
-
-Implement only the patients module first:
-
-| Method | Endpoint | Access / behavior |
-|---|---|---|
-| POST | /api/patients | ADMIN, RECEPTIONIST; create an unlinked profile |
-| GET | /api/patients | ADMIN, RECEPTIONIST, LAB_TECHNICIAN; paginated name/file-number/phone search |
-| GET | /api/patients/{id} | Authorized staff; PATIENT only for their linked profile |
-| PUT | /api/patients/{id} | ADMIN, RECEPTIONIST; update approved profile fields |
-
-Do not add a delete endpoint. Do not accept patient_number, user_id, created_by, or audit timestamps in the generic create/update DTOs. Keep patient self-registration/linking changes out of this first task.
+Use the next available Flyway migration version at implementation time. Never rewrite an applied migration, delete history, or reset a team database as a shortcut. Each slice requires requirement IDs, contract, transaction/ownership rules and scoped acceptance evidence before DONE.
 
 ## 10. Official technical references
 
-The sources support design principles; table names, lengths, and the 21-table structure are project decisions. This document does not claim FHIR or ISO certification.
+The sources support design principles; table names, lengths, and the planned 22-table structure are project decisions. This document does not claim FHIR or ISO certification.
 
 - [S1] PostgreSQL 16 - Constraints: https://www.postgresql.org/docs/16/ddl-constraints.html
 - [S2] PostgreSQL 16 - Numeric Types: https://www.postgresql.org/docs/16/datatype-numeric.html

@@ -76,8 +76,110 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         var result = mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(header().exists("Location"))
-                .andExpect(jsonPath("$.categories").doesNotExist()).andReturn();
+                .andExpect(jsonPath("$.categories").isArray()).andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("id").asString();
+    }
+
+    private String withCategories(String body, String categories) {
+        return body.stripTrailing().replaceFirst("}$", ",\"categories\":" + categories + "}");
+    }
+
+    private List<String> persistedCategories(String id) {
+        return jdbc.queryForList("SELECT category FROM lab_test_categories WHERE lab_test_id = ? ORDER BY category",
+                String.class, UUID.fromString(id));
+    }
+
+    @Test
+    void createsOptionalSingleMultipleAndAllCategoriesAndSerializesEveryResponse() throws Exception {
+        List<String> all = List.of("BLOOD_TESTS", "VITAMINS_MINERALS", "THYROID", "LIVER", "KIDNEY", "LIPIDS", "DIABETES");
+        List<String> reversed = new ArrayList<>(all);
+        Collections.reverse(reversed);
+        var inputs = Arrays.asList(null, "null", "[]", "[\"THYROID\"]", "[\"THYROID\",\"BLOOD_TESTS\"]",
+                json.writeValueAsString(reversed));
+        var expected = List.of(List.<String>of(), List.<String>of(), List.<String>of(), List.of("THYROID"),
+                List.of("BLOOD_TESTS", "THYROID"), all);
+        for (int i = 0; i < inputs.size(); i++) {
+            String body = BODY.replace(" cbc ", "CREATE_" + i);
+            if (inputs.get(i) != null) body = withCategories(body, inputs.get(i));
+            var response = mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN)
+                    .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isCreated()).andExpect(header().exists("Location"))
+                    .andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected.get(i))))
+                    .andExpect(jsonPath("$.category").doesNotExist()).andReturn().getResponse();
+            String id = json.readTree(response.getContentAsString()).get("id").asString();
+            assertEquals(new TreeSet<>(expected.get(i)), new TreeSet<>(persistedCategories(id)));
+            mvc.perform(bearer(get("/api/lab-tests/" + id), Role.PATIENT))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected.get(i))));
+            mvc.perform(bearer(get("/api/lab-tests").param("search", "CREATE_" + i), Role.RECEPTIONIST))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].categories").value(org.hamcrest.Matchers.is(expected.get(i))));
+            mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected.get(i))));
+            assertEquals(new TreeSet<>(expected.get(i)), new TreeSet<>(persistedCategories(id)));
+        }
+    }
+
+    @Test
+    void replacesWholeSetRemovesMembershipsAndClearsForOmittedNullAndEmptyArrays() throws Exception {
+        String id = create(withCategories(BODY, "[\"BLOOD_TESTS\",\"THYROID\"]"));
+        mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isOk());
+        for (String assignments : List.of("[\"KIDNEY\",\"LIVER\"]", "[\"KIDNEY\",\"LIVER\"]", "[\"KIDNEY\"]")) {
+            List<String> expected = assignments.contains("LIVER") ? List.of("LIVER", "KIDNEY") : List.of("KIDNEY");
+            mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
+                    .content(withCategories(BODY.replace("25.50", "30.00"), assignments)))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected)))
+                    .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.price").value(30));
+            assertEquals(new TreeSet<>(expected), new TreeSet<>(persistedCategories(id)));
+        }
+        for (String empty : Arrays.asList(null, "null", "[]")) {
+            mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
+                    .content(withCategories(BODY, "[\"THYROID\"]"))).andExpect(status().isOk());
+            mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
+                    .content(empty == null ? BODY : withCategories(BODY, empty)))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.categories").isEmpty())
+                    .andExpect(jsonPath("$.active").value(false));
+            assertTrue(persistedCategories(id).isEmpty());
+            mvc.perform(bearer(get("/api/lab-tests/" + id), Role.ADMIN))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.categories").isEmpty());
+        }
+    }
+
+    @Test
+    void rejectsInvalidCategoryValuesAndJsonTypesWithoutChangingFieldsOrAssignments() throws Exception {
+        String id = create(withCategories(BODY, "[\"BLOOD_TESTS\",\"THYROID\"]"));
+        var original = jdbc.queryForMap("SELECT * FROM lab_tests WHERE id = ?", UUID.fromString(id));
+        Map<String, List<String>> invalid = new LinkedHashMap<>();
+        invalid.put("VALIDATION_ERROR", List.of("[\"THYROID\",\"THYROID\"]", "[null]", "[\"\"]", "[\" \"]",
+                "[\"UNKNOWN\"]", "[\"thyroid\"]", "[\" THYROID\"]", "[\"THYROID \"]", "[\"Blood tests\"]", "[\"All\"]",
+                "[\"BLOOD_TESTS\",\"VITAMINS_MINERALS\",\"THYROID\",\"LIVER\",\"KIDNEY\",\"LIPIDS\",\"DIABETES\",\"THYROID\"]"));
+        invalid.put("INVALID_JSON", List.of("\"THYROID\"", "{}", "1", "true", "[1]", "[true]", "[{}]", "[[]]"));
+        for (var group : invalid.entrySet()) {
+            for (String value : group.getValue()) {
+                String body = withCategories(BODY.replace("25.50", "99.00"), value);
+                for (var request : List.of(post("/api/lab-tests").content(body.replace(" cbc ", "INVALID")),
+                        put("/api/lab-tests/" + id).content(body))) {
+                    var result = mvc.perform(bearer(request, Role.ADMIN).contentType(MediaType.APPLICATION_JSON))
+                            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(group.getKey()))
+                            .andExpect(header().exists("X-Request-Id")).andExpect(header().string("Cache-Control", "no-store"));
+                    if (group.getKey().equals("VALIDATION_ERROR"))
+                        result.andExpect(jsonPath("$.fieldErrors.categories").value("Invalid value."));
+                    else result.andExpect(jsonPath("$.fieldErrors").isEmpty());
+                }
+                assertEquals(original, jdbc.queryForMap("SELECT * FROM lab_tests WHERE id = ?", UUID.fromString(id)));
+                assertEquals(List.of("BLOOD_TESTS", "THYROID"), persistedCategories(id));
+                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM lab_tests", Integer.class));
+            }
+        }
+        String other = create(withCategories(BODY.replace(" cbc ", "OTHER"), "[\"LIVER\"]"));
+        mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
+                .content(withCategories(BODY.replace(" cbc ", "OTHER"), "[\"KIDNEY\"]")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAB_TEST_CODE_IN_USE"));
+        assertEquals(original, jdbc.queryForMap("SELECT * FROM lab_tests WHERE id = ?", UUID.fromString(id)));
+        assertEquals(List.of("BLOOD_TESTS", "THYROID"), persistedCategories(id));
+        assertEquals(List.of("LIVER"), persistedCategories(other));
     }
 
     @Test
@@ -87,7 +189,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 .andExpect(jsonPath("$.code").value("CBC")).andExpect(jsonPath("$.currency").value("ILS"))
                 .andExpect(jsonPath("$.price").value(25.5)).andExpect(jsonPath("$.active").value(true))
                 .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.categories").doesNotExist());
+                .andExpect(jsonPath("$.categories").isEmpty());
         mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAB_TEST_CODE_IN_USE"))
                 .andExpect(jsonPath("$.fieldErrors.code").exists())
@@ -111,15 +213,25 @@ class LabTestManagementTest extends IsolatedPostgresTest {
 
     @Test
     void enforcesAuthenticationRolesAndSanitizedErrors() throws Exception {
+        String categoryBody = withCategories(BODY, "[\"THYROID\",\"BLOOD_TESTS\"]");
         mvc.perform(get("/api/lab-tests")).andExpect(status().isUnauthorized());
-        String id = create(BODY);
+        String id = create(categoryBody);
+        Cookie csrf = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
+        assertNotNull(csrf);
+        for (var request : List.of(post("/api/lab-tests").content(categoryBody),
+                put("/api/lab-tests/" + id).content(categoryBody),
+                patch("/api/lab-tests/" + id + "/status").content("{\"active\":false}"))) {
+            // Satisfy CSRF so the anonymous request reaches the existing authentication check.
+            mvc.perform(request.cookie(csrf).header("X-XSRF-TOKEN", csrf.getValue())
+                    .contentType(MediaType.APPLICATION_JSON)).andExpect(status().isUnauthorized());
+        }
         for (Role role : Role.values()) {
             mvc.perform(bearer(get("/api/lab-tests"), role)).andExpect(status().isOk());
             mvc.perform(bearer(get("/api/lab-tests/" + id), role)).andExpect(status().isOk());
             if (role == Role.ADMIN) continue;
-            mvc.perform(bearer(post("/api/lab-tests"), role).contentType(MediaType.APPLICATION_JSON).content(BODY))
+            mvc.perform(bearer(post("/api/lab-tests"), role).contentType(MediaType.APPLICATION_JSON).content(categoryBody))
                     .andExpect(status().isForbidden());
-            mvc.perform(bearer(put("/api/lab-tests/" + id), role).contentType(MediaType.APPLICATION_JSON).content(BODY))
+            mvc.perform(bearer(put("/api/lab-tests/" + id), role).contentType(MediaType.APPLICATION_JSON).content(categoryBody))
                     .andExpect(status().isForbidden());
             mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), role)
                     .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
@@ -129,7 +241,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         mvc.perform(bearer(get("/api/lab-tests/" + UUID.randomUUID()), Role.ADMIN)).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("LAB_TEST_NOT_FOUND")).andExpect(header().exists("X-Request-Id"));
         mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                .content(BODY.replace("25.50", "1.001"))).andExpect(status().isBadRequest())
+                .content(categoryBody.replace("25.50", "1.001"))).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.price").value("Invalid value."))
                 .andExpect(jsonPath("$.fields").doesNotExist());
         mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
@@ -197,7 +309,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
 
     @Test
     void cookieAuthenticationAndCsrfApplyToEveryWrite() throws Exception {
-        String id = create(BODY);
+        String categoryBody = withCategories(BODY, "[\"THYROID\",\"BLOOD_TESTS\"]");
+        String id = create(categoryBody);
         Cookie csrf = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
         assertNotNull(csrf);
         for (Role role : Role.values()) {
@@ -207,8 +320,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             for (int operation = 0; operation < 3; operation++) {
                 for (String protection : List.of("missing", "mismatched", "valid")) {
                     var request = switch (operation) {
-                        case 0 -> post("/api/lab-tests").content(BODY.replace(" cbc ", "COOKIE"));
-                        case 1 -> put("/api/lab-tests/" + id).content(BODY);
+                        case 0 -> post("/api/lab-tests").content(categoryBody.replace(" cbc ", "COOKIE"));
+                        case 1 -> put("/api/lab-tests/" + id).content(categoryBody);
                         default -> patch("/api/lab-tests/" + id + "/status").content("{\"active\":false}");
                     };
                     request.cookie(access).contentType(MediaType.APPLICATION_JSON);
@@ -229,7 +342,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         var claims = JwtClaimsSet.builder().subject(adminId.toString()).build();
         var actor = new JwtAuthenticationToken(Jwt.withTokenValue("test").header("alg", "HS256")
                 .claims(c -> c.putAll(claims.getClaims())).build(), List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-        var request = new LabTestRequest("CBC", "CBC", null, BigDecimal.TEN, null, "Blood", null);
+        var request = new LabTestRequest("CBC", "CBC", null, BigDecimal.TEN, null, "Blood", null, List.of());
         var gate = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             Callable<String> create = () -> {

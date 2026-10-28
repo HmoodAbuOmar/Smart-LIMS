@@ -3,6 +3,9 @@ package com.smartlims.labtests.dto;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import tools.jackson.databind.annotation.JsonDeserialize;
 
 /** Full catalog replacement. Availability is managed separately through the status endpoint. */
@@ -15,7 +18,8 @@ public record LabTestRequest(
         @Digits(integer = 10, fraction = 2) BigDecimal price,
         @JsonDeserialize(using = LabTestJson.Text.class) @Pattern(regexp = "ILS") String currency,
         @JsonDeserialize(using = LabTestJson.Text.class) @NotBlank @Size(max = 40) String sampleType,
-        @JsonDeserialize(using = LabTestJson.Text.class) @Size(max = 10000) String preparationInstructions) {
+        @JsonDeserialize(using = LabTestJson.Text.class) @Size(max = 10000) String preparationInstructions,
+        @JsonDeserialize(using = LabTestJson.Categories.class) @ValidLabTestCategories List<String> categories) {
     public LabTestRequest {
         code = code == null ? null : code.strip().toUpperCase(Locale.ROOT);
         name = name == null ? null : name.strip();
@@ -23,6 +27,7 @@ public record LabTestRequest(
         currency = currency == null ? "ILS" : currency.strip();
         sampleType = sampleType == null ? null : sampleType.strip();
         preparationInstructions = optional(preparationInstructions);
+        categories = categories == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(categories));
     }
 
     private static String optional(String value) {

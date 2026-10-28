@@ -25,7 +25,7 @@ import static org.mockito.Mockito.*;
 class LabTestServiceTest {
     private final LabTestRepository repository = mock(LabTestRepository.class);
     private final LabTestService service = new LabTestService(repository, new LabTestMapper());
-    private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null);
+    private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null, List.of());
 
     private Authentication actor(String role) {
         return new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null,

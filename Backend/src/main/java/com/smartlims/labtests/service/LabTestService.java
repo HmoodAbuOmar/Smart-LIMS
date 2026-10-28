@@ -2,6 +2,7 @@ package com.smartlims.labtests.service;
 
 import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.entity.LabTest;
+import com.smartlims.labtests.entity.LabTestCategory;
 import com.smartlims.labtests.exception.LabTestException;
 import com.smartlims.labtests.mapper.LabTestMapper;
 import com.smartlims.labtests.repository.LabTestRepository;
@@ -38,6 +39,7 @@ public class LabTestService {
         if (tests.existsByCode(request.code())) throw LabTestException.duplicate();
         LabTest test = new LabTest(request.code(), request.name(), request.description(),
                 request.price().setScale(2, RoundingMode.UNNECESSARY), request.sampleType(), request.preparationInstructions());
+        request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
         return mapper.toResponse(save(test));
     }
 
@@ -75,6 +77,8 @@ public class LabTestService {
         test.setPrice(request.price().setScale(2, RoundingMode.UNNECESSARY));
         test.setSampleType(request.sampleType());
         test.setPreparationInstructions(request.preparationInstructions());
+        test.getCategories().clear();
+        request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
         test.setUpdatedAt(Instant.now());
         return mapper.toResponse(save(test));
     }

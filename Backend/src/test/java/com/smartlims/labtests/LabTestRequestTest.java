@@ -29,6 +29,27 @@ class LabTestRequestTest {
         assertNull(request.description());
         assertEquals("ILS", request.currency());
         assertEquals(new BigDecimal("25.50"), request.price());
+        assertEquals(List.of(), request.categories());
+    }
+
+    @Test
+    void validatesCategorySetsBeforeConversionAndPreservesExactIdentifiers() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            for (String value : List.of("null", "[]", "[\"THYROID\",\"BLOOD_TESTS\"]")) {
+                var request = json.readValue(BODY.replace("25.50", "25.50,\"categories\":" + value), LabTestRequest.class);
+                assertTrue(validator.validate(request).isEmpty());
+            }
+            for (String value : List.of("[null]", "[\"THYROID\",\"THYROID\"]", "[\"thyroid\"]",
+                    "[\"THYROID \"]", "[\"\"]", "[\"All\"]")) {
+                var request = json.readValue(BODY.replace("25.50", "25.50,\"categories\":" + value), LabTestRequest.class);
+                assertTrue(validator.validate(request).stream().anyMatch(v -> v.getPropertyPath().toString().equals("categories")));
+            }
+        }
+        for (String value : List.of("\"THYROID\"", "1", "true", "{}", "[1]", "[true]", "[{}]", "[[]]")) {
+            assertThrows(Exception.class, () -> json.readValue(
+                    BODY.replace("25.50", "25.50,\"categories\":" + value), LabTestRequest.class));
+        }
     }
 
     @Test

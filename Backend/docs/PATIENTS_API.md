@@ -1,9 +1,11 @@
 # Smart-LIMS Patients API Contract
 
-Status: patient management phases 1 and 2 implemented; linking is prepared as V5 alongside main's unchanged V4 lab migration. Combined verification is recorded in section 15.9. Legacy development history requires the separately authorized manual reconciliation runbook before startup; no development database was modified.
-Date: 2026-10-26.
+Status: patient management phases 1 and 2 implemented with canonical V3/V5 schema alongside V4 lab catalog. Saved operator artifacts record development reconciliation completed on 2026-10-26; see [database evidence and limits](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation). Earlier preparation/audit sections describe their own historical boundaries and are not the current migration status. No database was accessed during this documentation review.
+Reviewed: 2026-10-27.
 Repository location: `Backend/docs/PATIENTS_API.md`.
 Database reference: `Backend/docs/DATABASE_DESIGN.md`.
+
+Traceability: R-PAT-01, R-PAT-02, R-NFR-01 and T-PAT-01 in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). Historical verification is in sections 13 and 15 plus the later [full isolated-suite record](TESTING.md#verification-after-launcher-removal-2026-10-27). No tests ran in this documentation review. Future patient-affecting features need their own requirement/task and reviewed contract before code; existing self-update/delete/merge exclusions remain.
 
 ## 1. Purpose and phase boundary
 
@@ -700,7 +702,7 @@ Changed files (paths relative to Backend):
 
 ### 15.8. Main-branch migration compatibility audit (2026-10-26)
 
-**Historical audit:** source preparation as V5 was subsequently authorized and completed (section 15.9). Development-database reconciliation remains a separate, unexecuted manual operation. The observations below describe the earlier audit, before main was merged locally.
+**Historical audit:** source preparation as V5 was subsequently authorized and completed (section 15.9), followed by the recorded operator reconciliation described in DATABASE_DESIGN section 1.1. The observations and approval boundary below describe the earlier audit, before those later events; they do not mean reconciliation is still pending for that recorded database state.
 
 - Current branch: backend-hmood at 92f123cb45acb223bedf1aa792d39a0809b8d400. The local main ref was stale at that same commit. Fetching origin/main revealed 9cb1fe7, which includes V4__lab_tests.sql. No branch was switched or merged.
 - V1__auth_foundation.sql, V2__password_reset_attempts.sql, and V3__patients.sql are identical across the current branch and refreshed origin/main. The combined history has two different V4 scripts; V5 is the next available version.
@@ -724,7 +726,7 @@ Compatibility verification used a newly initialized disposable PostgreSQL 16.15 
 - The first temporary harness used multiple schemas and allowed cross-schema FK references, which interfered with fixture cleanup. It was corrected to use separate fresh databases; the corrected run above passed. No repository tests were weakened or bypassed.
 - These results establish the candidate schema/upgrade compatibility, not reconciliation of the development database's existing V4 identity. The earlier Postman run remains historical evidence for the original migration set; it was not rerun against this candidate.
 
-Original approval boundary and proposed reconciliation (source renumbering subsequently authorized; database writes remain unauthorized):
+Original approval boundary and proposed reconciliation (historical: source renumbering and later operator recovery are now recorded separately; this excerpt grants no new database-write authorization):
 
 1. Inventory every affected environment and take a verified backup before any history change. Stop application writers during the reconciliation window.
 2. Agree on main's existing V4__lab_tests.sql and the proposed V5__patient_link_tokens.sql as canonical identities. Adopting V5 for linking would require an explicit exception to the instruction not to rename an already-applied migration; its SQL contents/checksum would remain unchanged.

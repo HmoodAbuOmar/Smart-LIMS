@@ -1,5 +1,7 @@
 # Database-backed test setup
 
+SDLC traceability: R-NFR-01 and per-task acceptance in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). The run records below are historical evidence; this 2026-10-27 documentation review did not run tests, start the application, or check current database/server availability. A future implementation task must record its own command, isolated target, date, counts and result before DONE. The separately recorded development recovery is described in [DATABASE_DESIGN section 1.1](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation).
+
 The integration suites require an explicitly disposable PostgreSQL instance with a
 database named `smartlims_auth_regression`, accessed on loopback as `postgres` with
 an empty password. Their fixtures truncate application tables. Do not use a
@@ -194,3 +196,140 @@ cluster on `127.0.0.1:55432`; reconciliation tests used only their newly created
 SHA-256 checks confirmed that the SQL fixture's contents, main Flyway migrations,
 local Maven test configuration, pre-existing POM/isolation-guard changes, and
 retained database backup files were preserved.
+
+## Task 2 category persistence verification (2026-10-28)
+
+Scope: Stage 1 Task 2 only, extending R-CAT-01/R-NFR-01 and S1-CAT-R01/R04.
+V6 adds category persistence; DTOs, controllers, services, query filters, and
+availability permissions remain unchanged. This record is separate from the
+earlier full-suite runs above. The complete suite was not run for Task 2.
+
+Before testing, inspected the configured temporary cluster's postmaster files,
+postgresql.conf and pg_hba.conf; pg_ctl confirmed it was stopped. Started only
+that disposable cluster. An explicit psql connection to
+127.0.0.1:55432/smartlims_auth_regression confirmed PostgreSQL 16.15, user
+postgres, matching SMARTLIMS_TEST_POSTGRES_DATA directory ending in
+smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df, and loopback-only
+listen_addresses. A separate listener inspection also confirmed 127.0.0.1:55432.
+The unchanged machine-local Maven config and Surefire mapping selected this
+guarded database. No application datasource defaults or smart_lims_db connection
+were used. Migration suites created/dropped only their own generated
+smartlims_migration_<32 hex characters> databases on this same isolated instance.
+Persistence tests use rollback transactions and fake VerificationEmailSender.
+
+Exact initial command, from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestCategoryMigrationTest,LabTestCategoryPersistenceTest,LabTestManagementTest,PatientMigrationCompatibilityTest' test
+```
+
+Initial result: 20 tests, 0 assertion failures, 3 errors, 0 skips; exit 1,
+finished 2026-10-28 00:02:52 +02:00. All four category migration, seven catalog,
+and six patient migration compatibility cases passed. The three new persistence
+cases hit the existing lab_tests_code_check because their UUID-derived synthetic
+codes contained lowercase letters. Corrected only the synthetic factory with
+Locale.ROOT uppercase; production validation and test assertions were preserved.
+
+Reran only the affected suite:
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestCategoryPersistenceTest' test
+```
+
+Result: **3 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 2026-10-28 00:03:44 +02:00 in 30.483 seconds. No production code or
+other tested suite changed after the initial execution. Final per-suite results
+are therefore 20 distinct passing cases across these two invocations, not a
+single green 20-test Maven invocation:
+
+| Suite | Passing cases | Verification |
+|---|---:|---|
+| LabTestCategoryMigrationTest | 4 | Fresh V1-V6 and indexes; V5 upgrade with every catalog field/timestamp and prior Flyway metadata unchanged; repeat migration no-op; duplicate/invalid/null/orphan constraints; concurrent duplicate insertion |
+| LabTestCategoryPersistenceTest | 3 | Hibernate schema validation; round trips for zero/one/multiple/shared/all-seven categories; removal/clearing without removing the test; current PUT/status operations preserve assignments |
+| LabTestManagementTest | 7 | Current catalog HTTP/security/search/pagination/concurrency behavior; create/detail JSON still omit categories; FK-aware isolated fixture cleanup |
+| PatientMigrationCompatibilityTest | 6 | Existing fresh/upgrade/reconciliation and guard checks with V6 included in expected history; all assertions retained |
+
+Post-run read-only checks on the guarded regression database confirmed successful
+V6 history and zero remaining owned migration databases. SHA-256 comparisons
+confirmed 116 captured files unchanged, including V1-V5, local Maven
+configuration, isolation guard, application API files, unrelated documentation,
+and local-only exclusions. git diff --check passed. Task 2 is DONE; no
+development/production migration or readiness was verified.
+Tasks 3-5 (array DTOs/assignment, membership queries and patient inactive-test
+restrictions) remain TODO and were not implemented or tested as target behavior.
+
+
+## Task 3 administrative category assignment verification (2026-10-28)
+
+Scope: Stage 1 Task 3 only; R-CAT-01/R-NFR-01 and S1-CAT-R01/R03/R04,
+using DONE Task 2 persistence and the finalized category contract. POST accepts
+optional categories; PUT replaces/clears the complete set within the existing
+row-lock transaction. Every response includes all assignments in contract order
+or []. PATCH status, ADMIN-only writes, authentication and CSRF are preserved.
+Tasks 4-5 membership filters/patient inactive-test restrictions remain TODO.
+
+Before execution, independently inspected the saved temporary test data directory,
+postmaster files, postgresql.conf and pg_hba.conf. pg_ctl reported no running
+server and no 55432 listener was present; started only that disposable cluster.
+PostgreSQL recovered from its prior interrupted shutdown and became ready.
+An explicit psql connection confirmed PostgreSQL 16.15, current_database
+smartlims_auth_regression, user postgres, server/listen_addresses 127.0.0.1,
+port 55432, and the exact temporary data directory ending in
+smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df. A separate listener
+inspection matched 127.0.0.1:55432 and that cluster's postgres process. The
+unchanged local Maven config/Surefire mapping selected this guarded target.
+No smart_lims_db connection or application datasource fallback was used.
+Database-backed tests use synthetic fixtures and fake VerificationEmailSender;
+management fixtures truncate only the guarded regression database, while the
+persistence suite uses rollback transactions. No compatibility database was
+created. Flyway validated all six existing migrations and reported V6 current,
+with no migration necessary; Hibernate schema validation succeeded.
+
+Exact initial command from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestRequestTest,LabTestServiceTest,LabTestErrorHandlerTest,LabTestCategoryPersistenceTest,LabTestManagementTest' test
+```
+
+Initial result: **28 tests, 3 failures, 0 errors, 0 skips; BUILD FAILURE**,
+exit 1, finished 2026-10-28 16:23:11 +02:00 in 1 minute 1 second.
+All 18 request/service/error-handler/persistence cases passed. Seven of ten
+management cases passed. Two new assertions hit Spring JsonPath's conversion
+of immutable expected Lists into their concrete implementation type, yielding
+null during assertion conversion; switched to Hamcrest equality to compare
+arrays directly without conversion. The anonymous-write setup also incorrectly
+expected 401 before satisfying existing CSRF protection (which returns 403
+first). Supplied valid CSRF without an access token to reach and assert 401.
+These were test-only corrections; no production/security change followed the
+initial run, and the full array/order and authentication assertions are retained.
+
+Reran only the affected suite:
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestManagementTest' test
+```
+
+Result: **10 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished 2026-10-28 16:25:51 +02:00 in 52.869 seconds. Final evidence covers
+**28 distinct passing cases across these two invocations**, not a single green
+28-test Maven invocation:
+
+| Suite | Passing cases | Evidence |
+|---|---:|---|
+| LabTestRequestTest | 5 | Existing field/JSON/query validation plus optional categories, exact identifiers, duplicate/null rejection and strict JSON element/container types |
+| LabTestServiceTest | 6 | Service authorization, uniqueness/constraint translation, availability/status behavior and identifier handling |
+| LabTestErrorHandlerTest | 4 | Existing validation/error envelope, request IDs, JSON, method and content-type statuses |
+| LabTestCategoryPersistenceTest | 3 | Existing zero/one/multiple/shared/all-seven mapping checks; updated full replacement round trip and status preservation |
+| LabTestManagementTest | 10 | Real PostgreSQL plus MockMvc/security: POST omission/null/[]/single/multiple/all seven; reverse input normalized to contract response order; full arrays in create/detail/list/status; complete replacement, membership removal, repeated replacement, all three clearing forms, preserved availability; invalid/duplicate/null/blank/padded/lowercase/unknown/excessive values and wrong JSON types on POST/PUT; unchanged complete row/timestamps and assignments after invalid/conflicting updates; existing field validation, pagination/search/concurrent creation, ADMIN-only bearer/cookie writes, anonymous 401 after valid CSRF, missing/mismatched/valid cookie CSRF for every write and role |
+
+Documentation verification parsed all seven catalog JSON examples; git diff
+--check passed. Pre-task SHA-256 comparisons preserve all unrelated captured
+files, including the four unrelated modified documents, V1-V6, security/controller/
+repository/query/entity code, POM, isolation guard, local Maven config and local-only
+exclusions. Existing edits in the three relevant tracked documents were retained
+and extended; IMPLEMENTATION_PLAN.md remains locally excluded/untracked.
+
+The complete suite, migration compatibility suites, live-server/network HTTP,
+Tasks 4-5 target behavior and development/production deployment were not run or
+verified. smart_lims_db was not accessed. No Postman artifacts, commits, pushes,
+branch switches, new migrations or changes to applied migrations were made.

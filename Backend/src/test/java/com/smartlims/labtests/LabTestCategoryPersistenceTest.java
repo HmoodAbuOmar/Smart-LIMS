@@ -80,23 +80,23 @@ class LabTestCategoryPersistenceTest extends IsolatedPostgresTest {
     }
 
     @Test
-    void existingCatalogReplacementAndStatusOperationsPreserveAssignments() {
+    void catalogReplacementReplacesAssignmentsAndStatusPreservesThem() {
         LabTest test = syntheticTest();
         test.getCategories().addAll(Set.of(BLOOD_TESTS, THYROID));
         tests.saveAndFlush(test);
         var admin = UsernamePasswordAuthenticationToken.authenticated("synthetic-admin", null,
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
         var request = new LabTestRequest(test.getCode(), "Replaced synthetic catalog test", null,
-                new BigDecimal("2.00"), "ILS", "SYNTHETIC", null);
+                new BigDecimal("2.00"), "ILS", "SYNTHETIC", null, List.of("KIDNEY", "LIVER"));
 
         service.update(admin, test.getId().toString(), request);
         LabTest loaded = reload(test.getId());
-        assertEquals(Set.of(BLOOD_TESTS, THYROID), loaded.getCategories());
+        assertEquals(Set.of(LIVER, KIDNEY), loaded.getCategories());
         assertEquals("Replaced synthetic catalog test", loaded.getName());
 
         service.changeStatus(admin, test.getId().toString(), new LabTestStatusRequest(false));
         loaded = reload(test.getId());
-        assertEquals(Set.of(BLOOD_TESTS, THYROID), loaded.getCategories());
+        assertEquals(Set.of(LIVER, KIDNEY), loaded.getCategories());
         assertFalse(loaded.isActive());
     }
 }
