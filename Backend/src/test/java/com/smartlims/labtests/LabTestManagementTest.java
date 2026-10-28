@@ -89,6 +89,165 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 String.class, UUID.fromString(id));
     }
 
+    private String catalogTest(String code, String name, boolean active, String... categories) throws Exception {
+        String id = create(json.writeValueAsString(Map.of("code", code, "name", name, "price", BigDecimal.TEN,
+                "sampleType", "SYNTHETIC", "categories", Arrays.asList(categories))));
+        if (!active) mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isOk());
+        return id;
+    }
+
+    @Test
+    void categoryMembershipReturnsUniqueTestsWithAllAssignmentsAndAllIncludesUncategorized() throws Exception {
+        String multi = catalogTest("MULTI", "A synthetic", true, "THYROID", "BLOOD_TESTS");
+        String blood = catalogTest("BLOOD", "B synthetic", true, "BLOOD_TESTS");
+        String empty = catalogTest("EMPTY", "C synthetic", true);
+        for (String category : List.of("BLOOD_TESTS", "THYROID")) {
+            mvc.perform(bearer(get("/api/lab-tests").param("category", category), Role.PATIENT))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(category.equals("THYROID") ? 1 : 2))
+                    .andExpect(jsonPath("$.content[0].id").value(multi))
+                    .andExpect(jsonPath("$.content[0].categories").value(org.hamcrest.Matchers.is(List.of("BLOOD_TESTS", "THYROID"))));
+        }
+        mvc.perform(bearer(get("/api/lab-tests"), Role.PATIENT)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.content[*].id").value(org.hamcrest.Matchers.is(List.of(multi, blood, empty))))
+                .andExpect(jsonPath("$.content[2].categories").isArray()).andExpect(jsonPath("$.content[2].categories").isEmpty());
+        for (var category : com.smartlims.labtests.entity.LabTestCategory.values()) {
+            int count = switch (category) { case BLOOD_TESTS -> 2; case THYROID -> 1; default -> 0; };
+            mvc.perform(bearer(get("/api/lab-tests").param("category", category.name()), Role.ADMIN))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(count));
+        }
+        mvc.perform(bearer(get("/api/lab-tests").param("category", "KIDNEY"), Role.PATIENT))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.totalElements").value(0)).andExpect(jsonPath("$.totalPages").value(0))
+                .andExpect(jsonPath("$.first").value(true)).andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test
+    void combinesFiltersBeforePaginationCountsAndStableSortingWithoutDuplicates() throws Exception {
+        List<String> expected = new ArrayList<>();
+        expected.add(catalogTest("M1", "Matching synthetic", true, "BLOOD_TESTS", "THYROID"));
+        expected.add(catalogTest("M2", "Matching synthetic", true, "BLOOD_TESTS"));
+        catalogTest("M3", "Matching synthetic", true, "KIDNEY");
+        catalogTest("M4", "Matching synthetic", false, "BLOOD_TESTS", "THYROID");
+        catalogTest("M5", "Matching synthetic", true);
+        expected.add(catalogTest("M6", "Matching synthetic", true, "BLOOD_TESTS", "LIPIDS"));
+        catalogTest("N1", "Unrelated synthetic", true, "BLOOD_TESTS");
+        // PostgreSQL UUID ordering supplies the unchanged tie-breaker for equal names/prices.
+        List<String> byId = expected.stream().sorted().toList();
+        for (String sort : List.of("name,asc", "name,desc", "price,asc", "price,desc")) {
+            Set<String> seen = new HashSet<>();
+            for (int page = 0; page < 3; page++) {
+                var response = mvc.perform(bearer(get("/api/lab-tests").param("search", " mAtChInG ")
+                        .param("category", "BLOOD_TESTS").param("active", "true").param("size", "1")
+                        .param("page", Integer.toString(page)).param("sort", sort), Role.PATIENT))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3))
+                        .andExpect(jsonPath("$.totalPages").value(3)).andExpect(jsonPath("$.page").value(page))
+                        .andExpect(jsonPath("$.content.length()").value(1))
+                        .andExpect(jsonPath("$.content[0].id").value(byId.get(page))).andReturn().getResponse();
+                assertTrue(seen.add(json.readTree(response.getContentAsString()).get("content").get(0).get("id").asString()));
+            }
+            assertEquals(new HashSet<>(expected), seen);
+        }
+        mvc.perform(bearer(get("/api/lab-tests").param("search", "matching").param("category", "BLOOD_TESTS")
+                .param("sort", "code,desc"), Role.PATIENT)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].code").value(org.hamcrest.Matchers.is(List.of("M6", "M2", "M1"))));
+        for (String page : List.of("3", "2147483647")) {
+            mvc.perform(bearer(get("/api/lab-tests").param("search", "matching").param("category", "BLOOD_TESTS")
+                    .param("page", page).param("size", "2"), Role.PATIENT))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty())
+                    .andExpect(jsonPath("$.totalElements").value(3)).andExpect(jsonPath("$.totalPages").value(2));
+        }
+        mvc.perform(bearer(get("/api/lab-tests").param("search", "M2").param("category", "BLOOD_TESTS"), Role.PATIENT))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].code").value("M2"));
+    }
+
+    @Test
+    void listAvailabilityAppliesToEveryRoleAndBothAuthenticationTransports() throws Exception {
+        catalogTest("ACTIVE", "Active synthetic", true, "BLOOD_TESTS");
+        catalogTest("INACTIVE", "Inactive synthetic", false, "BLOOD_TESTS");
+        catalogTest("EMPTY_ACTIVE", "Unassigned active", true);
+        catalogTest("EMPTY_INACTIVE", "Unassigned inactive", false);
+        for (Role role : Role.values()) {
+            for (boolean cookie : List.of(false, true)) {
+                for (String active : List.of("omitted", "true", "false")) {
+                    for (boolean category : List.of(false, true)) {
+                        var request = get("/api/lab-tests");
+                        if (!active.equals("omitted")) request.param("active", active);
+                        if (category) request.param("category", "BLOOD_TESTS");
+                        if (cookie) request.cookie(new Cookie("access_token", tokens.get(role)));
+                        else bearer(request, role);
+                        if (role == Role.PATIENT && active.equals("false")) {
+                            mvc.perform(request).andExpect(status().isForbidden())
+                                    .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                                    .andExpect(jsonPath("$.fieldErrors").isEmpty());
+                        } else {
+                            int count = (role == Role.PATIENT || !active.equals("omitted") ? 2 : 4) / (category ? 2 : 1);
+                            var result = mvc.perform(request).andExpect(status().isOk())
+                                    .andExpect(jsonPath("$.totalElements").value(count));
+                            if (role == Role.PATIENT || active.equals("true"))
+                                result.andExpect(jsonPath("$.content[*].active").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(true))));
+                            if (active.equals("false"))
+                                result.andExpect(jsonPath("$.content[*].active").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(false))));
+                        }
+                    }
+                }
+            }
+        }
+        mvc.perform(bearer(get("/api/lab-tests").param("categories", "BLOOD_TESTS").param("isActive", "false"), Role.PATIENT))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].active").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(true))));
+        mvc.perform(get("/api/lab-tests").param("category", "BLOOD_TESTS")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/lab-tests").param("category", "BLOOD_TESTS").header("Authorization", "Bearer invalid"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void invalidAndRepeatedQueriesUseExistingErrorsBeforePatientInactivePolicy() throws Exception {
+        Map<String, List<String>> invalid = new LinkedHashMap<>();
+        invalid.put("category", List.of("", " ", "All", "null", "UNKNOWN", "blood_tests", " BLOOD_TESTS", "BLOOD_TESTS ", "BLOOD_TESTS,THYROID"));
+        invalid.put("active", List.of("", "False", "0", "null"));
+        invalid.put("page", List.of("", "-1", "1.0", "2147483648"));
+        invalid.put("size", List.of("0", "101", "-1", "1.0"));
+        invalid.put("sort", List.of("category,asc", "name,ASC", "name", ""));
+        invalid.put("search", List.of("x".repeat(151)));
+        for (var field : invalid.entrySet()) {
+            for (String value : field.getValue()) {
+                var request = get("/api/lab-tests").param(field.getKey(), value);
+                if (!field.getKey().equals("active")) request.param("active", "false");
+                var response = mvc.perform(bearer(request, Role.PATIENT)).andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                        .andExpect(jsonPath("$.fieldErrors." + field.getKey()).value("Invalid value."))
+                        .andExpect(header().string("Cache-Control", "no-store"))
+                        .andExpect(header().exists("X-Request-Id")).andReturn().getResponse();
+                assertEquals(response.getHeader("X-Request-Id"), json.readTree(response.getContentAsString()).get("requestId").asString());
+            }
+        }
+        for (var field : Map.of("category", "THYROID", "active", "false", "search", "", "page", "0", "size", "20", "sort", "name,asc").entrySet()) {
+            var request = get("/api/lab-tests").param(field.getKey(), field.getValue(), field.getValue());
+            if (!field.getKey().equals("active")) request.param("active", "false");
+            mvc.perform(bearer(request, Role.PATIENT)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.fieldErrors." + field.getKey()).value("Invalid value."));
+        }
+    }
+
+    @Test
+    void categoryFilteringPreservesLiteralSearchWildcardsBackslashAndBlankSearch() throws Exception {
+        catalogTest("LITERAL", "Synthetic 50%_\\ marker", true, "THYROID", "BLOOD_TESTS");
+        catalogTest("PLAIN", "Synthetic 50AB marker", true, "THYROID");
+        catalogTest("OTHER", "Synthetic 50%_\\ marker", true, "LIVER");
+        for (String search : List.of("%", "_", "\\", "50%_\\")) {
+            mvc.perform(bearer(get("/api/lab-tests").param("category", "THYROID").param("search", search), Role.PATIENT))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].code").value("LITERAL"));
+        }
+        mvc.perform(bearer(get("/api/lab-tests").param("category", "THYROID").param("search", "  "), Role.PATIENT))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+    }
+
     @Test
     void createsOptionalSingleMultipleAndAllCategoriesAndSerializesEveryResponse() throws Exception {
         List<String> all = List.of("BLOOD_TESTS", "VITAMINS_MINERALS", "THYROID", "LIVER", "KIDNEY", "LIPIDS", "DIABETES");
@@ -203,7 +362,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         mvc.perform(bearer(get("/api/lab-tests").param("active", "true"), Role.RECEPTIONIST))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(bearer(get("/api/lab-tests").param("active", "false").param("search", "CbC"), Role.PATIENT))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mvc.perform(bearer(get("/api/lab-tests").param("search", "%"), Role.ADMIN))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(bearer(get("/api/lab-tests").param("page", "2147483647"), Role.ADMIN))

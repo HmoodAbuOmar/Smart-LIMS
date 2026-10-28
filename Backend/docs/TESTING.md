@@ -333,3 +333,61 @@ The complete suite, migration compatibility suites, live-server/network HTTP,
 Tasks 4-5 target behavior and development/production deployment were not run or
 verified. smart_lims_db was not accessed. No Postman artifacts, commits, pushes,
 branch switches, new migrations or changes to applied migrations were made.
+
+
+## Task 4 catalog list filtering verification (2026-10-28)
+
+Scope: Stage 1 Task 4 only; R-CAT-01/R-NFR-01, S1-CAT-R02/R03/R04;
+depends on DONE Tasks 2-3. GET /api/lab-tests accepts one exact category
+identifier. A correlated EXISTS predicate combines membership, literal search
+and effective availability before pagination/counting, preserving one row per
+test and every assigned category in the response. PATIENT omission/active=true
+lists active tests only; well-formed active=false returns 403 after supported
+query syntax validation. Staff retain either availability state. Unknown query
+keys remain ignored. Task 5 detail visibility/catalog completion remains TODO;
+no detail-endpoint policy change is included.
+
+Before testing, reverified the independent disposable PostgreSQL 16.15 cluster:
+inspected the saved temporary data directory, postmaster files, postgresql.conf
+and pg_hba.conf. pg_ctl confirmed PID 17864 running that directory, and a separate
+listener inspection matched 127.0.0.1:55432 to that process. An explicit psql
+connection to smartlims_auth_regression confirmed current_database, postgres user,
+loopback server address/port, listen_addresses=127.0.0.1, and the exact temporary
+data directory ending in
+smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df. No startup or cluster
+configuration change was needed. The unchanged excluded .mvn/maven.config and
+Surefire mapping selected jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression.
+No smart_lims_db connection or application datasource fallback was used.
+Management fixtures use synthetic data, fake VerificationEmailSender and truncate
+only the guarded regression database. No compatibility databases were created.
+Flyway validated all six existing migrations, reported V6 current and no migration
+necessary; Hibernate schema validation succeeded.
+
+Exact command, from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=LabTestRequestTest,LabTestServiceTest,LabTestErrorHandlerTest,LabTestManagementTest' test
+```
+
+Result: **32 tests, 0 failures, 0 errors, 0 skips; BUILD SUCCESS**, exit 0,
+finished **2026-10-28 17:14:25 +02:00**, total Maven time **35.013 seconds**.
+This was one successful focused invocation; no rerun or complete-suite execution.
+
+| Suite | Passing cases | Evidence |
+|---|---:|---|
+| LabTestRequestTest | 6 | Existing DTO/JSON/query validation; all seven exact enum query identifiers accepted; omission and ignored plural key; invalid/blank/padded/lowercase/label/comma-separated and repeated category rejected |
+| LabTestServiceTest | 7 | Existing write/identifier/constraint checks; PATIENT active=false rejected directly at the service boundary before repository access, with existing forbidden envelope semantics; missing authentication rejected |
+| LabTestErrorHandlerTest | 4 | Existing validation envelope, matching request ID, no-store, JSON and method/content-type behavior |
+| LabTestManagementTest | 15 | Five new list cases plus ten existing assignment/security/catalog regressions (the former patient inactive-list success assertion updated to the finalized 403 rule). Real PostgreSQL plus MockMvc/security verifies membership under either assigned category with full arrays; all seven filter values; no duplicates/inflated totals; unfiltered uncategorized inclusion and named-filter exclusion; combined case-insensitive trimmed name/code search and availability; count/pagination across equal-name/price UUID ties in both sort directions and code-desc sorting; ordinary and Integer.MAX_VALUE distant pages retain filtered totals; empty-page metadata; literal %, _ and backslash; blank search; every role via bearer and cookie with omitted/true/false active and optional category; unknown-key bypass attempts; missing/invalid authentication; invalid/repeated syntax for every supported query key, including 400 precedence over the patient inactive-list policy, fieldErrors, no-store and matching request ID. Existing ADMIN writes and cookie CSRF checks pass. |
+
+Final review: git diff --check passed; all seven catalog JSON examples parsed.
+Pre-task SHA-256 comparisons confirm unrelated files, V1-V6, entity/category mapping,
+request/response assignment DTOs, mapper, controller/repository/error handling,
+security, POM, database guard, local Maven mapping and local exclusions unchanged.
+Relevant API/design/test documentation and the excluded local implementation plan
+were updated without changing historical run results. Task 4 is DONE; Task 5 TODO.
+
+Not run/verified: complete backend suite, migration compatibility suites, live
+network HTTP server, Task 5 inactive-detail restrictions/final stage completion,
+and development/production deployment readiness. No smart_lims_db access, new or
+modified applied migrations, Postman files, commits, pushes or branch changes.

@@ -8,6 +8,7 @@ import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.service.LabTestService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
@@ -109,5 +110,17 @@ class LabTestServiceTest {
                 () -> service.get(actor("PATIENT"), "1-1-1-1-1")).getStatus());
         assertEquals(HttpStatus.NOT_FOUND, assertThrows(LabTestException.class,
                 () -> service.get(actor("PATIENT"), UUID.randomUUID().toString())).getStatus());
+    }
+
+    @Test
+    void rejectsPatientInactiveListAtServiceBoundaryBeforeQuerying() {
+        var query = LabTestQueryRequest.fromQueryParameters(Map.of("active", List.of("false")));
+        var error = assertThrows(LabTestException.class, () -> service.list(actor("PATIENT"), query));
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
+        assertEquals("FORBIDDEN", error.getCode());
+        assertNull(error.getField());
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(LabTestException.class,
+                () -> service.list(null, query)).getStatus());
+        verifyNoInteractions(repository);
     }
 }

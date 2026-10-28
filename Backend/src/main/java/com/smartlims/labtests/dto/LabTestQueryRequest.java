@@ -1,10 +1,12 @@
 package com.smartlims.labtests.dto;
 
+import com.smartlims.labtests.entity.LabTestCategory;
 import com.smartlims.labtests.exception.LabTestException;
 import java.util.List;
 import java.util.Map;
 
-public record LabTestQueryRequest(String search, Boolean active, int page, int size, String sort) {
+public record LabTestQueryRequest(String search, Boolean active, int page, int size, String sort,
+        LabTestCategory category) {
     public LabTestQueryRequest {
         search = search == null ? "" : search.strip();
         sort = sort == null ? "name,asc" : sort;
@@ -22,7 +24,14 @@ public record LabTestQueryRequest(String search, Boolean active, int page, int s
         return new LabTestQueryRequest(single(query, "search", ""),
                 active == null ? null : Boolean.valueOf(active),
                 integer(single(query, "page", "0"), "page"),
-                integer(single(query, "size", "20"), "size"), single(query, "sort", "name,asc"));
+                integer(single(query, "size", "20"), "size"), single(query, "sort", "name,asc"),
+                category(single(query, "category", null)));
+    }
+
+    private static LabTestCategory category(String value) {
+        if (value == null) return null;
+        try { return LabTestCategory.valueOf(value); }
+        catch (IllegalArgumentException error) { throw LabTestException.invalid("category"); }
     }
 
     private static String single(Map<String, List<String>> query, String field, String fallback) {

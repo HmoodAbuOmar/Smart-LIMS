@@ -46,10 +46,16 @@ public class LabTestService {
     @Transactional(readOnly = true)
     public LabTestPageResponse list(Authentication actor, @NotNull LabTestQueryRequest query) {
         requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+        Boolean active = query.active();
+        if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT"))) {
+            if (Boolean.FALSE.equals(active))
+                throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
+            active = true;
+        }
         String[] sort = query.sort().split(",");
         PageRequest pageable = PageRequest.of(query.page(), query.size(),
                 Sort.by(Sort.Direction.fromString(sort[1]), sort[0]).and(Sort.by("id")));
-        var filter = LabTestSpecifications.filter(query.search(), query.active());
+        var filter = LabTestSpecifications.filter(query.search(), active, query.category());
         if (pageable.getOffset() > Integer.MAX_VALUE) {
             long total = tests.count(filter);
             if (pageable.getOffset() >= total)

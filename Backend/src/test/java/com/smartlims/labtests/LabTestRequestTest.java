@@ -89,6 +89,7 @@ class LabTestRequestTest {
         assertEquals(20, defaults.size());
         assertEquals("name,asc", defaults.sort());
         assertNull(defaults.active());
+        assertNull(defaults.category());
         for (var query : List.of(Map.of("size", List.of("0")), Map.of("size", List.of("101")),
                 Map.of("page", List.of("-1")), Map.of("page", List.of("9999999999999")),
                 Map.of("sort", List.of("description,asc")), Map.of("sort", List.of("name,ASC")),
@@ -96,5 +97,21 @@ class LabTestRequestTest {
                 Map.of("search", List.of("x".repeat(151))))) {
             assertThrows(LabTestException.class, () -> LabTestQueryRequest.fromQueryParameters(query));
         }
+    }
+
+    @Test
+    void acceptsOnlyOneExactCategoryIdentifierAndIgnoresUnknownKeys() {
+        for (var category : com.smartlims.labtests.entity.LabTestCategory.values()) {
+            assertEquals(category, LabTestQueryRequest.fromQueryParameters(
+                    Map.of("category", List.of(category.name()))).category());
+        }
+        for (String value : List.of("", " ", "All", "null", "THYROID,LIVER", "thyroid", " THYROID", "THYROID ", "Blood tests")) {
+            var error = assertThrows(LabTestException.class, () -> LabTestQueryRequest.fromQueryParameters(
+                    Map.of("category", List.of(value))));
+            assertEquals("category", error.getField());
+        }
+        assertEquals("category", assertThrows(LabTestException.class, () -> LabTestQueryRequest.fromQueryParameters(
+                Map.of("category", List.of("THYROID", "THYROID")))).getField());
+        assertNull(LabTestQueryRequest.fromQueryParameters(Map.of("categories", List.of("THYROID"))).category());
     }
 }
