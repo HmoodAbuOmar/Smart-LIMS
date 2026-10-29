@@ -134,7 +134,7 @@ class PatientMigrationCompatibilityTest {
                 scripts.put(rows.getString(1), rows.getString(2));
                 if ("5".equals(rows.getString(1))) assertEquals(504398204, rows.getInt(3));
             }
-            assertEquals(List.of("1", "2", "3", "4", "5", "6", "7"), new ArrayList<>(scripts.keySet()));
+            assertEquals(List.of("1", "2", "3", "4", "5", "6", "7", "8"), new ArrayList<>(scripts.keySet()));
             assertEquals("V4__lab_tests.sql", scripts.get("4"));
             assertEquals("V5__patient_link_tokens.sql", scripts.get("5"));
             assertEquals("V6__lab_test_categories.sql", scripts.get("6"));
@@ -158,9 +158,9 @@ class PatientMigrationCompatibilityTest {
     }
 
     @Test
-    void freshDatabaseAppliesAndValidatesExactlySevenMigrations() throws SQLException {
+    void freshDatabaseAppliesAndValidatesExactlyEightMigrations() throws SQLException {
         Flyway flyway = combined(null, false);
-        assertEquals(7, flyway.migrate().migrationsExecuted);
+        assertEquals(8, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertCombinedHistory();
         assertTrue(tableExists("lab_tests"));
@@ -176,7 +176,7 @@ class PatientMigrationCompatibilityTest {
                     + "('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','SYNTHETIC','Synthetic Catalog Test',1.00,'SYNTHETIC')");
         }
         Flyway flyway = combined(null, false);
-        assertEquals(3, flyway.migrate().migrationsExecuted);
+        assertEquals(4, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertCombinedHistory();
         assertEquals(1, count("patients"));
@@ -195,7 +195,7 @@ class PatientMigrationCompatibilityTest {
         assertEquals(1, count("patients"));
         assertEquals(1, count("patient_link_tokens"));
         Flyway oneTimeMigration = combined(null, true);
-        assertEquals(3, oneTimeMigration.migrate().migrationsExecuted);
+        assertEquals(4, oneTimeMigration.migrate().migrationsExecuted);
         // Normal strict startup must succeed without persisting the out-of-order option.
         Flyway normal = combined(null, false);
         normal.validate();

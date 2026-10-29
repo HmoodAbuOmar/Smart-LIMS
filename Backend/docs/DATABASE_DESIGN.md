@@ -1,6 +1,12 @@
 # Smart-LIMS Database Design
 
 Status: implemented-schema inventory plus carried-forward design for unimplemented features.
+Stage 3 update (2026-10-29): V8 and appointment APIs implement the owner-approved
+Asia/Jerusalem schedule, retained CONFIRMED/CANCELLED bookings, capacity/retry/history
+rules and atomic order-cancellation cascade. Stage 3 is DONE: final full isolated
+suite passed 273 tests/34 suites, zero failures/errors/skips, at 23:16:44 +02:00.
+[Evidence](TESTING.md#stage-3-verification-2026-10-29). Older stage-specific notes below are
+historical and do not describe current appointment integration.
 Stage 2 Task 11 verification update: 2026-10-28; [one complete isolated-suite invocation](TESTING.md#task-11-full-stage-verification-2026-10-28) passes 236 tests across 27 suites with zero failures/errors/skips. Task 11 and Stage 2 are DONE. The owner's 2026-10-29 clarification treats committing as a separate handoff, not an acceptance criterion; no tests were rerun for this correction. No source/schema/test changes, Postman use, commit/push, production migration or deployment in Task 11. Earlier per-task notes below describe their own verification boundaries.
 Updated: 2026-10-27 (documentation-only SDLC review).
 Stage 2 Task 7 persistence update: 2026-10-28; V7 adds order storage and JPA mappings. Focused isolated execution is recorded in [TESTING.md](TESTING.md#task-7-order-persistence-verification-2026-10-28); that evidence covers persistence only. Later creation evidence is recorded separately below; deployment remains unverified.
@@ -11,7 +17,7 @@ Stage 2 Task 6 design review: 2026-10-28; ORDERS_API.md and sections 4.7-4.8 rec
 Task 2 source update: 2026-10-28; V6 adds category persistence/mapping only. Verification is recorded separately in [TESTING.md](TESTING.md#task-2-category-persistence-verification-2026-10-28); this does not establish development/production migration status or future category API behavior.
 Requirements, decisions, task IDs and completion evidence: [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). The scope is confirmed; unimplemented column/state/workflow proposals still require the applicable decision and API contract before coding. This design is not evidence of deployed functionality.
 Planned results allow unfilled draft measurements and preserve required-parameter snapshots per version; results are not implemented yet.
-Migration integration: canonical source is V1-V7. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. V6/V7 source/test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
+Migration integration: canonical source is V1-V8. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. Later migration source/isolated-test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
 Intended repository path: `Backend/docs/DATABASE_DESIGN.md`.
 
 ## 1. Scope and implementation status
@@ -26,8 +32,15 @@ This document inventories the current schema and preserves the proposed database
 - Patient name, birth date, gender, and phone are required; address is optional; phone numbers are not unique.
 - Initial monetary currency: ILS.
 - Payments are recorded manually or by external transaction reference; no payment gateway is included in this baseline.
-- The inventory lists 22 application tables: eight implemented in source migrations, twelve planned for the core workflow, and two deferred for AI. `flyway_schema_history`, `patient_number_seq`, and `order_number_seq` are technical objects, not additional application tables. V6/V7 verification uses only the isolated test cluster; development/production application is not established.
-- `users`, `email_action_tokens`, `patients`, `lab_tests`, `patient_link_tokens`, `lab_test_categories`, `test_orders`, and `order_items` are implemented through V1-V7. Other application tables remain implementation targets.
+- The original inventory lists 22 business tables; 10 are now implemented, 10 remain
+  planned for core workflow, two are deferred for AI. Stage 3 also adds supporting
+  appointment_types and appointment_reschedules (12 implemented business/support
+  tables total). appointment_coordination, flyway_schema_history and the patient/
+  order sequences are technical objects. Isolated verification does not establish
+  development/production migration status.
+- V1–V7 implement users, email_action_tokens, patients, lab_tests, patient_link_tokens,
+  lab_test_categories, test_orders and order_items. V8 adds appointment_types,
+  appointment_slots, appointments, appointment_reschedules and technical coordination.
 - The supplied SQL also adds `users.reset_code_failed_attempts`; it is included here.
 - Preserve existing authentication behavior. Do not recreate existing authentication tables or rewrite an applied migration.
 - Symptom-based suggestions are scheduled for a later AI phase. Further AI result-analysis persistence is outside this baseline and requires a separate scope decision.
@@ -43,6 +56,7 @@ This document inventories the current schema and preserves the proposed database
 | V5__patient_link_tokens.sql | patient_link_tokens, outstanding-token uniqueness and state/hash checks | R-PAT-02; T-PAT-01 |
 | V6__lab_test_categories.sql | Empty category assignment table; composite PK, catalog FK, seven-value CHECK, reverse membership index | R-CAT-01/R-NFR-01; Stage 1 Task 2; isolated-test evidence in TESTING.md |
 | V7__orders.sql | Order sequence, headers/items, retry uniqueness, snapshot/cancellation checks, retained FKs and lookup indexes | R-ORD-01/R-NFR-01; Stage 2 Task 7; isolated-test evidence in TESTING.md |
+| V8__appointments.sql | Types, explicit non-overlapping slots, coordination, retained appointments/retry/cancellation and reschedule history | S3-APT-R01–R07; Stage 3 Tasks 13–18; isolated-test evidence in TESTING.md |
 
 The private `Smart-LIMS-DB-Backups` directory retains `reconciliation-result-20261026-221059.json`, `flyway-before-20261026-221059.csv`, `flyway-after-20261026-221059.csv`, `validation-normal-20261026-221059.log`, and the backup archive. These are historical operator artifacts, inspected as files only in this review:
 
@@ -80,8 +94,8 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 6 | `reference_ranges` | Planned; T-REF-02/03 | Approved numeric or textual reference ranges by parameter, age, sex, and validity period. |
 | 7 | `test_orders` | Implemented V7; Stage 2 Task 7 persistence only | The main laboratory order belonging to a patient. |
 | 8 | `order_items` | Implemented V7; Stage 2 Task 7 persistence only | The individual tests selected within an order, including historical name and price snapshots. |
-| 9 | `appointment_slots` | Planned; T-APT-02 | Available booking periods and the maximum number of appointments for each period. |
-| 10 | `appointments` | Planned; T-APT-03/04 | An optional appointment for a laboratory order. |
+| 9 | `appointment_slots` | Stage 3 V8; verified DONE | Explicit shared-capacity non-overlapping booking periods. |
+| 10 | `appointments` | Stage 3 V8; verified DONE | Retained order-linked bookings; one CONFIRMED per order. |
 | 11 | `payments` | Planned; T-PAY-02/03 | Payment and refund records. This design does not integrate a payment gateway. |
 | 12 | `samples` | Planned; T-SMP-02/03 | Physical samples collected for an order, including receipt, rejection, and replacement tracking. |
 | 13 | `sample_tests` | Planned; T-SMP-02 | Many-to-many links between physical samples and ordered tests. |
@@ -389,9 +403,12 @@ Stage 2 Task 6 reviewed design, implemented in V7 by Task 7 with the OrderItem m
 
 ### 4.9. `appointment_slots`
 
-Available booking periods and the maximum number of appointments for each period.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Stage 3 approved design (2026-10-29), superseding the former proposal. V8 adds
+explicit slots, appointment_types, appointment_coordination, appointments and
+appointment_reschedules. V1–V7 are preserved. Detailed rules/DTOs:
+[APPOINTMENTS_API.md](APPOINTMENTS_API.md). Implemented and verified in Stage 3;
+final full-suite evidence is in TESTING.md. Development/production application is
+not established by isolated migration tests.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -405,39 +422,74 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 
 **Rules and relationships**
 
-- ends_at > starts_at and capacity > 0. active defaults to TRUE.
-- This scope uses one laboratory booking schedule with non-overlapping periods. An EXCLUDE constraint on tstzrange(starts_at, ends_at, '[)') can enforce non-overlap. [S1]
-- Booking locks the slot row with SELECT FOR UPDATE, counts capacity-consuming appointments, and inserts the appointment in the same transaction. BOOKED and CHECKED_IN consume capacity. [S3]
-- Do not reduce capacity below existing active bookings. Do not change the times of a booked slot; explicitly reschedule to a new slot.
-- Walk-in orders do not automatically consume a booking slot.
+- Positive capacity and end > start; EXCLUDE USING gist on tstzrange(start,end,'[)')
+  prohibits overlap for all slots, including inactive. No PostgreSQL extension needed.
+- Explicit future publication by ADMIN/RECEPTIONIST; no generated hours. Times immutable
+  through API. Capacity shared across types; CONFIRMED rows alone consume capacity.
+- Asia/Jerusalem for display; TIMESTAMPTZ instants for storage/comparison. Start/end
+  input requires explicit offset; API retains microsecond precision.
+- appointment_types: UUID PK, unique code VARCHAR(30), name VARCHAR(150), active boolean,
+  created_at/updated_at; checks mirror normalized code/name. ADMIN create/replace only.
+  No deletion/seeds. Existing appointment type_name_snapshot remains unchanged.
+- appointment_coordination has one checked id=1 row. Every appointment/schedule write
+  obtains its SELECT FOR UPDATE lock. This intentionally serializes writes for one
+  laboratory, protecting cross-order patient overlap and global creator/key uniqueness.
+  Availability is advisory. No account/patient lock is acquired after order/coordination.
+
+Lock order: appointment mutations first discover the immutable order ID without a
+write lock, lock that order row, then coordination, then re-read/lock appointment,
+then old/new slots in lexical UUID order. Booking: order→coordination→type→slot.
+Schedule management: coordination→type/slot only. Linked order cancellation already
+holds order, then coordination→appointment→slot. Never acquire order while holding
+coordination. Count capacity/patient conflicts and write under those same locks;
+flush before returning. Rollback preserves old allocation. Capacity is derived from
+CONFIRMED rows, with no mutable counter to drift. Schedule capacity update uses the
+same coordination lock and cannot drop below occupancy. Service boundaries guard
+capacity/cross-order patient overlap; SQL partial uniqueness guards active order too.
 
 ### 4.10. `appointments`
 
-An optional appointment for a laboratory order.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Order-linked retained bookings, Stage 3 approved design. Active explicitly means
+CONFIRMED even after start. Only CONFIRMED/CANCELLED are stored in this stage.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
 | `id` | `UUID` | No | PK | Record identifier |
-| `order_id` | `UUID` | No | UNIQUE; FK test_orders.id | Parent laboratory order |
+| `order_id` | `UUID` | No | FK test_orders.id; partial UNIQUE WHERE status=CONFIRMED | Parent laboratory order |
 | `slot_id` | `UUID` | No | FK appointment_slots.id | Selected booking period |
-| `status` | `VARCHAR(20)` | No | DEFAULT BOOKED | Business workflow state |
+| `type_id` | `UUID` | No | FK appointment_types.id | Retained appointment type |
+| `type_name_snapshot` | `VARCHAR(150)` | No | Trimmed nonblank | Original display name |
+| `status` | `VARCHAR(20)` | No | DEFAULT CONFIRMED; two-value CHECK | Business workflow state |
+| `version` | `BIGINT` | No | DEFAULT 0; >=0 | Optimistic revision |
 | `created_by` | `UUID` | No | FK users.id | Authenticated creator |
-| `checked_in_at` | `TIMESTAMPTZ` | Yes | - | Arrival time |
+| `idempotency_key` | `UUID` | No | UNIQUE(created_by,idempotency_key) | Durable original booking retry |
+| `original_slot_id` | `UUID` | No | FK appointment_slots.id | Original retry intent, unaffected by moves |
+| `cancelled_by` | `UUID` | Yes | FK users.id | Original cancellation actor |
 | `cancelled_at` | `TIMESTAMPTZ` | Yes | - | Cancellation time |
 | `cancellation_reason` | `TEXT` | Yes | - | Cancellation reason |
-| `notes` | `TEXT` | Yes | - | Optional notes |
 | `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Last modification time |
 
 **Rules and relationships**
 
-- order_id is UNIQUE: an order has zero or one appointment. Do not duplicate patient_id or scheduled_at; obtain them from the order and slot.
-- status values: BOOKED, CHECKED_IN, COMPLETED, CANCELLED, NO_SHOW. Initial status is BOOKED.
-- Check-in records checked_in_at. Cancellation records cancelled_at and a reason.
-- Reschedule by locking the old and new slots in a stable order, checking capacity, and updating slot_id; record the change in audit_logs.
-- Cancelling an appointment does not implicitly cancel the order. Future appointment integration must define atomic order/appointment cancellation before enabling that coupling; Stage 2 order cancellation has no appointment side effect.
+- All FKs retain history with NO ACTION. No patient/time duplication; derive from order/slot.
+- Cancellation consistency CHECK requires actor/time exactly when CANCELLED; optional
+  reason trimmed 1–1000 characters when present. Staff reason enforced in service.
+- Initial booking requires owned/authorized PENDING order, active type/slot, future
+  slot, spare capacity and no active patient overlap. Cancelled rows permit rebooking.
+- Durable creator/key retry compares order/type/original slot under coordination;
+  replay rechecks current authorization and returns current state without side effects.
+- appointment_reschedules: UUID PK; appointment_id, old_slot_id, new_slot_id,
+  changed_by retained FKs; from_version >=0; changed_at UTC. Unique(appointment_id,
+  from_version); old != new. Records every real move, supports exact immediate retry.
+- Direct changes before start only. Cancel releases capacity by changing status, never
+  deleting rows. Reschedule updates slot/revision, retaining original intent/history.
+- Order cancellation now atomically cascades to active appointment irrespective of
+  start, copying original order actor/time/reason. Direct appointment cancellation
+  never cancels order. Existing order-only cancellations behave as before.
+- Indexes cover order, slot/status, creator/key, type, cancellation actor and event
+  actor/slots. Order patient indexes support owned lists; no child join duplication.
+- Visit transitions/general audit subsystem remain deferred. No clock-driven statuses.
 
 ### 4.11. `payments`
 
@@ -749,7 +801,7 @@ Links involving planned/deferred tables below are proposed relationships, not ex
 | test_parameters | reference_ranges | One parameter to multiple demographic/time ranges |
 | test_orders | order_items | One order to one or more test items |
 | lab_tests | order_items | One catalog test referenced by many ordered items |
-| test_orders | appointments | Zero or one appointment per order |
+| test_orders | appointments | Many retained appointments; at most one CONFIRMED per order |
 | appointment_slots | appointments | Many appointments up to capacity |
 | test_orders | payments | Multiple payments/refunds |
 | payments | payments | Refund points to original payment |
@@ -781,7 +833,9 @@ Additional recommended indexes:
 - Stage 2 implemented V7: `order_items(order_id, lab_test_id)` UNIQUE, covering order_id FK/loading, plus `order_items(lab_test_id)` for its retained catalog FK.
 - `test_parameters(lab_test_id, code)` UNIQUE.
 - `reference_ranges(parameter_id, gender, valid_from)`.
-- `appointments(order_id)` UNIQUE and `appointments(slot_id, status)`.
+- Stage 3 V8: partial UNIQUE `appointments(order_id) WHERE status='CONFIRMED'`,
+  `appointments(slot_id,status)`, creator/key retry uniqueness, retained type/actor/
+  original-slot FKs and reschedule history; see sections 4.9–4.10.
 - `payments(order_id, status)` and `payments(original_payment_id)`.
 - `samples(order_id)` and `samples(replaces_sample_id)`.
 - `sample_tests(sample_id, order_item_id)` UNIQUE and `sample_tests(order_item_id)`.
@@ -796,7 +850,7 @@ Additional recommended indexes:
 Concurrency controls must cover every write path:
 
 1. Stage 2 creation: current account, patient, then selected catalog rows in stable UUID order; successful retry lookup precedes fresh catalog admission. Cancellation locks its order and never takes account/patient locks afterward. See section 4.7 and ORDERS_API.md.
-2. Future booking: lock slot rows before capacity checks and appointment writes.
+2. Stage 3 booking/actions: order row→appointment coordination→appointment→slots in lexical UUID order before capacity checks/writes; see sections 4.9–4.10.
 3. Lock order/payment rows before payment or refund amount checks.
 4. Lock ordered test items before allocating result revisions or publishing.
 5. Lock parameters before reference-range overlap checks and writes.
@@ -819,7 +873,9 @@ Existing patient/catalog/account permissions are defined by their implemented co
 
 ## 8. End-to-end example
 
-This illustrates the planned workflow only. Orders, appointments, payments, samples, results, notification persistence and audit persistence are not implemented yet.
+This illustrates the wider planned workflow only. Orders are implemented in V7;
+Stage 3 V8 implements appointments as described in sections 4.9–4.10. Payments,
+samples, results, notification persistence and general audit persistence remain planned.
 
 The short IDs below illustrate relationships; actual identifiers are UUIDs. No medical reference values or prices are specified.
 

@@ -75,6 +75,18 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
 
+                        .requestMatchers(HttpMethod.GET, "/api/appointment-types").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointment-types").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/appointment-types/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/appointment-slots/schedule").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/appointment-slots").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointment-slots").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/appointment-slots/{id}").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointments").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/me", "/api/appointments/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/{id}/alternatives").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointments/{id}/reschedule", "/api/appointments/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+
                         .requestMatchers(HttpMethod.POST, "/api/orders/me").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/orders/me", "/api/orders/me/{id}").hasRole("PATIENT")

@@ -1,6 +1,7 @@
 package com.smartlims.orders.service;
 
 import com.smartlims.auth.entity.Role;
+import com.smartlims.appointments.service.AppointmentOrderCancellation;
 import com.smartlims.orders.dto.CancelOrderRequest;
 import com.smartlims.orders.dto.OrderDetailResponse;
 import com.smartlims.orders.entity.OrderStatus;
@@ -24,12 +25,14 @@ public class OrderCancellationService {
     private final TestOrderRepository orders;
     private final OrderMapper mapper;
     private final EntityManager entities;
+    private final AppointmentOrderCancellation appointments;
 
-    public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities) {
+    public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities, AppointmentOrderCancellation appointments) {
         this.access = access;
         this.orders = orders;
         this.mapper = mapper;
         this.entities = entities;
+        this.appointments = appointments;
     }
 
     @Transactional
@@ -50,6 +53,7 @@ public class OrderCancellationService {
         // Match database/ORM microsecond precision instead of rounding a later nanosecond upward.
         order.setCancelledAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
         order.setCancellationReason(request.reason());
+        appointments.cancelForOrder(order);
         orders.flush();
         entities.refresh(order);
         return mapper.toDetail(order);

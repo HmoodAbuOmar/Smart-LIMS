@@ -1,5 +1,122 @@
 # Database-backed test setup
 
+## Stage 3 verification (2026-10-29)
+
+Current branch backend-hmood. The saved disposable PostgreSQL 16 cluster was stopped;
+restarted only its resolved temporary directory, confirmed pg_ctl PID 17724,
+postmaster.pid/data directory and actual psql current_setting('data_directory') all
+match C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df.
+psql independently confirmed smartlims_auth_regression, postgres and loopback
+127.0.0.1:55432; listener belongs to PID 17724. Development Windows service is a
+separate PID 5464 and was not a target. Unchanged .mvn/maven.config/Surefire mapping
+selects that guarded URL. Synthetic fixtures, fake email; no application defaults.
+Compatibility tests own only newly created smartlims_migration_* databases.
+
+Initial focused command: `.\mvnw.cmd '-Dtest=AppointmentScheduleTest' test`.
+Result: 6 tests, 1 failure/2 errors, finished 2026-10-29 23:01:23 +02:00,
+53.643 s, exit 1. Three fixtures generated nanosecond timestamp strings, correctly
+rejected by the contract's microsecond precision validation. Normalized synthetic
+fixture timestamps to microseconds; production validation was preserved. Corrected
+schedule/migration run and later slice evidence will be recorded below.
+
+Corrected Task 13 run: `.\mvnw.cmd '-Dtest=AppointmentScheduleTest,AppointmentMigrationTest' test`.
+8 tests, 0 failures/errors/skips; BUILD SUCCESS; exit 0, 33.091 s, finished
+2026-10-29 23:02:21 +02:00. Fresh/upgrade migrations, no seeded schedule, legacy
+checksum/data preservation, DB overlap/positive-capacity constraints and concurrent
+slot publication verified. Additional occupied-capacity persistence coverage follows.
+
+Task 13 expanded check: `.\mvnw.cmd '-Dtest=AppointmentScheduleTest' test`.
+7/7, zero failures/errors/skips, BUILD SUCCESS, exit 0, 29.592 s, finished
+2026-10-29 23:03:30 +02:00. Added occupied-capacity rejection, active-order partial
+uniqueness, retained slot FK and type-name snapshot verification. Task 13 DONE;
+no full-suite or deployment claim.
+
+Task 14: `.\mvnw.cmd '-Dtest=AppointmentBookingTest' test` — 6/6, zero
+failures/errors/skips, BUILD SUCCESS, exit 0; 35.056 s; finished 2026-10-29
+23:05:28 +02:00. Verified linked ownership/staff unlinked target, initial response,
+retained PENDING order, original-intent retry, strict JSON/header validation,
+availability filtering/counts, shared capacity, active-order and patient overlap,
+concurrent last-capacity allocation and same-key retry. Task 14 DONE.
+
+Task 15: `.\mvnw.cmd '-Dtest=AppointmentReadTest' test` — 4/4, zero
+failures/errors/skips, BUILD SUCCESS, exit 0; 33.731 s; finished 2026-10-29
+23:06:58 +02:00. Grouping uses one captured now with complementary predicates;
+patient ownership, tab paging/counts/large offsets, retained snapshot, Asia/Jerusalem
+winter/summer offsets/date rollover and action flags pass. Task 15 DONE.
+
+Task 16: `.\mvnw.cmd '-Dtest=AppointmentRescheduleTest' test` — 6/6, zero
+failures/errors/skips, BUILD SUCCESS, exit 0; 35.877 s; finished 2026-10-29
+23:08:36 +02:00. Alternatives/capacity, retained identity/type/snapshot/original
+retry, exact move repeat, stale revision, staff/owner permissions, old-slot release,
+non-PENDING/started/patient-overlap rejection, transaction rollback and concurrent
+last-place movement pass. Task 16 DONE.
+
+Task 17: `.\mvnw.cmd '-Dtest=AppointmentCancellationTest,OrderCancellationTest' test`
+— 24/24 (9 appointment + 15 existing order), zero failures/errors/skips,
+BUILD SUCCESS, exit 0; 41.761 s; finished 2026-10-29 23:11:14 +02:00. Retained
+metadata/repeats, strict reasons/privacy, capacity release/rebooking, original
+cancelled history, post-start order cascade, atomic order/appointment rollback and
+book/move/cancel/order races pass. Expected synthetic-trigger rejection from the
+existing order rollback test is not a suite failure. Task 17 DONE.
+
+Task 18 additional focused check: `.\mvnw.cmd '-Dtest=AppointmentConcurrencyTest' test`
+— 3/3, zero failures/errors/skips, BUILD SUCCESS, exit 0; 28.725 s; finished
+2026-10-29 23:13:43 +02:00. Concurrent different orders for the same patient cannot
+double-book despite spare capacity; booking versus reschedule cannot overbook or
+lose the existing booking; cookie appointment writes require matching CSRF while
+bearer transport remains exempt. All 37 new appointment cases have passed focused
+runs; this cumulative statement is not yet full-suite evidence.
+
+Pre-full check at 23:14 +02:00 reverified actual PostgreSQL data directory, guarded
+database, loopback address/port and listener PID 17724. V1–V7, POM and local Maven
+mapping remain unchanged; git diff --check passes. Existing test modifications are
+limited to explicit cleanup tables for retained V8 FKs and expected latest migration
+counts/history. No guard or existing behavioral assertion was removed or weakened.
+
+Final direct full invocation from Backend, branch backend-hmood:
+
+```powershell
+.\mvnw.cmd test
+```
+
+**273 tests across 34 suites, 0 failures, 0 errors, 0 skips; BUILD SUCCESS;
+exit 0.** Finished **2026-10-29 23:16:44 +02:00**; Maven duration **2 minutes
+13 seconds**. All 34 Surefire XML reports were freshly written by this invocation
+(appointment reports 23:14:54–23:15:07); independent XML totals match Maven.
+
+| Suite group | Suites | Passing tests |
+|---|---:|---:|
+| New appointments: booking 6, cancellation 9, concurrency/browser security 3, migration 2, reads 4, reschedule 6, schedule/persistence 7 | 7 | 37 |
+| All existing authentication, provisioning, browser security, patient/linking, catalog, orders, migration and application-context suites | 27 | 236 |
+| Total in one final invocation | 34 | 273 |
+
+| Stage acceptance | Result/evidence |
+|---|---|
+| Booking/types/availability | PASS: explicit staff schedule, active type discovery, owned PENDING order admission, no seeds/hours, strict inputs and original-intent retry. |
+| Upcoming/Past/table/actions | PASS: complementary grouping at captured now, retained future cancellations/past CONFIRMED rows, Asia/Jerusalem winter/summer offsets and date rollover, snapshot type, ID/status and action eligibility, accurate paging and ownership privacy. |
+| Reschedule | PASS: valid alternatives, retained type/ID/history, exact immediate retry/stale revision handling, full/overlapping/started/non-PENDING rejection, old/new capacity atomicity and rollback. |
+| Cancellation/order integration | PASS: retained original metadata, staff reasons/repeat validation, once-only release, rebooking and atomic linked order cascade including past slots; no reverse cancellation. |
+| Concurrency/security | PASS: last-capacity competition, same-key retries, cross-order patient conflict, booking versus move, concurrent moves/cancels/order cascade, JWT roles/ownership and cookie CSRF. |
+| Schema/data/regressions | PASS: V8 fresh/upgrade/constraints, retained rows/FKs/snapshots, V1–V7 migration history preserved; all 236 existing cases pass with V8 cleanup/history expectations. |
+| Scope/docs/handoff | PASS: all 13 method/path mappings matched to contract/security/service/DTOs; no deferred visit workflow or other stage; exact manual requests in APPOINTMENTS_API.md section 7. |
+
+Task 18 and Stage 3 are **DONE**. This is one green final complete invocation,
+not a cumulative substitute. Earlier focused fixture failures remain recorded
+above. Only documentation/status evidence changed after the final full run; no
+application/test code changed. git diff --check passes. V1–V7, dependencies,
+isolation guard, machine-local Maven mapping and local exclusions are preserved.
+No Postman use/artifacts, frontend changes, staging, commit, push or next-stage work.
+
+Owner manual HTTP verification/commit are separate. A live network application,
+development/production application of V8, real email and deployment readiness were
+not verified. Check-in/completion/no-show remain intentionally deferred. No Stage 3
+acceptance gap remains. Appointment mutations intentionally serialize for one lab
+using a database coordination row; this is a throughput tradeoff, not a capacity
+counter or a replacement for order/slot locks. Any future workflow writing these
+records must follow the documented lock order and capacity rules.
+
+## Historical setup and earlier evidence
+
 SDLC traceability: R-NFR-01 and per-task acceptance in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). The run records below are historical evidence; this 2026-10-27 documentation review did not run tests, start the application, or check current database/server availability. A future implementation task must record its own command, isolated target, date, counts and result before DONE. The separately recorded development recovery is described in [DATABASE_DESIGN section 1.1](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation).
 
 The integration suites require an explicitly disposable PostgreSQL instance with a

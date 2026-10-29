@@ -76,7 +76,7 @@ class OrderCreationTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             UserAccount actor = UserAccount.invite("Synthetic order actor", role.name().toLowerCase(Locale.ROOT)
                     + "@example.invalid", null, null, role);

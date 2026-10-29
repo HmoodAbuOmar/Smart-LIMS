@@ -1,5 +1,14 @@
 # Orders API Contract
 
+Stage 3 integration (2026-10-29): cancelling a PENDING order atomically cancels its
+CONFIRMED appointment, if any, and releases capacity even after slot start. Copy
+the order cancellation actor/time/reason; retain both records. Order eligibility,
+repeats, ownership and original items/prices remain unchanged. Appointment
+cancellation alone leaves the order unchanged. The detailed
+[appointment contract](APPOINTMENTS_API.md) and database sections 4.9–4.10 supersede
+older Stage 2 statements below about absence of appointment-cancellation effects.
+Check-in/completion/no-show remain deferred.
+
 Status: finalized design for Stage 2 Task 6, 2026-10-28. Tasks 7-10 implement V7 storage/mappings, creation/replay, owned patient list/detail and atomic cancellation with retained metadata. [Task 11 technical verification](TESTING.md#task-11-full-stage-verification-2026-10-28) passes one complete invocation of 236 tests across 27 suites, with zero failures/errors/skips. Task 11 and Stage 2 are DONE based on that passing evidence. The owner's 2026-10-29 clarification makes committing a separate handoff, not an acceptance criterion; no tests were rerun or commit/push performed for this correction. No Postman was used in this verification. Local tests do not establish deployment readiness.
 
 Traceability: R-ORD-01/R-NFR-01; Stage 2 Tasks 6–11 in the [local plan](../IMPLEMENTATION_PLAN.md#stage-2--patient-orders). Local acceptance IDs: S2-ORD-R01 creation/identity, R02 patient reads, R03 cancellation, R04 snapshots/totals, R05 retries/concurrency. Reuse [patient identity/linking](PATIENTS_API.md), [catalog](LAB_TESTS_API.md), and [database design sections 4.7–4.8](DATABASE_DESIGN.md#47-test_orders). This is the single detailed order API reference.
