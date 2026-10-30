@@ -1,5 +1,85 @@
 # Database-backed test setup
 
+## My Profile verification (2026-10-30)
+
+Tasks 33-36, MP-PAT-R01-R06. Branch backend-hmood. Scope: patient-only My
+Profile view/edit/completion, existing profile/linking/account separation and
+published snapshot preservation. No Postman, frontend, Dashboard, Notifications,
+PDF changes or broad live HTTP campaign. Existing owner edits in SampleService.java
+and VisitService.java were present at entry and are preserved independently.
+
+Before database tests, independently verified the running disposable PostgreSQL
+16.15 instance: saved SMARTLIMS_TEST_POSTGRES_DATA matched postmaster.pid and
+pg_ctl's postgres process -D; pg_ctl and the separate loopback listener check both
+identified PID 14408 at 127.0.0.1:55432. Inspected postgresql.conf (listen_addresses
+127.0.0.1, port 55432), pg_hba.conf (test-only loopback postgres trust) and explicit
+psql connection to smartlims_auth_regression. psql confirmed that database, user=postgres,
+server address/port, loopback listen_addresses and actual data_directory:
+`C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df`.
+The separate development service/data was not accessed. The unchanged local
+.mvn/maven.config/Surefire mapping selects only the guarded regression database.
+No application datasource fallback. Fixtures are synthetic; external email is fake.
+
+Focused command, directly from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=PatientSelfProfileTest,PatientProfileCompletionTest,PatientProfileSnapshotTest,PatientProfileLinkingTest,PatientRequestTest,PatientManagementTest' test
+```
+
+Focused result: **78 tests across 6 suites, 0 failures, 0 errors, 0 skips,
+BUILD SUCCESS, exit 0**, Maven duration **01:10 min**, finished
+**2026-10-30T19:13:41 +02:00**. New: PatientSelfProfileTest 16,
+PatientProfileCompletionTest 5, PatientProfileSnapshotTest 1. Existing:
+PatientManagementTest 27, PatientProfileLinkingTest 26, PatientRequestTest 3.
+Final direct full-suite execution and preservation evidence are recorded below.
+
+| Requirement | Acceptance checks |
+|---|---|
+| MP-PAT-R01 | Authenticated identity only, no query selectors, foreign profile concealment, absent/unlinked 404, existing create/claim flows. |
+| MP-PAT-R02 | Strict DTO types, trimmed bounds, uppercase gender, real/nonfuture Jerusalem birth date, optional address clearing, unchanged original nine-field responses/staff API. |
+| MP-PAT-R03 | Read-only account email; whole users row and patient identity/link/creator unchanged; account name/phone remain independent; every read-only/security field rejected atomically; no email delivery. |
+| MP-PAT-R04 | Five equal 20-point fields, deterministic missingFields, UNKNOWN valid, address excluded, future date incomplete; valid linked profiles normally 100. Incomplete synthetic mapper fixtures are in memory only, not incomplete persisted profiles. |
+| MP-PAT-R05 | Stored role/eligibility, cookie CSRF, bearer precedence, rollback, self/staff replacement race, immutable current and superseded published patient/specimen snapshots. |
+| MP-PAT-R06 | Final direct full-suite run and independent fresh XML totals; source/contract/data-design/diff/preservation review. |
+
+Contract and request examples: [PATIENTS_API.md section 16](PATIENTS_API.md#16-patient-my-profile).
+No migration, dependency or authentication strategy change. V1-V9, report rendering,
+isolation guard and machine-local Maven mapping remain unchanged. Existing explicit
+registration, profile creation and secure staff-assisted token linking remain the
+only account/profile initialization flows. Secure self-email change is unavailable;
+email remains read-only. Manual live client/deployment verification is unperformed.
+
+Final required command, after final source/security/contract/data-design review
+and independent pg_ctl/listener/psql recheck of the same disposable instance:
+
+```powershell
+.\mvnw.cmd test
+```
+
+**367 tests across 49 suites, 0 failures, 0 errors, 0 skips, BUILD SUCCESS,
+exit 0.** Maven duration **04:01 min**, finished **2026-10-30T19:19:08 +02:00**.
+All 49 Surefire XML reports independently sum to these totals and are fresh for
+this invocation (zero reports predating the start). The same run passes all 345
+existing cases plus 22 new My Profile cases, including current/superseded snapshot
+preservation, concurrent staff/self edits, rollback and security/CSRF tests.
+No failed run or skipped case is omitted from this task's evidence. The only
+change after the focused run was replacing a raw test Map decode with its typed
+equivalent; that exact final test source passed the full run. No source changes
+followed the full run.
+
+Post-run isolated psql checks: Flyway V1-V9 all successful; no remaining
+smartlims_migration_* compatibility databases. `git diff --check` and new-file
+whitespace/conflict scan passed. Protected-file diff confirms no changes to
+POM/dependencies, applied migration sources, account/security model/services,
+patient entity/existing validation DTO, result/report source, isolation guard or
+Maven mapping. Starting SHA-256 hashes of the owner's pre-existing SampleService
+and VisitService edits still match exactly. Existing tests were not weakened.
+API/data design/plan and evidence reconciled; MP-PAT-R01-R06 and Tasks 33-36 are
+DONE. No implementation blocker remains. Existing eligible account and explicit
+profile create/link flow are prerequisites; changing email requires a separately
+implemented secure flow and is deliberately not offered here. No commit, push,
+staging, deployment or broad live client campaign was performed.
+
 ## Stage 5 medical history verification (2026-10-30)
 
 Tasks 28-32, S5-MH-R01-R06. Branch `backend-hmood`. Existing owner additions to

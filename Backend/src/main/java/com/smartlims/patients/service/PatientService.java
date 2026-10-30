@@ -31,6 +31,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.validation.annotation.Validated;
 
 @Service
@@ -57,6 +58,29 @@ public class PatientService {
         UserAccount account = currentAccount(actor, false, "PATIENT");
         return mapper.toResponse(patients.findByUser_Id(account.getId())
                 .orElseThrow(PatientProfileException::notLinked));
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public PatientSelfProfileResponse getMyProfile(Authentication actor) {
+        UserAccount account = currentAccount(actor, false, "PATIENT");
+        Patient patient = patients.findByUser_Id(account.getId()).orElseThrow(PatientProfileException::notLinked);
+        return mapper.toSelfProfile(patient, account);
+    }
+
+    @Transactional
+    public PatientSelfProfileResponse updateMyProfile(Authentication actor, @Valid UpdatePatientRequest request) {
+        // Match creation/claim ordering; staff updates serialize on the same profile lock.
+        UserAccount account = currentAccount(actor, true, "PATIENT");
+        Patient patient = patients.findWithLockByUserId(account.getId()).orElseThrow(PatientProfileException::notLinked);
+        validateBirthDate(request.dateOfBirth());
+        patient.setFullName(request.fullName());
+        patient.setDateOfBirth(request.dateOfBirth());
+        patient.setGender(request.gender());
+        patient.setPhoneNumber(request.phoneNumber());
+        patient.setAddress(request.address());
+        patient.setUpdatedAt(Instant.now());
+        patients.flush();
+        return mapper.toSelfProfile(patient, account);
     }
 
     @Transactional

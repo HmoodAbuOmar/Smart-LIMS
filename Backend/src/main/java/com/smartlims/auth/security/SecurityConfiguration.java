@@ -107,7 +107,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/orders/me", "/api/orders/me/{id}").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/orders/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
 
-                        .requestMatchers(HttpMethod.GET, "/api/patients/me").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/patients/me", "/api/patients/me/profile").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/patients/me/profile").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/patients/me", "/api/patients/me/link")
                         .hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/patients/{id}/link-tokens")

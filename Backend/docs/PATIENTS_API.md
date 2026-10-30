@@ -1,11 +1,12 @@
 # Smart-LIMS Patients API Contract
 
-Status: patient management phases 1 and 2 implemented with canonical V3/V5 schema alongside V4 lab catalog. Saved operator artifacts record development reconciliation completed on 2026-10-26; see [database evidence and limits](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation). Earlier preparation/audit sections describe their own historical boundaries and are not the current migration status. No database was accessed during this documentation review.
-Reviewed: 2026-10-27.
+Status: patient management phases 1 and 2 implemented with canonical V3/V5 schema alongside V4 lab catalog. Saved operator artifacts record development reconciliation completed on 2026-10-26; see [database evidence and limits](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation). Earlier preparation/audit sections describe their own historical boundaries and are not the current migration status. The original 2026-10-27 documentation-only review did not access a database.
+My Profile extension (section 16): DONE, 2026-10-30; Tasks 33-36, MP-PAT-R01-R06. Final direct isolated suite: 367 tests/49 suites, zero failures/errors/skips; [current verification](TESTING.md#my-profile-verification-2026-10-30).
+Reviewed: original phases 2026-10-27; My Profile extension 2026-10-30.
 Repository location: `Backend/docs/PATIENTS_API.md`.
 Database reference: `Backend/docs/DATABASE_DESIGN.md`.
 
-Traceability: R-PAT-01, R-PAT-02, R-NFR-01 and T-PAT-01 in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). Historical verification is in sections 13 and 15 plus the later [full isolated-suite record](TESTING.md#verification-after-launcher-removal-2026-10-27). No tests ran in this documentation review. Future patient-affecting features need their own requirement/task and reviewed contract before code; existing self-update/delete/merge exclusions remain.
+Traceability: R-PAT-01, R-PAT-02, R-NFR-01 and T-PAT-01 in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). Historical verification is in sections 13 and 15 plus the later [full isolated-suite record](TESTING.md#verification-after-launcher-removal-2026-10-27). The historical documentation review ran no tests. My Profile Tasks 33-36/MP-PAT-R01-R06 add the narrowly scoped self-update in section 16; deletion, merge and reassignment remain excluded. Current execution evidence belongs in TESTING.md.
 
 ## 1. Purpose and phase boundary
 
@@ -17,11 +18,11 @@ Account and patient-profile `fullName` values are independent and never automati
 
 Phase 1 supports staff-created, unlinked patient profiles, staff search, profile retrieval, and staff updates. It also defines ownership-protected retrieval for an account that already has a legitimate profile link.
 
-Phase 2 adds GET/POST `/me`, staff-issued link tokens, and POST `/me/link`. All four original endpoints retain their existing contracts. Profile updates remain staff-only. Profile/account demographics remain separate.
+Phase 2 adds GET/POST `/me`, staff-issued link tokens, and POST `/me/link`. All four original endpoints retain their existing contracts. My Profile adds GET/PUT `/me/profile` (section 16); original PUT `/{id}` remains staff-only. Profile/account demographics remain separate.
 
 Out of scope:
 
-- Patient self-updates after creation and unlinking/reassignment.
+- Unlinking/reassignment and account/security edits through patient-profile APIs.
 - Automatically matching profiles by name or phone.
 - Profile deletion, merging, orders, bookings, results, or payment operations.
 - Changes to authentication, JWT, cookies, CORS, or CSRF behavior.
@@ -68,6 +69,8 @@ All endpoints require authentication. No anonymous access is allowed.
 | POST /api/patients/me | Forbidden | Forbidden | Forbidden | Verified and eligible; one profile per account |
 | POST /api/patients/{id}/link-tokens | Allowed | Allowed | Forbidden | Forbidden |
 | POST /api/patients/me/link | Forbidden | Forbidden | Forbidden | Verified and eligible; token required |
+| GET /api/patients/me/profile | Forbidden | Forbidden | Forbidden | Own My Profile view, account email and completion |
+| PUT /api/patients/me/profile | Forbidden | Forbidden | Forbidden | Replace own linked patient demographics only |
 
 Check both role and ownership on the backend. UI visibility is not authorization.
 
@@ -654,7 +657,7 @@ Conflict leaves a valid token unconsumed. Token validity is checked before link 
 
 - Self-create locks the current account. Claim locks account -> profile -> token; token usability and current account eligibility/role are checked within that transaction. Two claims against one token produce one success; different profile tokens cannot give one account two profiles.
 - Issuance locks issuer -> profile before revoking token rows. Issuance and claim serialize on the profile: either the old token is consumed and issuance conflicts, or issuance revokes it and its claim fails. Expiry is evaluated after waiting for locks.
-- Staff PUT locks the profile, preserving links during concurrent demographic updates. PUT remains a full replacement and staff-only; there is no patient self-update route.
+- Staff PUT locks the profile, preserving links during concurrent demographic updates. PUT /{id} remains a full replacement and staff-only. My Profile's later self-update uses a separate /me/profile route (section 16).
 - V5 adds only patient_link_tokens and its constraints/indexes; applied V1-V4 and all existing authentication transports remain unchanged. No email delivery, orders, appointments, results, payments, dashboards, unlinking, or merging is added by this patient phase.
 
 ### 15.6. Separately managed Postman requests and backend verification
@@ -773,3 +776,123 @@ Actual checks:
 - Only a newly initialized, confirmed empty PostgreSQL 16.15 cluster bound to loopback was used. No connection to smart_lims_db was made during this V5 preparation. Its backup/reconciliation commands are provided for manual execution only.
 - Postman artifacts/removals and .gitignore were not edited. No Git staging, commit, push, branch switch, or deployment was performed. The earlier Postman run is historical evidence; no new Postman run was needed for this migration-only preparation.
 - Final preservation checks matched the complete Git index snapshot (including staged removals), both root/Backend .gitignore hashes, and the original V4/linking SQL hashes. All six PowerShell runbook blocks parsed successfully; git diff --check passed. The disposable PostgreSQL cluster was stopped and removed. No development backup or reconciliation command was executed.
+
+## 16. Patient My Profile
+
+Status: DONE, 2026-10-30. Focused 78/78 and final full 367/367 tests pass;
+see TESTING.md. Manual live client/deployment checks and owner commit are separate.
+
+Tasks 33-36, MP-PAT-R01-R06. Screenshot: ui-references/patient-profile.jpeg.
+Additive backend support; no frontend, Dashboard, Notifications or PDF changes.
+Original GET/POST /me, POST /me/link, staff routes and nine-field PatientResponse
+are unchanged. This section supersedes the earlier exclusion of self-updates only
+for the explicit self-only /me/profile route. No schema migration is required.
+
+### 16.1 View and edit
+
+| Method/path | Behavior |
+|---|---|
+| GET /api/patients/me/profile | Own persisted patient demographics plus account email and calculated completion. |
+| PUT /api/patients/me/profile | Full replacement of editable demographics using existing UpdatePatientRequest; returns the same My Profile view. |
+
+Both require an authenticated, currently eligible stored-role PATIENT. Identity
+comes exclusively from authentication -> users.id -> patients.user_id. No path or
+query patient/account selector. All query parameters, including repeated ones,
+are rejected with 400 VALIDATION_ERROR and the supplied query key in fieldErrors.
+Staff receive 403; missing/ineligible authentication 401, subject to the existing
+CSRF-filter precedence described in section 4. Bearer/cookie, CSRF and CORS policy
+are unchanged. Success and errors carry Cache-Control: no-store; errors retain
+the existing {code,message,fieldErrors,requestId} envelope and X-Request-Id.
+
+No linked profile: **404 PATIENT_PROFILE_NOT_LINKED** for either operation. GET
+does not create a profile, return account demographics as patient data, report a
+fictitious 0% profile or identify matching walk-in records. An unlinked walk-in
+with identical name/phone remains inaccessible. Reuse POST /api/patients/me to
+explicitly create, or the existing staff-issued token and POST /me/link to claim
+an existing record. Registration alone creates an account, not a patient profile.
+
+PUT JSON (synthetic example):
+
+```json
+{
+  "fullName":"Synthetic Patient Updated",
+  "dateOfBirth":"2000-06-19",
+  "gender":"UNKNOWN",
+  "phoneNumber":"000001",
+  "address":null
+}
+```
+
+Editable fields belong to **patients**, not users. Reuse existing strict string
+deserializers, trimming before validation and uppercase MALE/FEMALE/UNKNOWN enum.
+fullName is nonblank <=120; phoneNumber nonblank <=20, not unique and without a
+new invented phone-format rule. dateOfBirth is a real YYYY-MM-DD string, required
+and not in the future using Asia/Jerusalem today. Address is optional <=500;
+omitted/null/blank clears it to null. All other four fields are required on PUT.
+Wrong JSON types/coercion, invalid date/enum, unknown fields: 400 INVALID_JSON.
+Missing/null/blank/overlong required values or future birth date: 400
+VALIDATION_ERROR. Invalid requests leave all patient/account fields unchanged.
+
+**Read-only:** id, patientNumber, createdAt, updatedAt, email, emailEditable,
+completionPercentage and missingFields. Ownership/account IDs, role, security,
+verification, password and token fields are never accepted. Email is the current
+authenticated user's canonical users.email, with emailEditable=false. No secure
+self-email-change flow exists: even administrative account updates explicitly
+reject changing email. This endpoint does not send email, change login identity,
+verification state, account name/phone or account timestamps. Account/profile
+fullName and phoneNumber remain independent by the approved existing policy.
+
+Response (GET and PUT, 200):
+
+```json
+{
+  "id":"11111111-1111-4111-8111-111111111111",
+  "patientNumber":"PAT-000001",
+  "fullName":"Synthetic Patient Updated",
+  "dateOfBirth":"2000-06-19",
+  "gender":"UNKNOWN",
+  "phoneNumber":"000001",
+  "address":null,
+  "createdAt":"2026-10-30T10:00:00Z",
+  "updatedAt":"2026-10-30T11:00:00Z",
+  "email":"patient@example.invalid",
+  "emailEditable":false,
+  "completionPercentage":100,
+  "missingFields":[]
+}
+```
+
+### 16.2 Completion and transaction rules
+
+No pre-existing completion policy was found. Compute the score at read/response
+time from five equally weighted fields, **20 points each**, in this fixed order:
+fullName, dateOfBirth, gender, phoneNumber, email. Name/phone/email must be nonblank;
+date must be nonnull/nonfuture in Asia/Jerusalem; gender must be a stored enum.
+UNKNOWN is an accepted explicit gender value and **counts as complete**. Do not
+require a patient to invent a different gender or infer clinical matching.
+missingFields lists absent/invalid fields in that order using the exact API names.
+Address is optional, contributes no points and is never listed as missing.
+
+Valid linked profiles normally score 100: existing profile creation requires all
+four demographics and account access requires a verified email. This is required
+field completion, not identity verification, clinical accuracy or care readiness.
+An absent profile produces the explicit 404 above, not a fabricated score.
+
+GET uses a repeatable-read transaction for a consistent account/profile projection.
+PUT locks the eligible account first, then the profile selected by its user_id,
+reusing the existing account -> profile ordering for creation/claim. Staff PUT
+locks the same profile. Concurrent full replacements serialize; the last accepted
+replacement wins as in existing staff PUT, never a field-wise merge. No optimistic
+version/precondition is introduced. Identical PUT is safe to retry, creates no
+record/link/security side effect and advances updatedAt as existing staff PUT does.
+On uncertain response GET the current profile; PUT needs no Idempotency-Key.
+No pagination applies to a single profile.
+
+Patient ID/number/creator/link/creation time remain unchanged. Current demographics
+can change future drafts/approvals under the existing workflow; already published
+patient/result/specimen/reviewer snapshots remain immutable. No clinical history
+rewrite, account synchronization, unlink/reassignment or publication-policy change.
+
+Verification and honest execution limits are recorded in TESTING.md under My
+Profile verification and Tasks 33-36 of IMPLEMENTATION_PLAN.md. Manual examples
+here were not executed as a live HTTP campaign.

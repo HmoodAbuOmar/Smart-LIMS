@@ -295,9 +295,22 @@ Implementation status: implemented in V3; phase-2 self-profile creation and veri
 - gender values: MALE, FEMALE, UNKNOWN. Reject future birth dates in the service. Do not infer sex-specific reference ranges for UNKNOWN.
 - Phone numbers may repeat; a child may use a guardian phone number. Do not automatically link profiles based only on name or phone.
 - created_by comes from the authenticated actor: staff for a walk-in profile, or the PATIENT account for self-profile creation. Linking preserves the original creator.
-- Patient profile fields are the laboratory record; account fields are login/account data. Profile creation, linking, and staff updates never synchronize demographics into users. Profile updates remain ADMIN/RECEPTIONIST only.
+- Patient profile fields are the laboratory record; account fields are login/account data. Creation, linking and demographic updates never synchronize demographics into users. Staff /{id} updates remain ADMIN/RECEPTIONIST only; My Profile adds explicit patient-owned GET/PUT /me/profile (PATIENTS_API.md section 16).
 - Staff creates unlinked profiles. A verified, eligible PATIENT can create one profile for their own authenticated account or claim an existing unlinked profile using a staff-issued linking token. Neither path matches or merges by name, phone, or patient number.
 - Self-create and claim transactions lock the current account row before checking its link. Claims then lock the target profile and token. Staff profile updates also lock the profile to preserve concurrent links. The unique patients.user_id constraint remains the database backstop. Profiles are never reassigned.
+
+My Profile (Tasks 33-36) reuses this schema, with no new migration/column. Self
+edits lock the eligible account then its linked profile, matching creation/claim
+ordering and serializing with the existing staff profile lock. Full replacement
+updates only patient name/dateOfBirth/gender/phone/address and updatedAt. User
+name/phone/email/security/verification and patient identity/link/creator remain
+unchanged. Read-only account email and computed completion are self-view DTO
+fields, not new persisted/denormalized columns. Repeatable-read GET projects a
+consistent account/profile view. Five required fields (profile name, birth date,
+gender including UNKNOWN, phone, account email) contribute 20 points each; address
+is optional. Missing link returns the existing explicit 404 rather than inferred
+data/score. Published result patient snapshots stay immutable; demographics are
+read from the current profile only by the existing draft/approval workflow.
 
 ### 4.3a. `patient_link_tokens`
 

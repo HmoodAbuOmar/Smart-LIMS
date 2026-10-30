@@ -18,6 +18,10 @@ public interface PatientRepository extends JpaRepository<Patient, UUID>, JpaSpec
     boolean existsByUser_Id(UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Patient p where p.user.id = :userId")
+    Optional<Patient> findWithLockByUserId(@Param("userId") UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Patient p where p.id = :id")
     Optional<Patient> findWithLockById(@Param("id") UUID id);
 
