@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "SMARTLIMS_TEST_DATABASE_URL",
         matches = "jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/smartlims_auth_regression")
 class PatientMigrationCompatibilityTest {
-    @TempDir Path legacyMigrations;
+    @TempDir Path historicalMigrations;
     private String rootUrl;
     private String databaseName;
     private String testUrl;
@@ -55,9 +55,16 @@ class PatientMigrationCompatibilityTest {
         return DriverManager.getConnection(testUrl, "postgres", "");
     }
 
-    private Flyway combined(String target, boolean outOfOrder) {
+    private Flyway canonical(String target) {
         var config = Flyway.configure().dataSource(testUrl, "postgres", "")
-                .locations("classpath:db/migration").outOfOrder(outOfOrder);
+                .locations("classpath:db/migration");
+        if (target != null) config.target(target);
+        return config.load();
+    }
+
+    private Flyway historical(String target, boolean outOfOrder) {
+        var config = Flyway.configure().dataSource(testUrl, "postgres", "")
+                .locations("classpath:db/fixtures/historical-v1-v9").outOfOrder(outOfOrder);
         if (target != null) config.target(target);
         return config.load();
     }
@@ -65,13 +72,13 @@ class PatientMigrationCompatibilityTest {
     private void migrateLegacyLinkingV4() throws IOException {
         for (String filename : List.of("V1__auth_foundation.sql", "V2__password_reset_attempts.sql",
                 "V3__patients.sql", "V5__patient_link_tokens.sql")) {
-            try (var source = getClass().getResourceAsStream("/db/migration/" + filename)) {
+            try (var source = getClass().getResourceAsStream("/db/fixtures/historical-v1-v9/" + filename)) {
                 assertNotNull(source, filename);
-                Files.copy(source, legacyMigrations.resolve(filename.replace("V5__", "V4__")));
+                Files.copy(source, historicalMigrations.resolve(filename.replace("V5__", "V4__")));
             }
         }
         Flyway legacy = Flyway.configure().dataSource(testUrl, "postgres", "")
-                .locations("filesystem:" + legacyMigrations.toAbsolutePath()).load();
+                .locations("filesystem:" + historicalMigrations.toAbsolutePath()).load();
         assertEquals(4, legacy.migrate().migrationsExecuted);
         legacy.validate();
     }
@@ -125,7 +132,7 @@ class PatientMigrationCompatibilityTest {
         }
     }
 
-    private void assertCombinedHistory() throws SQLException {
+    private void assertHistoricalHistory() throws SQLException {
         try (Connection connection = connection(); Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("SELECT version, script, checksum FROM flyway_schema_history "
                      + "WHERE version IS NOT NULL ORDER BY version::integer")) {
@@ -139,6 +146,24 @@ class PatientMigrationCompatibilityTest {
             assertEquals("V5__patient_link_tokens.sql", scripts.get("5"));
             assertEquals("V6__lab_test_categories.sql", scripts.get("6"));
             assertEquals("V7__orders.sql", scripts.get("7"));
+        }
+    }
+
+    private void assertCanonicalHistory() throws SQLException {
+        try (Connection connection = connection(); Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT version, script FROM flyway_schema_history "
+                     + "WHERE success AND version IS NOT NULL ORDER BY version::integer")) {
+            Map<String, String> scripts = new LinkedHashMap<>();
+            while (rows.next()) scripts.put(rows.getString(1), rows.getString(2));
+            assertEquals(java.util.stream.IntStream.rangeClosed(1, 24).mapToObj(Integer::toString).toList(),
+                    new ArrayList<>(scripts.keySet()));
+            assertEquals("V4__patients.sql", scripts.get("4"));
+            assertEquals("V5__lab_tests.sql", scripts.get("5"));
+            assertEquals("V6__patient_link_tokens.sql", scripts.get("6"));
+            assertEquals("V7__lab_test_categories.sql", scripts.get("7"));
+            assertEquals("V8__test_orders.sql", scripts.get("8"));
+            assertEquals("V9__order_items.sql", scripts.get("9"));
+            assertEquals("V24__laboratory_events.sql", scripts.get("24"));
         }
     }
 
@@ -158,27 +183,27 @@ class PatientMigrationCompatibilityTest {
     }
 
     @Test
-    void freshDatabaseAppliesAndValidatesExactlyNineMigrations() throws SQLException {
-        Flyway flyway = combined(null, false);
-        assertEquals(9, flyway.migrate().migrationsExecuted);
+    void freshDatabaseAppliesAndValidatesExactlyTwentyFourCanonicalMigrations() throws SQLException {
+        Flyway flyway = canonical(null);
+        assertEquals(24, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertCombinedHistory();
+        assertCanonicalHistory();
         assertTrue(tableExists("lab_tests"));
         assertTrue(tableExists("patient_link_tokens"));
     }
 
     @Test
-    void mainV4UpgradeRetainsExistingCatalogAndPatientRows() throws SQLException {
-        assertEquals(4, combined("4", false).migrate().migrationsExecuted);
+    void mainV5UpgradeRetainsExistingCatalogAndPatientRows() throws SQLException {
+        assertEquals(5, canonical("5").migrate().migrationsExecuted);
         seedPatientAndToken();
         try (Connection connection = connection(); Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO lab_tests(id,code,name,price,sample_type) VALUES "
                     + "('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','SYNTHETIC','Synthetic Catalog Test',1.00,'SYNTHETIC')");
         }
-        Flyway flyway = combined(null, false);
-        assertEquals(5, flyway.migrate().migrationsExecuted);
+        Flyway flyway = canonical(null);
+        assertEquals(19, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertCombinedHistory();
+        assertCanonicalHistory();
         assertEquals(1, count("patients"));
         assertEquals(1, count("lab_tests"));
         assertEquals(0, count("patient_link_tokens"));
@@ -194,13 +219,13 @@ class PatientMigrationCompatibilityTest {
         assertFalse(tableExists("lab_tests"));
         assertEquals(1, count("patients"));
         assertEquals(1, count("patient_link_tokens"));
-        Flyway oneTimeMigration = combined(null, true);
+        Flyway oneTimeMigration = historical(null, true);
         assertEquals(5, oneTimeMigration.migrate().migrationsExecuted);
         // Normal strict startup must succeed without persisting the out-of-order option.
-        Flyway normal = combined(null, false);
+        Flyway normal = historical(null, false);
         normal.validate();
         assertEquals(0, normal.migrate().migrationsExecuted);
-        assertCombinedHistory();
+        assertHistoricalHistory();
         assertEquals(before, linkingHistoryMetadata("5"));
         assertEquals(1, count("patients"));
         assertEquals(1, count("patient_link_tokens"));

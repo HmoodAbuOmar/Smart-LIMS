@@ -1,5 +1,27 @@
 # Smart-LIMS Database Design
 
+Local cutover and canonical-resource cleanup (2026-10-30): **smart_lims_db uses
+V1-V24**, selected by the single main `application.yaml` at
+`classpath:db/migration`; no profile is required for normal startup. The owner
+reported no-profile startup with Flyway validation at V24 and Hibernate
+initialization. A read-only audit confirmed 24 successful history rows at V24 and
+identical SHA-256 contents between the canonical migrations and the verified
+V1-V24 set before its staging directory was removed. The active database and
+history were not changed during cleanup. The original remains
+`smart_lims_db_legacy` for rollback. Full transfer evidence, retained backups and
+rollback steps are in [LOCAL_MIGRATION_CUTOVER.md](LOCAL_MIGRATION_CUTOVER.md).
+The isolated regression PostgreSQL instance was unavailable for this cleanup's
+Maven rerun; other environments were unchanged.
+
+Historical migration-split record (2026-10-30): the initial MIG-SPLIT-02
+preparation used separate legacy V1-V9 and one-table V1-V24 resource directories.
+The approved local transition later selected V1-V24; the repository cleanup
+consolidated that lineage at the sole active `db/migration` path. Historical
+V1-V9 compatibility SQL is now test-only. These notes retain the earlier history
+and do not describe additional active application locations. Full DDL equivalence
+and synthetic transfer evidence remains in
+[TESTING.md](TESTING.md#migration-lineage-split-verification-2026-10-30).
+
 Status: implemented-schema inventory plus carried-forward design for unimplemented features.
 Stage 4 approved design (2026-10-29): decisions S4-RES-D01–D05 supersede earlier
 pending/proposed paragraphs for this slice. See RESULTS_API.md, VISITS_API.md,
@@ -132,6 +154,10 @@ This document inventories the current schema and preserves the proposed database
 - Symptom-based suggestions are scheduled for a later AI phase. Further AI result-analysis persistence is outside this baseline and requires a separate scope decision.
 
 ### 1.1. Implemented migrations and recorded reconciliation
+
+The inventory below is the immutable legacy lineage. The new one-table inventory,
+including sequence/function/trigger placement, is in
+[MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md#exact-split-inventory).
 
 | Migration | Implemented schema change | Requirements / task evidence |
 |---|---|---|
@@ -962,3 +988,22 @@ The sources support design principles; table names, lengths, and the planned 22-
 - [S6] OWASP - Logging Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 
 The laboratory must provide the approved catalog, reference values, sample/container requirements, methods, and result interpretation policies before clinical use.
+
+## Patient dashboard read model (DASH-37)
+
+The [dashboard contract](DASHBOARD_API.md) adds no schema or migration. One
+read-only REPEATABLE_READ transaction resolves the eligible linked PATIENT and
+reuses order aggregates, actual order-to-visit links, appointment slots/types,
+current PUBLISHED results and active catalog DTOs. Database pages/counts select
+all owned orders, future CONFIRMED appointments and current publications before
+fixed preview limits; no joins multiply counts. All cutoff comparisons use the
+same response asOf instant. Published historical tests remain visible even if
+the live catalog is inactive or an order has retained CANCELLED state.
+
+The existing trend grouping supplies the preview's compatible snapshot identity
+and numeric points; no parallel clinical calculation/storage. Choose the latest
+measured compatible series and expose its last six chronological points with
+original chartValue/comparator semantics. Existing trend grouping loads the owned
+numeric history before limiting; large-history performance remains unbenchmarked.
+Existing FK/current-result indexes are reused. No writers, locks, lifecycle
+changes, popularity tracking or notifications storage are introduced.

@@ -1,5 +1,10 @@
 # Smart-LIMS Patients API Contract
 
+Migration-version references in historical sections describe the original V1-V9
+implementation. The current application uses canonical V1-V24 from
+`src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
+fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
+
 Status: patient management phases 1 and 2 implemented with canonical V3/V5 schema alongside V4 lab catalog. Saved operator artifacts record development reconciliation completed on 2026-10-26; see [database evidence and limits](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation). Earlier preparation/audit sections describe their own historical boundaries and are not the current migration status. The original 2026-10-27 documentation-only review did not access a database.
 My Profile extension (section 16): DONE, 2026-10-30; Tasks 33-36, MP-PAT-R01-R06. Final direct isolated suite: 367 tests/49 suites, zero failures/errors/skips; [current verification](TESTING.md#my-profile-verification-2026-10-30).
 Reviewed: original phases 2026-10-27; My Profile extension 2026-10-30.
@@ -697,7 +702,7 @@ Changed files (paths relative to Backend):
 - `src/main/java/com/smartlims/patients/entity/PatientLinkToken.java`, `repository/PatientLinkTokenRepository.java`: dedicated token persistence and revocation/locking.
 - `src/main/java/com/smartlims/patients/dto/LinkPatientRequest.java`, `dto/PatientLinkTokenResponse.java`: strict request and one-time response; redacted string representations.
 - `src/main/java/com/smartlims/patients/exception/PatientProfileException.java`, `exception/PatientErrorHandler.java`: phase-2 errors using the existing envelope.
-- `src/main/resources/db/migration/V5__patient_link_tokens.sql`: additive token table, indexes, and constraints; originally tested under V4 before the main-branch collision was discovered, then renumbered with unchanged SQL under explicit user authorization.
+- Historical source `V5__patient_link_tokens.sql`, now retained byte-identically at `src/test/resources/db/fixtures/historical-v1-v9/`: additive token table, indexes, and constraints; originally tested under V4 before the main-branch collision was discovered, then renumbered unchanged as canonical V6 under explicit user authorization.
 - `src/test/java/com/smartlims/patients/PatientProfileLinkingTest.java`, `PatientLinkTokenTest.java`: phase-2 integration/concurrency/unit coverage.
 - `src/test/java/com/smartlims/patients/PatientManagementTest.java`, `src/test/java/com/smartlims/auth/AuthenticationRegressionTest.java`: retain existing assertions; include token table in isolated cleanup and the canonical V1-V5 migration expectations.
 - `docs/DATABASE_DESIGN.md`, `docs/PATIENTS_API.md`: schema/contract/examples/verification documentation.
@@ -896,3 +901,10 @@ rewrite, account synchronization, unlink/reassignment or publication-policy chan
 Verification and honest execution limits are recorded in TESTING.md under My
 Profile verification and Tasks 33-36 of IMPLEMENTATION_PLAN.md. Manual examples
 here were not executed as a live HTTP campaign.
+
+## Patient dashboard
+
+`GET /api/patients/me/dashboard` is the patient-only aggregate for the three
+Dashboard references. See [DASHBOARD_API.md](DASHBOARD_API.md) for fields, counts,
+ordering/limits/empty states, profile-linking/security, destination action mapping
+and explicit notification unavailability. Existing profile endpoints are unchanged.

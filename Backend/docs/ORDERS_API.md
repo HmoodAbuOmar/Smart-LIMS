@@ -1,5 +1,10 @@
 # Orders API Contract
 
+Migration-version references in historical sections describe the original V1-V9
+implementation. The current application uses canonical V1-V24 from
+`src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
+fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
+
 Stage 4 integration (DONE 2026-10-30; final isolated suite 319/319): an actual
 staff-recorded visit moves PENDING→IN_PROGRESS under the order lock. Booking alone
 still does not start processing. Order cancellation remains PENDING-only and

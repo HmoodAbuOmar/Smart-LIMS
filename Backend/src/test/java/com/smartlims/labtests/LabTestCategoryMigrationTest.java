@@ -106,11 +106,11 @@ class LabTestCategoryMigrationTest {
     @Test
     void freshDatabaseAppliesAndValidatesCategorySchemaWithBothIndexes() throws SQLException {
         Flyway flyway = migrations(null);
-        assertEquals(9, flyway.migrate().migrationsExecuted);
+        assertEquals(24, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertEquals(List.of("0"), rows("SELECT count(*) FROM lab_test_categories"));
-        assertEquals(List.of("V6__lab_test_categories.sql"), rows(
-                "SELECT script FROM flyway_schema_history WHERE version = '6' AND success"));
+        assertEquals(List.of("V7__lab_test_categories.sql"), rows(
+                "SELECT script FROM flyway_schema_history WHERE version = '7' AND success"));
         List<String> indexes = rows("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' "
                 + "AND tablename = 'lab_test_categories' ORDER BY indexname");
         assertEquals(2, indexes.size());
@@ -120,18 +120,18 @@ class LabTestCategoryMigrationTest {
     }
 
     @Test
-    void upgradeFromV5PreservesEveryCatalogFieldAndPriorMigrationMetadata() throws SQLException {
-        assertEquals(5, migrations("5").migrate().migrationsExecuted);
+    void upgradeFromV6PreservesEveryCatalogFieldAndPriorMigrationMetadata() throws SQLException {
+        assertEquals(6, migrations("6").migrate().migrationsExecuted);
         seedTest("SYNTH_ACTIVE", true);
         seedTest("SYNTH_INACTIVE", false);
         String catalogSql = "SELECT row_to_json(t)::text FROM lab_tests t ORDER BY id";
         String historySql = "SELECT row_to_json(h)::text FROM flyway_schema_history h "
-                + "WHERE version::integer <= 5 ORDER BY installed_rank";
+                + "WHERE version::integer <= 6 ORDER BY installed_rank";
         List<String> beforeCatalog = rows(catalogSql);
         List<String> beforeHistory = rows(historySql);
 
         Flyway flyway = migrations(null);
-        assertEquals(4, flyway.migrate().migrationsExecuted);
+        assertEquals(18, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertEquals(beforeCatalog, rows(catalogSql));
         assertEquals(beforeHistory, rows(historySql));

@@ -321,16 +321,18 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 () -> jdbc.update("DELETE FROM users WHERE id = ?", actors.get(Role.ADMIN).getId()));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE patients SET created_by = ? WHERE id = ?", UUID.randomUUID(), second));
-        assertEquals(List.of("1", "2", "3", "4", "5", "6", "7", "8", "9"), jdbc.queryForList(
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, 24).mapToObj(Integer::toString).toList(), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
-        assertEquals("V4__lab_tests.sql", jdbc.queryForObject(
-                "SELECT script FROM flyway_schema_history WHERE version = '4'", String.class));
-        assertEquals("V5__patient_link_tokens.sql", jdbc.queryForObject(
+        assertEquals("V5__lab_tests.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '5'", String.class));
-        assertEquals("V6__lab_test_categories.sql", jdbc.queryForObject(
+        assertEquals("V6__patient_link_tokens.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '6'", String.class));
-        assertEquals("V7__orders.sql", jdbc.queryForObject(
+        assertEquals("V7__lab_test_categories.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '7'", String.class));
+        assertEquals("V8__test_orders.sql", jdbc.queryForObject(
+                "SELECT script FROM flyway_schema_history WHERE version = '8'", String.class));
+        assertEquals("V9__order_items.sql", jdbc.queryForObject(
+                "SELECT script FROM flyway_schema_history WHERE version = '9'", String.class));
     }
 
     @Test

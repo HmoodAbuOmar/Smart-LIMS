@@ -8,6 +8,7 @@ import com.smartlims.patients.repository.PatientRepository;
 import com.smartlims.results.dto.HealthTrendResponse;
 import com.smartlims.results.dto.HealthTrendResponse.*;
 import com.smartlims.results.dto.ResultResponse;
+import com.smartlims.patients.dto.PatientDashboardResponse.TrendPreview;
 import com.smartlims.results.entity.ResultValue;
 import com.smartlims.results.repository.ResultValueRepository;
 import java.math.*;
@@ -40,6 +41,18 @@ public class HealthTrendService {
     private record SeriesKey(UUID parameterId, String code, String name, String type,
             String unit, String method, List<SpecimenKind> specimens) {}
     private record Point(SeriesKey key, Measurement measurement) {}
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public TrendPreview preview(Authentication actor) {
+        var groups = groups(actor);
+        var selected = groups.entrySet().stream().map(e -> series(e.getKey(), e.getValue()))
+                .sorted(Comparator.comparing(Series::latestMeasuredAt).reversed().thenComparing(Series::seriesId))
+                .findFirst();
+        if (selected.isEmpty()) return null;
+        var series = selected.get();
+        var points = groups.get(series.seriesId()).stream().map(Point::measurement).sorted(CHRONOLOGICAL).toList();
+        return new TrendPreview(series, points.getLast(), points.subList(Math.max(0, points.size() - 6), points.size()));
+    }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public LaboratoryQuery.PageBody<Series> biomarkers(Authentication actor, LaboratoryQuery query) {

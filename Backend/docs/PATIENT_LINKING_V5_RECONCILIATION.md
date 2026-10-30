@@ -1,5 +1,11 @@
 # Patient linking V5: manual development database reconciliation
 
+Migration-version references in historical sections describe the original V1-V9
+implementation. The current application uses canonical V1-V24 from
+`src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
+fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
+This reconciliation procedure is legacy-only and must never target the new lineage.
+
 This is a retained operator procedure for an exact legacy history, not a pending action for every checkout. Saved private operator artifacts record development reconciliation completed on 2026-10-26, including restored-backup verification, unchanged business rows and normal-order validation; see [database evidence and limits](DATABASE_DESIGN.md#11-implemented-migrations-and-recorded-reconciliation). This documentation review accessed files only and did not connect to a database or rerun the procedure.
 
 Do not rerun history reclassification on a database already using canonical V4 lab/V5 linking identities. For another environment, first establish its exact history and obtain separate authorization with a verified backup. Source preparation, tests and this runbook do not authorize database writes. T-MIG-01 and D-OPS in the [SDLC index](../IMPLEMENTATION_PLAN.md) distinguish the completed historical recovery from outstanding environment inventory.

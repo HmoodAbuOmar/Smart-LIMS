@@ -16,10 +16,10 @@ class ResultMigrationTest {
   if(url==null)return;if(!name.matches("smartlims_migration_[0-9a-f]{32}"))throw new IllegalStateException("Unexpected database");
   try(var c=DriverManager.getConnection(root,"postgres","");var s=c.createStatement()){s.executeUpdate("DROP DATABASE "+name);}
  }
- Flyway migration(String target){var c=Flyway.configure().dataSource(url,"postgres","").locations("classpath:db/migration");if(target!=null)c.target(target);return c.load();}
+  Flyway migration(String target){var c=Flyway.configure().dataSource(url,"postgres","").locations("classpath:db/migration");if(target!=null)c.target(target);return c.load();}
  List<String> rows(String sql) throws SQLException {try(var c=DriverManager.getConnection(url,"postgres","");var s=c.createStatement();var r=s.executeQuery(sql)){List<String> rows=new ArrayList<>();while(r.next())rows.add(r.getString(1));return rows;}}
- @Test void v8UpgradePreservesCatalogOrderAppointmentRowsAndHistoricalChecksums() throws SQLException {
-  assertEquals(8,migration("8").migrate().migrationsExecuted);
+  @Test void v20UpgradePreservesCatalogOrderAppointmentRowsAndMigrationHistory() throws SQLException {
+   assertEquals(20,migration("20").migrate().migrationsExecuted);
   try(var c=DriverManager.getConnection(url,"postgres","");var s=c.createStatement()){
    for(String sql:List.of(
     "INSERT INTO users(id,full_name,email,role,origin) VALUES ('00000000-0000-0000-0000-000000000001','Synthetic','synthetic@example.invalid','ADMIN','ADMIN_INVITATION')",
@@ -35,10 +35,11 @@ class ResultMigrationTest {
   }
   List<String> tables=List.of("users","patients","lab_tests","lab_test_categories","test_orders","order_items","appointment_types","appointment_slots");Map<String,List<String>> before=new LinkedHashMap<>();for(String table:tables)before.put(table,rows("SELECT to_jsonb(t)::text FROM "+table+" t ORDER BY 1"));
   var appointment=rows("SELECT to_jsonb(a)::text FROM appointments a");var history=rows("SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
-  var f=migration(null);assertEquals(1,f.migrate().migrationsExecuted);f.validate();
+   var f=migration(null);assertEquals(4,f.migrate().migrationsExecuted);f.validate();
   for(var entry:before.entrySet())assertEquals(entry.getValue(),rows("SELECT to_jsonb(t)::text FROM "+entry.getKey()+" t ORDER BY 1"));
-  assertEquals(appointment,rows("SELECT (to_jsonb(a)-ARRAY['checked_in_at','checked_in_by','completed_at','completed_by','no_show_at','no_show_by'])::text FROM appointments a"));
-  assertEquals(history,rows("SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=8 ORDER BY installed_rank"));
+  // V20 already includes V16's visit-state columns; preserve the complete row.
+  assertEquals(appointment,rows("SELECT to_jsonb(a)::text FROM appointments a"));
+   assertEquals(history,rows("SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=20 ORDER BY installed_rank"));
   for(String table:List.of("test_parameters","visits","samples","test_results","result_values","laboratory_events"))assertEquals(List.of("0"),rows("SELECT count(*) FROM "+table));
  }
 }

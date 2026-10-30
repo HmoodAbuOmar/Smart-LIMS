@@ -18,6 +18,7 @@ spring:
 
   flyway:
     enabled: true
+    locations: classpath:db/migration
 
   mail:
     host: ${SMTP_HOST:}

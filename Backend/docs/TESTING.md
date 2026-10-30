@@ -1,5 +1,290 @@
 # Database-backed test setup
 
+## Patient Dashboard verification (2026-10-30)
+
+Task DASH-37, DASH-R01-R06. Branch backend-hmood; Backend only. New contract and
+every screenshot section/action: [DASHBOARD_API.md](DASHBOARD_API.md). Existing
+entry migration/configuration work and ResultPublicationService.java are preserved.
+No development/shared database, real patient data, SMTP, frontend, Postman, PDF
+redesign, dependency change, commit or push is part of this verification.
+
+### Restored and independently verified disposable instance
+
+The previous recorded disposable directory was incomplete (missing PG_VERSION
+and configuration); its verified PostgreSQL PID 14408 still held 127.0.0.1:55432
+but pg_ctl rejected the directory and pg_isready returned no response. Inspected
+that process's executable/command line plus postmaster.pid/postmaster.opts and
+stopped only that exact disposable process. Created a fresh PostgreSQL 16.15
+cluster using initdb, postgres test user, empty test password, UTF8/locale C,
+loopback-only listener on the approved test port. No old directory was deleted.
+
+New data_directory:
+`C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-3001a4f182414219be120887abd9480b`.
+PID **29672** was independently confirmed through pg_ctl status, postmaster.pid,
+Windows process executable/`-D`, and the sole listener **127.0.0.1:55432**. Inspected
+pg_hba.conf (local/loopback trust for disposable tests); direct explicit psql
+confirmed current_database=smartlims_auth_regression, current_user=postgres,
+server address/port, actual data_directory and listen_addresses=127.0.0.1.
+Repeated identity checks before the full suite found exactly 24 successful
+canonical migrations. Windows-user SMARTLIMS_TEST_POSTGRES_DATA/BIN now record
+the restored disposable directory and PostgreSQL 16 client bin. Test database
+URL still comes from unchanged .mvn/maven.config/Surefire mapping; the unchanged
+IsolatedPostgresTest URL/name guard and no-fallback rule remain intact.
+
+The main-resource cleanup had removed implicit local-profile activation, while
+the existing HTTP-cookie test harness explicitly requires insecure test cookies.
+Added test-only application.properties activating local, satisfying the existing
+production cookie-policy check without altering that check, main config, guard,
+URL/credential mapping or authentication behavior. Updated PatientManagementTest's
+stale legacy manifest assertion to the exact canonical V1-V24 scripts, including
+separate order/items. Historical compatibility cases still use immutable V1-V9
+fixtures in their own guarded smartlims_migration_* databases.
+
+The first complete run also exposed ResultMigrationTest's old asymmetric row
+projection: its V20 baseline already includes V16's appointment visit-state
+columns, but its post-upgrade SELECT alone removed them. Corrected that single
+comparison to require equality of the **complete** original and upgraded rows;
+retained its V20 milestone, four pending migrations and full-history checks.
+No migration SQL or persisted migration history was changed.
+
+Task file inventory (separate from the preexisting working tree): new patient
+dashboard controller/service/response DTO; HealthTrendService preview; exact GET
+security matcher and LaboratoryErrorHandler registration; PatientDashboardTest;
+test-only application.properties; PatientManagementTest canonical-manifest
+assertions; ResultMigrationTest full-row preservation assertion; DASHBOARD_API.md,
+PATIENTS_API.md, DATABASE_DESIGN.md, this evidence and the local implementation plan.
+
+### Commands and execution record
+
+Commands run directly from Backend with the independently verified instance:
+
+```powershell
+$env:SMARTLIMS_TEST_POSTGRES_DATA = 'C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-3001a4f182414219be120887abd9480b'
+$env:SMARTLIMS_TEST_POSTGRES_BIN = 'C:/Program Files/PostgreSQL/16/bin'
+.\mvnw.cmd '-DskipTests' compile
+.\mvnw.cmd clean '-Dtest=PatientDashboardTest' test
+.\mvnw.cmd '-Dtest=PatientDashboardTest' test
+.\mvnw.cmd test
+.\mvnw.cmd '-Dtest=ResultMigrationTest,MigrationLineageTest,PatientManagementTest' test
+.\mvnw.cmd test
+```
+
+Compilation passed (12.783 s, 23:18:09 +02:00). Initial clean focused attempt
+failed test compilation on a mistaken DTO accessor (20.788 s, 23:19:19); corrected
+to existing visitDetailsAvailable, without changing the response. Next attempt
+reached the isolated database and migrated V1-V24, but all 11 then-existing cases
+failed context startup because local profile was inactive (30.074 s, 23:20:18).
+After adding test-only activation, a shell attempt was interrupted by PowerShell
+treating a JVM/Mockito diagnostic on stderr as terminating; it supplies no test
+pass evidence. Corrected shell stderr handling after explicit fail-closed prechecks.
+No development fallback or destructive application-database access occurred.
+
+Final focused run: **13 tests, 0 failures/errors/skips, BUILD SUCCESS, exit 0**,
+45.306 s, finished **2026-10-30T23:22:43 +02:00**. Covers final dashboard source/tests.
+First full direct suite started **23:22:58 +02:00**, finished **23:27:32 +02:00**,
+04:30 min, BUILD FAILURE: **385 tests / 51 suites, 1 failure, 0 errors/skips**.
+All XML reports were independently summed and fresh. The sole failure was the
+stale ResultMigrationTest projection described above; all dashboard cases passed.
+The exact final assertion is verified by a targeted migration/patient rerun and
+then a fresh complete invocation; final results are recorded below after execution.
+
+Corrected focused regression run: **33 tests / 3 suites, 0 failures/errors/skips,
+BUILD SUCCESS, exit 0**, 01:12 min, finished **23:28:59 +02:00**. ResultMigrationTest
+1, MigrationLineageTest 5 and PatientManagementTest 27 all pass. This covers
+canonical fresh/upgrade/history/data/protection behavior, the full-row preservation
+correction and the current patient schema manifest. Final direct full suite
+started **23:29:23 +02:00**, following fresh pg_ctl/PID/process/listener/direct SQL
+identity verification of the same disposable instance.
+
+**Final direct `.\mvnw.cmd test`: 385 tests / 51 suites, 0 failures, 0 errors,
+0 skips, BUILD SUCCESS, exit 0; 04:25 min; finished
+2026-10-30T23:33:52 +02:00.** Independently parsed every Surefire XML: exact same
+totals, zero reports older than the final invocation start. All 372 existing
+cases and 13 new dashboard cases pass together on the final source. No source
+or test changes followed this run; only documentation/status evidence was updated.
+
+Post-run explicit psql on the independently verified disposable instance found
+24 successful canonical migrations, latest V24, and **zero** remaining
+smartlims_migration_* databases. Final diff/whitespace and task-file conflict
+checks pass. Owner ResultPublicationService.java SHA-256 still equals entry:
+`d21a8b16f8b41d5862ddd0fe524511f15dc4ebc12d8db2d4a2ac03a0d8b83c97`.
+POM, machine-local Maven mapping, guard, main configuration, migration SQL and
+report renderer were not edited by DASH-37. Existing unrelated working-tree
+and staged work remain in place. Local plan/instructions stay excluded.
+
+DASH-37 is DONE. This also completes the pending isolated regression verification
+for MIG-CUTOVER-REGRESSION-01 and MIG-CANONICAL-01. Earlier failed/unavailable
+attempts below remain historical evidence, not the current verification outcome.
+The restored disposable server remains available; no development server was
+restarted, queried or used for test fallback in this task.
+
+### Acceptance coverage
+
+| Requirement | New and existing verification |
+|---|---|
+| DASH-R01 | Profile/account name independence, real patient UUID, all-state order totals, upcoming counts vs list and shared asOf cutoff, current publication count vs AVAILABLE list. |
+| DASH-R02 | Three recent orders, stable UUID ties, backend totals/currency, multiple real visits and navigable order/visit details; next owned appointment/date/offset/type; three latest publication cards with retained labels and working-version exclusion; actual result and PDF URLs. |
+| DASH-R03 | Empty numeric history, latest compatible series, six ordered points matching full trend, separate parameter/unit/method/specimen signatures, null chartValue for censored values, stable series ties, correction replacement and concurrent aggregate snapshot consistency. Existing HealthTrendTest covers full periods/DST/arithmetic/compatibility. |
+| DASH-R04 | Four active stable suggestions, equal-name UUID ties, inactive exclusion, real IDs/detail navigation and empty active catalog. No invented popularity. |
+| DASH-R05 | Anonymous/staff/stored-role/ineligible/account-link checks, cookie GET, strict selectors, foreign data exclusion, cancelled publication retention, explicit present null unreadCount and available=false. Existing destination security suites cover cross-patient details/reports and cookie-write CSRF. |
+| DASH-R06 | Patient HTTP browse/review/create/replay/slot discovery/book/replay/list/detail path feeds aggregate without duplicate orders/appointments. Contract mapping, data design and full isolated regressions recorded. |
+
+Remaining intentional gaps: notifications/unread tracking and actual popularity;
+payments/AI remain deferred. No new clinical policy or reference values. Preview
+grouping reuses existing full-history materialization; large-history performance
+is unbenchmarked. No deployed browser/frontend or real SMTP verification claimed.
+
+## Canonical migration resource cleanup (2026-10-30)
+
+The owner manually set the single main `application.yaml` to use
+`classpath:db/migration`, with `ddl-auto: none`, and removed the runtime profile
+requirement. The owner-reported no-profile startup validated V1-V24, reported
+version 24/no pending work, initialized Hibernate and started on port 8080.
+This audit confirmed the canonical directory has exactly 24 migrations V1-V24,
+each byte-identical to the pre-cleanup verified V1-V24 file, and read-only history
+inspection found 24 successful rows with V24 latest. The active database was not
+modified by this cleanup.
+
+The approved disposable PostgreSQL instance was unavailable: `pg_isready` returned
+no response at 127.0.0.1:55432. Maven tests were not run and no application database
+was used as fallback. Earlier cutover-suite results below remain historical; rerun
+the full wrapper suite after independently restoring and verifying that isolated
+instance.
+
+Subsequently completed during DASH-37 above: restored independent disposable
+instance; final canonical full suite **385/385**, zero failures/errors/skips.
+This resolves this cleanup's pending test verification; the unavailable-instance
+record above describes the earlier attempt.
+
+## Local migration cutover verification (2026-10-30)
+
+MIG-CUTOVER-LOCAL-01: DONE for local execution. [Full evidence and rollback](LOCAL_MIGRATION_CUTOVER.md).
+Initial/final private full dumps restored and verified before changes/cutover;
+complete row/sequence/history comparisons passed. Created fresh smart_lims_db_v2,
+applied/validated V1-V24 using existing credentials, froze source writes and copied
+all 130 rows across 22 application tables. Verified exact actual-source DDL,
+ownership/grants/locale, 53 FKs, 83 CHECK expressions, 86 public indexes and four
+user triggers. Nameswap preserved OIDs: original 16508 -> smart_lims_db_legacy
+(connections disabled); v2 25256 -> smart_lims_db (active). No history repair/reset.
+
+At the initial cutover startup, the machine-local profile selected the staged
+classpath:db/migration-one-table path and Hibernate validate.
+Actual IntelliJ startup **21:10:52 +02:00** passed Flyway's 24-migration validation,
+reported V24/no work, completed Hibernate validation and started HTTP on 8080.
+**32 rehearsal and 32 final live checks all PASS**, including six normal synthetic
+logins, owned reads/clinical authorization, retained corrections/history and two
+PDF downloads. Positive JSON reads match rehearsal. Complete business-data/sequence
+fingerprints remain unchanged after final smoke checks. These were direct HTTP/SQL
+checks, not Postman or destructive application-test fixtures against user data.
+
+The previous complete-suite rerun was **not green**. Following an isolation precheck
+failure (recorded disposable data directory no longer a valid cluster; psql on
+127.0.0.1:55432 disconnected), the shell inadvertently continued into
+`.\mvnw.cmd test`. It completed **21:06:44 +02:00**, **36.423 s**, BUILD FAILURE:
+**372 tests / 50 suites, 0 assertion failures, 323 errors, 0 skips**. All XML reports
+were current; 49 unit cases passed, while connection/context errors prevented
+DB-backed verification. No development datasource fallback occurred; main data
+hashes remained exact. The earlier 20:10:48 372/372 split run below is historical,
+not the outcome of this rerun. Restore/independently verify the approved disposable
+instance and rerun the full suite; no unrelated test-instance rebuild was performed.
+
+Before the canonical cleanup, a test-resource application-local.yaml pinned the
+legacy path. The approved cleanup removed it, made Spring tests use the canonical
+main configuration, and retained historical V1-V9 SQL only as test fixtures for
+legacy reconciliation coverage. The isolation guard, .mvn/maven.config and Surefire mapping are unchanged. No
+production Java/package/API, dependency, original migration, frontend or Postman
+changes; unrelated owner edits are preserved. No commit/push.
+
+## Migration lineage split verification (2026-10-30)
+
+Task MIG-SPLIT-02, requirements MIG-R01-R06: DONE for implementation, isolated
+verification and transition preparation. Real-environment MIG-CUTOVER-01 remains
+TODO. [Inventory and transition/rollback procedure](MIGRATION_LINEAGES.md).
+No Postman, development database access, runtime restart, commit/push or cutover.
+
+### Independently confirmed target
+
+Before execution, verified all of: pg_ctl status; postmaster.pid; Windows process
+PID **14408** and its PostgreSQL 16 executable/`-D` command; actual listener
+**127.0.0.1:55432** (no wildcard listener); and direct read-only psql identity.
+Database **smartlims_auth_regression**, user **postgres**, empty test password,
+PostgreSQL/client tools **16.15**, server data_directory:
+`C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df`.
+This matched the separately recorded Windows-user SMARTLIMS_TEST_POSTGRES_DATA
+value and disposable cluster process, independent of the JDBC URL. Before/after
+checks found all nine legacy versions successful with the assessed checksums and
+zero remaining smartlims_migration_* databases after completion. No development
+DB_URL/datasource default was used as a fallback.
+
+All new migration operations own freshly generated
+smartlims_migration_<32 lowercase hex> databases on this same instance; cleanup
+drops only those owned names. Existing integration fixtures use only the guarded
+regression database. The legacy reconciliation fixture executes only in its
+existing owned compatibility tests, never on development or the new lineage.
+
+### Commands and actual results
+
+From Backend, after confirming the isolated instance, set the PostgreSQL client
+location in the test process environment (no credentials):
+
+```powershell
+$env:SMARTLIMS_TEST_POSTGRES_BIN = 'C:/Program Files/PostgreSQL/16/bin'
+.\mvnw.cmd clean '-Dtest=MigrationLineageTest' test
+.\mvnw.cmd test
+```
+
+The first `clean` removes stale generated resources from the relocated original
+path; no target files were manually edited. Rebuild cleanly when moving between
+checkouts with the old layout. Both leaf lineages are copied to the classpath;
+**each Flyway instance selects one only**. The obsolete default migration path
+has zero SQL resources. The runtime source setting remains legacy; existing
+integration/API/ORM suites run against the legacy regression schema. New tests
+independently create and compare both lineages, rather than renumbering historical
+assertions. Resolved Flyway **12.4.0** came from the existing POM/dependencies.
+
+| Invocation | Result | Finished (Asia/Jerusalem) | Duration |
+|---|---|---|---|
+| Focused clean lineage checks | 5 tests, 0 failures/errors/skips; BUILD SUCCESS | 2026-10-30 20:05:34 +02:00 | 50.181 s |
+| Complete direct wrapper suite | **372 tests / 50 suites**, 0 failures/errors/skips; **BUILD SUCCESS** | **2026-10-30 20:10:48 +02:00** | **04:46 min** |
+
+After the focused run, an actual child/parent anti-join check for **every FK** was
+added to the import checks before the final full invocation. All 50 Surefire XML
+reports were independently parsed: 372 tests, failures=0, errors=0, skipped=0;
+none predated this invocation (started 20:05:59 +02:00). All 367 existing cases
+and five new cases passed together. Existing legacy migration suites retain all
+20 historical fresh/upgrade/recovery/refusal cases and their assertions; only
+the resource location strings changed. No behavior/assertion/isolation guard was
+weakened, and no new production Java or dependency change was made.
+
+### Acceptance evidence
+
+| Check | Actual result |
+|---|---|
+| Exact manifest/granularity | Pending manifest is exactly the assessed ordered V1-V24 names; 22 files have one CREATE TABLE; only V3/V16 have zero. Each legacy signed Flyway CRC matches the assessed applied value. All nine original pre/post-move SHA-256 values match; normalized SQL also equals Git HEAD. |
+| Final schema equality | Fresh legacy applies 9; fresh split applies 24. Both validate and rerun with zero work. PostgreSQL pg_dump --schema-only output is identical after excluding only flyway_schema_history and dump comments/random restrict tokens. Includes columns/order/types/nullability/defaults, all named PK/unique/FK/check/exclusion constraints, partial and ordinary indexes, four sequence definitions, three functions and four user triggers. 22 application tables and coordination singleton id=1. |
+| Lineage separation | Factories and runtime select explicit single leaf paths. Each opposite-lineage validation fails without mutating history. No Flyway invocation combines both paths. Obsolete default migration resources are absent. |
+| New milestone upgrades | V5/V6/V7/V9/V14/V24 incrementally apply expected counts; prior complete history JSON and retained synthetic account remain unchanged. Legacy suites separately retain their catalog/order/appointment/result upgrade data checks. |
+| Failed-file recovery | A test-owned view obstructs V22 after V21. Failed migration transaction leaves all prior history unchanged and no V22 index. Removing that test obstruction permits exactly the final three files to apply/validate, then no-op; no repair. |
+| Data-preserving copy | Dedicated synthetic fixture covers every table, including auth/link tokens, singleton, reschedule history, completed appointment/visit, rejected/replacement specimen self-link, attestations, superseded/current published correction versions, values, exact specimen links and events. pg_dump data-only excludes history; psql performs seed removal + privileged temporary trigger disabling/import/re-enabling in one transaction. Complete JSON rows in all 22 tables, every last_value/is_called pair and both histories match before/after; source data is unchanged. |
+| Sequences and protection after copy | Tests include called and uncalled states for all four sequences, then equal nextval on both owned databases. Both schemas still match. Every actual FK anti-join is empty; constraints validated and user triggers enabled. Published header update/delete, child mutation/deletion and event deletion reject with SQLSTATE 23514; two published versions with exactly one current version remain. |
+| Existing backend behavior | All existing account/security, patient/linking/profile, catalog, order, appointment, clinical/result/report and medical-history tests pass against unchanged legacy DDL, with Hibernate validation. Production source outside the preexisting owner edit is unchanged. |
+
+Final checks: git diff --check and new/local file whitespace/conflict scans pass;
+classpath contains 9 legacy + 24 split migration files and none at the obsolete
+location. Source inspection confirms only the intended two configuration lines
+and historical test resource strings changed outside the added tests/docs/migrations.
+POM, .mvn/maven.config, Surefire mapping, IsolatedPostgresTest and legacy SQL fixture
+are unchanged. The separate owner edit in ResultPublicationService.java retains
+its entry SHA-256 `d21a8b16f8b41d5862ddd0fe524511f15dc4ebc12d8db2d4a2ac03a0d8b83c97`.
+
+Limits and remaining steps: full API tests run on legacy, with full DDL equality
+and focused transfer/protection checks on split. No private real-data full-backup
+restore rehearsal, other environment inventory, destination application/live
+HTTP smoke check, role/grant/collation portability verification, package deployment
+or cutover was performed. Those remain explicit release steps in the runbook.
+No real database/history was reset, repaired, reclassified or migrated. The
+running application and development database remain unchanged.
+
 ## My Profile verification (2026-10-30)
 
 Tasks 33-36, MP-PAT-R01-R06. Branch backend-hmood. Scope: patient-only My

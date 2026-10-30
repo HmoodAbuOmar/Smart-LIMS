@@ -1,5 +1,10 @@
 # Lab Tests API
 
+Migration-version references in historical sections describe the original V1-V9
+implementation. The current application uses canonical V1-V24 from
+`src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
+fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
+
 Traceability: R-CAT-01/R-CAT-02 and R-NFR-01 in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). Stage 4 implements the approved parameter slice below; automatic reference_ranges remains deferred. No clinical definitions/ranges are seeded.
 
 Stage 4 approved decisions: [RESULTS_API.md](RESULTS_API.md) governs manual references/

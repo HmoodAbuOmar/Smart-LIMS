@@ -129,11 +129,11 @@ class OrderMigrationTest {
     @Test
     void freshDatabaseAppliesValidatesAndReappliesWithoutChanges() throws SQLException {
         Flyway flyway = migrations(null);
-        assertEquals(9, flyway.migrate().migrationsExecuted);
+        assertEquals(24, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertEquals(List.of("1", "2", "3", "4", "5", "6", "7", "8", "9"), rows(
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, 24).mapToObj(Integer::toString).toList(), rows(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank"));
-        assertEquals(List.of("V7__orders.sql"), rows("SELECT script FROM flyway_schema_history WHERE version='7'"));
+        assertEquals(List.of("V8__test_orders.sql"), rows("SELECT script FROM flyway_schema_history WHERE version='8'"));
         assertEquals(List.of("0"), rows("SELECT count(*) FROM test_orders"));
         assertEquals(List.of("0"), rows("SELECT count(*) FROM order_items"));
         assertEquals(0, flyway.migrate().migrationsExecuted);
@@ -152,8 +152,8 @@ class OrderMigrationTest {
     }
 
     @Test
-    void upgradeFromV6PreservesAllExistingRowsHistoryAndPatientSequence() throws SQLException {
-        assertEquals(6, migrations("6").migrate().migrationsExecuted);
+    void upgradeFromV7PreservesAllExistingRowsHistoryAndPatientSequence() throws SQLException {
+        assertEquals(7, migrations("7").migrate().migrationsExecuted);
         seedExistingData();
         assertEquals(List.of("42"), rows("SELECT setval('patient_number_seq', 42, true)"));
         Map<String, List<String>> before = new LinkedHashMap<>();
@@ -161,10 +161,10 @@ class OrderMigrationTest {
             before.put(table, rows("SELECT row_to_json(t)::text FROM " + table + " t ORDER BY 1"));
             assertFalse(before.get(table).isEmpty());
         }
-        String history = "SELECT row_to_json(h)::text FROM flyway_schema_history h WHERE version::integer <= 6 ORDER BY installed_rank";
+        String history = "SELECT row_to_json(h)::text FROM flyway_schema_history h WHERE version::integer <= 7 ORDER BY installed_rank";
         List<String> oldHistory = rows(history);
         Flyway flyway = migrations(null);
-        assertEquals(3, flyway.migrate().migrationsExecuted);
+        assertEquals(17, flyway.migrate().migrationsExecuted);
         flyway.validate();
         for (var entry : before.entrySet()) {
             assertEquals(entry.getValue(), rows("SELECT row_to_json(t)::text FROM " + entry.getKey() + " t ORDER BY 1"));

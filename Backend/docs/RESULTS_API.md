@@ -1,5 +1,10 @@
 # Results API Contract — Stage 4
 
+Migration-version references in historical sections describe the original V1-V9
+implementation. The current application uses canonical V1-V24 from
+`src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
+fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
+
 Stage 5 additive patient reads: `GET /api/results/me/trends/biomarkers` and
 `GET /api/results/me/trends`. See [MEDICAL_HISTORY_API.md](MEDICAL_HISTORY_API.md)
 for owned numeric series, time windows, chart/table projections and arithmetic
