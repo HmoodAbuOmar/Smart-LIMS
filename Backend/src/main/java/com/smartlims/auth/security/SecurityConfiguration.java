@@ -90,6 +90,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/appointments/{id}/alternatives").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/appointments/{id}/reschedule", "/api/appointments/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
 
+                        .requestMatchers(HttpMethod.GET, "/api/results/me/trends", "/api/results/me/trends/biomarkers",
+                                "/api/visits/me/archive", "/api/visits/me/archive/tests", "/api/visits/me/archive/{id}").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.GET, "/api/results/me", "/api/results/me/{id}", "/api/results/me/{id}/report", "/api/results/me/{id}/history").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.GET, "/api/results/versions", "/api/results/work-items", "/api/results/{id}").hasAnyRole("ADMIN", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.POST, "/api/results", "/api/results/{id}/corrections").hasRole("LAB_TECHNICIAN")

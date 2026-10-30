@@ -6,6 +6,10 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface TestResultRepository extends JpaRepository<TestResult,UUID>,JpaSpecificationExecutor<TestResult>{
+    @Query("select distinct r from TestResult r join r.specimenIds sampleId, Sample s where s.id=sampleId and s.visit.id=:visit and r.current=true and r.status=com.smartlims.results.entity.ResultStatus.PUBLISHED")
+    List<TestResult> currentForVisit(@Param("visit") UUID visit);
+    @Query("select distinct r from TestResult r join r.specimenIds sampleId, Sample s where s.id=sampleId and s.visit.status=com.smartlims.visits.entity.Visit.Status.COMPLETED and r.item.order.patient.user.id=:user and r.current=true and r.status=com.smartlims.results.entity.ResultStatus.PUBLISHED")
+    List<TestResult> archivedForPatient(@Param("user") UUID user);
     @Query("select coalesce(max(r.versionNumber),0) from TestResult r where r.item.id=:item") int lastNumber(@Param("item") UUID item);
     Optional<TestResult> findByEnteredBy_IdAndIdempotencyKey(UUID actor,UUID key);
     Optional<TestResult> findByItem_IdAndCurrentTrue(UUID item);

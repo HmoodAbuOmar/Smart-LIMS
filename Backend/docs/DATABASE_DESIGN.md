@@ -891,6 +891,44 @@ order. Corrections retain the old publication until replacement atomically
 publishes. No payment/notification/general audit data or medical interpretation
 is fabricated.
 
+### 8.1 Stage 5 medical history read model
+
+[MEDICAL_HISTORY_API.md](MEDICAL_HISTORY_API.md) defines the additive patient read
+contract. Reuses the implemented V7/V9 model without a schema change or migration.
+Ownership follows test_orders.patient_id -> patients.user_id for every selection.
+Archive: COMPLETED visits with an EXISTS current PUBLISHED test_results row whose
+result_specimens sample belongs to that visit. Do not associate a publication
+merely through the same order or visit_items; multiple visits can select one item.
+Search/test/flag predicates operate inside that publication EXISTS, preserving
+one visit row/count regardless of multi-value or multi-specimen joins. Reported
+flags are stored result_values flags, not computed clinical classifications.
+Test dropdown choices deduplicate existing lab_test_id and retain ordered-test
+snapshots even after catalog deactivation. Details reuse published ResultResponse.
+
+Trends: result_values -> current PUBLISHED test_results -> order_items -> owned
+test_orders. Only reported NUMERIC values; one point per retained value UUID,
+regardless of number of specimens. Correction current-marker swaps replace the
+old point atomically; working/superseded versions are excluded. Published
+specimen_snapshots provide immutable sample type/container and real visit links.
+Series keys include parameter UUID, definition code/name/type snapshots, unit,
+method and sorted distinct specimen-kind pairs; no conversion, live definition
+lookup, specimen inference or cross-parameter merging. Parameter FK is used for
+identity only. References/flags/explanation remain retained display data.
+
+All new reads use repeatable-read transactions so count/page/projections and
+current-version selection share a snapshot under concurrent corrections. No
+writers, locks or lifecycle changes are added. Visit filtering is database-paged;
+biomarker/test choices and trend table pagination follow grouping within the
+patient's owned publication data, with long offset arithmetic. Chart data returns
+every point in the selected window, without downsampling. No large-history load
+benchmark is claimed. Existing FK/partial-current/parameter/sample indexes are
+reused; no speculative index migration. MeasuredAt determines trends; arrivedAt
+determines archive dates. Inclusive Asia/Jerusalem dates become half-open instant
+ranges via local midnight, covering DST correctly. Decimal comparison uses
+BigDecimal, with six-place HALF_UP percentage rounding and explicit null handling
+for missing/zero-previous/censored measurements. No payment or clinical policy is
+introduced.
+
 ## 9. Incremental implementation plan
 
 The current [implementation plan](../IMPLEMENTATION_PLAN.md) records completed Stage 1 catalog work and Stage 2 order Tasks 6-10. Task 6 is contract/design review; Task 7 supplies persistence, Task 8 creation and Tasks 9/10 owned reads/cancellation, each with focused evidence. Task 11 passes the full suite and all stage acceptance criteria; Task 11 and Stage 2 are DONE. The owner commit is a separate handoff. References and the remaining workflow stay unimplemented. Older R-/T- identifiers elsewhere in this design are carried-forward traceability, not current task numbering.

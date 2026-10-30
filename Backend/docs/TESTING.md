@@ -1,5 +1,361 @@
 # Database-backed test setup
 
+## Stage 5 medical history verification (2026-10-30)
+
+Tasks 28-32, S5-MH-R01-R06. Branch `backend-hmood`. Existing owner additions to
+this file (280 lines at task entry) are preserved. No Postman or live development
+HTTP/database work was performed for Stage 5; tests use MockMvc, real JWT/cookie
+security, synthetic fixtures and fake external email.
+
+Independently verified disposable PostgreSQL 16.15 before execution: inspected
+the saved SMARTLIMS_TEST_POSTGRES_DATA path under the user's temporary directory,
+postgresql.conf loopback-only listener/55432 and pg_hba.conf loopback postgres
+trust entry. pg_ctl initially reported stopped (stale postmaster.pid); started
+only that resolved disposable directory. psql explicitly connected to
+127.0.0.1:55432/smartlims_auth_regression and confirmed current_database,
+current_user=postgres, server address/port, listen_addresses=127.0.0.1 and actual
+data_directory matching
+`C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df`.
+pg_ctl and the independent listener inspection both identified PID 14408.
+The development PostgreSQL service was separate and untouched. The unchanged
+machine-local .mvn/maven.config and Surefire mapping target only that guarded
+regression URL. No application datasource fallback; no credentials printed.
+
+Commands run directly from Backend:
+
+| Command | Result |
+|---|---|
+| `.\mvnw.cmd '-DskipTests' compile` | BUILD SUCCESS, 13.394 s, finished 18:27:35 +02:00. Compile only. |
+| `.\mvnw.cmd '-Dtest=VisitArchiveTest,HealthTrendTest' test` (initial) | 22 tests, 1 failure, 0 errors/skips; 56.258 s, finished 18:31:06 +02:00. New cookie fixture incorrectly named the cookie; corrected to existing access_token. No production security change or weakened assertion. |
+| `.\mvnw.cmd '-Dtest=VisitArchiveTest,HealthTrendTest' test` (expanded/corrected) | **26 tests, 0 failures/errors/skips, BUILD SUCCESS**, 58.709 s, finished **18:33:10 +02:00**. VisitArchiveTest 10; HealthTrendTest 16. |
+
+Coverage and acceptance:
+
+| Requirement | Current focused evidence |
+|---|---|
+| S5-MH-R01 | Completed/publication/exact-visit evidence; literal search; ANDed date/test/flag filters; same-test flag correlation; multi-specimen/value unique totals; deterministic UUID ties; empty/distant pages; historical inactive test choices. |
+| S5-MH-R02 | Owned details reuse complete published snapshots, notes/explanation/real visit links and existing result/report URLs; draft/approved/open/foreign/missing visits concealed; no payment fields or internal events. |
+| S5-MH-R03 | Numeric-only owned current publications; TEXT/unreported exclusion; separate unit/method/specimen/container/parameter identity series; multi-kind signature; same-kind specimen deduplication; retained snapshots after catalog/definition deactivation; search/paging. |
+| S5-MH-R04 | Measurement chronology independent of publication order, chart ascending/table descending, selected-window stats independent of page; period defaults/all/custom/calendar windows; Jerusalem 25-hour DST day and exact date bounds; empty/single/zero/negative/unchanged/censored and full storage precision decimals. |
+| S5-MH-R05 | Bearer/cookie/current-role/ownership/unlinked behavior; strict repeated/unknown/malformed selectors; correction replacement and cancelled published retention; simultaneous publication/read never hides or duplicates a point/visit test. |
+| S5-MH-R06 | PASS: full invocation and final preservation/diff review below; all 319 existing plus 26 Stage 5 tests pass together. |
+
+No migration is needed. V1-V9, POM/dependency versions, existing tests, isolation
+guard and local Maven mapping are preserved. New synthetic fixture SQL changes
+only unpublished snapshot rows in the guarded regression database to exercise
+historical incompatible definitions/unreported numeric data; published immutability
+guards remain enforced. API examples: [MEDICAL_HISTORY_API.md](MEDICAL_HISTORY_API.md).
+No clinical data/authority, payment information or educational interpretation
+is seeded. Existing Stage 4 reviewer configuration/approved definitions/publication
+workflow remains the prerequisite for populating histories. No large-history load
+benchmark, live client/manual verification or deployment claim.
+
+Final required invocation, after final source/contract/data-design review and
+independent recheck of pg_ctl PID 14408, loopback listener and actual psql database/
+data_directory identity:
+
+```powershell
+.\mvnw.cmd test
+```
+
+**345 tests across 46 suites, 0 failures, 0 errors, 0 skips, BUILD SUCCESS,
+exit 0.** Maven duration **04:03 min**; finished **2026-10-30T18:38:41 +02:00**.
+All 46 Surefire XML reports were independently parsed after completion: exact same
+totals, zero stale reports predating this invocation. The 26 new cases passed
+again in this final run alongside all 319 existing tests, including migration,
+Stage 4 workflow/clinical security/correction concurrency and PDF regressions.
+No PDF code or layout was changed. No further source change followed this run.
+
+Final read-only isolated psql checks: all nine Flyway versions successful and no
+remaining smartlims_migration_* compatibility databases. `git diff --check` and
+new-file whitespace/conflict scan passed. Protected-file diff confirmed unchanged
+POM, applied migration sources, report rendering, isolation guard and Maven mapping.
+Only Backend Stage 5 source/tests/contracts/design/evidence and the excluded local
+implementation plan changed; previous owner work in this file remains intact.
+No existing test/assertion was removed or weakened. No implementation blocker
+remains: Stage 5 and Tasks 28-32 are DONE. Owner review/manual client checks,
+commit/push and deployment remain separate and were not performed.
+
+## Stage 3 and 4 live HTTP verification (2026-10-30)
+
+Status: DONE. Owner-authorized follow-up to Tasks 18/27, S3-APT-R01–R07 and
+S4-RES-R01–R08. Branch `backend-hmood`; clean working tree at entry.
+This entry supersedes the earlier manual-HTTP handoff only; historical isolated
+automated-suite results and deployment limits below remain separate.
+
+Executed **153 recorded scenario checks, 326 boolean assertions, all PASS**.
+Transport: Python urllib HTTP client against the running local backend at
+`http://127.0.0.1:8080`, from **2026-10-30T12:44:21.628668+00:00** through
+**2026-10-30T13:14:58.369937+00:00** (UTC). These are actual HTTP exchanges, not inspection of saved
+requests, MockMvc, simulated responses, or a Postman cloud collection run.
+The connected full Postman MCP toolset exposed resource management but no usable
+request/collection execution tool; terminal execution was therefore used.
+Private bootstrap/discovery calls are setup context, outside the scenario count.
+
+| Workflow | Result | Actual evidence |
+|---|---|---|
+| Stage 3 rescheduling and retries | PASS | Dedicated and supplied fixtures moved; same ID/type retained; exact immediate retry retained revision; conflicting stale revision returned 409. |
+| Appointment cancellation / Past | PASS | Cancelled record retained in patient Past; authorized cancellation retry preserved timestamp/version; order remained PENDING. |
+| Capacity / rebooking / order cascade | PASS | Capacity-one schedule read before/after booking, movement, cancellation and cascade; released/consumed exactly as expected. Fresh-key rebooking created a new ID. |
+| Supplied test order/appointment | PASS | Order `75b7e73c-a6aa-475f-bead-31ad9405f691` and appointment `0a4e6cfe-fe21-4c9f-882a-e29fe79b4c41` were processed through authorized staff flows; supplied order is now CANCELLED. Its rebooking also became CANCELLED on order cascade. |
+| Visits / processing / closure | PASS | Explicit real-time synthetic arrival created OPEN visit, IN_PROGRESS order and CHECKED_IN appointment; exact retry retained visit; direct cancellation then conflicted. Visit closure completed appointment/order and released capacity after publication. |
+| Specimens | PASS | REGISTERED→RECEIVED, explicit suitability, nullable collection time, retained rejection and independent replacement receipt/attestation; cross-order suitability denied; APPROVED/PUBLISHED evidence protected with SAMPLE_IN_USE. |
+| Drafts / independent review | PASS | Complete synthetic parameter snapshots; stale revision/strict decimal checks; drafts and unpublished approvals concealed; technician/generic ADMIN review denied. Separate allowlisted reviewer approved/published. Editing APPROVED cleared approval and required reapproval. |
+| Patient results / corrections | PASS | Pending before visits; All/Available/Pending, search/category/unique counts, complete owned detail, foreign concealment; correction draft retained current original publication. Publishing correction atomically changed current ID and preserved two published historical versions. |
+| PDF downloads | PASS | Three actual 200 downloads: initial, superseded initial, corrected current; valid PDF signature/EOF, nonempty bytes, PDF content type, attachment, private/no-store. Foreign/draft downloads returned 404. |
+| Actual-time no-show | PASS | Fresh near-term slot booked; pre-end no-show returned 409; after actual slot end NO_SHOW recorded, retry retained revision, patient Past retained it, capacity released. Pending fixture order subsequently cancelled while NO_SHOW history remained. |
+| Authorization / privacy | PASS | Anonymous protected reads 401; missing-authentication/CSRF writes 403; role denials 403; foreign patient visit/result/appointment 404. Standard error envelope, request-ID equality and no-store checked on independent anonymous scenarios. |
+
+### Safe setup and local configuration
+
+Established bootstrap ADMIN access through an existing supported login flow without
+printing credentials/tokens. Created six dedicated `verify_00c77b0a_*` accounts
+through ADMIN invitations, captured only synthetic `@example.invalid` mail in a
+loopback sink, accepted invitations through the public set-password API and logged
+in normally. No account/security rows were edited directly in PostgreSQL.
+Separate patient/foreign-patient profiles prove ownership. A dedicated zero-price
+SYNTHETIC panel with NUMERIC/TEXT parameters and explicitly synthetic categories
+was used; no clinical ranges, interpretation rules or inferred specimen suitability
+were introduced.
+
+Independent reviewer ADMIN UUID:
+`7633d456-f0fe-455b-916b-8a3f82e64915`.
+Technician author UUID:
+`3a0af84d-20de-493c-a037-fb1346df9ae2`.
+The reviewer UUID was added to `SMARTLIMS_LABORATORY_AUTHORIZED_ADMIN_IDS` in the
+local Windows user environment, merging existing entries (none were present).
+The current IDE launch has the same explicit grant. Existing DB/JWT/security
+settings were preserved. Temporary loopback SMTP launch overrides were removed;
+the final three HTTP checks passed after original email settings were restored.
+Generated passwords/tokens are Windows-user DPAPI encrypted in a user-only local
+directory outside Git. No secret values were uploaded to shared Postman variables
+or saved request/response examples. Independent review was never disabled.
+
+### Saved account evidence
+
+Workspace **Smart-LIMS** (`86c94ce6-e272-464e-adc8-f3c4c2b699a5`),
+[Smart-LIMS API](https://go.postman.co/collection/50742279-2e703687-f70e-46b1-bcf5-55db0d345512),
+environment **Smart-LIMS Local**. MCP read-back verified **153 new verification
+requests and 153 actual sanitized response examples**, with no missing/status/body
+mismatches. All **80 pre-existing requests**, collection authentication, scripts
+and collection variables remain unchanged. Temporary account-only transfer
+collections were verified empty and removed; the workspace again contains only
+the original Smart-LIMS API collection.
+
+| Saved feature path | Verification requests/examples |
+|---|---:|
+| Auths / Verification 2026-10-30 - Setup / Setup - executed evidence 1 | 23 |
+| Appointments / Verification 2026-10-30 (including executed evidence 1–2) | 35 |
+| Visits / Verification 2026-10-30 (including executed evidence 1–2) | 27 |
+| Samples / Verification 2026-10-30 (including executed evidence 1) | 18 |
+| Results / Verification 2026-10-30 (including executed evidence 1–6) | 50 |
+
+Non-secret connection/supplied IDs and 57 observed fixture values (IDs, dates,
+versions and operation keys) are saved in the existing environment. Private
+authentication values were preserved. Verification requests use separate
+`verification*Token` role variables without shared raw token values.
+Examples are timestamped historical states, not resettable fixtures.
+
+Recorded creation keys belong to their exact historical operations: stage-3 order,
+booking and rebooking; supplied-order rebooking; stage-4 order/booking; arrival;
+initial/rejected/replacement specimens; initial result; correction; no-show order
+and booking. Reuse a key only with the same intent/body for that exact retry.
+An intentional new creation needs a fresh key; a new complete run also needs
+fresh unique fixture identities/codes. Versioned mutation bodies retain the actual
+historical `expectedVersion`; obtain the current technical `version` for a new
+mutation, including between approval and publication. `versionNumber` is clinical.
+No pre-request script regenerates creation keys.
+
+PDF examples preserve the exact downloaded bytes as explicitly labelled base64,
+with actual HTTP headers and SHA-256 values:
+
+| Check | Bytes | SHA-256 |
+|---|---:|---|
+| S4-53 initial publication | 38135 | `96f67563528e72ccfb5d1d4b8bdaa648bc8c50addcbfe52c75eadf9f324a40bb` |
+| S4-70 superseded initial | 37687 | `cb30fe3d3084bb0521ee078f9a48d4d9766ecfbe939a45629280bb93db6f6295` |
+| S4-71 corrected current | 38194 | `3e196f8eb0789a2eb3cc03e0ab201754916f49f8777d177979af1f1117612c6f` |
+
+### Execution limits and review notes
+
+No backend implementation defect was identified; no production code, dependency,
+schema or applied migration was changed. No Maven/regression tests or direct
+database operations were run against the development database. No isolated suite
+was rerun; the historical 319-test result below is not evidence from this run.
+PDF checks here establish actual downloads/headers/byte completeness, not a new
+visual typography/layout review. Earlier visual/automated evidence remains separate.
+External SMTP delivery and production deployment remain unverified.
+
+Provisioning recovered an existing invitation after a helper's mixed-case email
+lookup; it did not create a duplicate account. A helper initially checked the visit
+projection using `items`; the actual contract uses `tests`. That assertion helper
+was corrected and the read was rerun successfully (S4-58); it was not a backend
+defect. Only the final retained observation is in the scenario manifest.
+MCP gateway size/transport errors affected evidence archiving; state was read back
+before retry/cleanup, and final saved requests/examples match retained observations.
+Only verification Markdown was written in Backend. No Postman exports/configuration
+files were created in Git; no commit or push was performed.
+
+### Saved verification request manifest
+
+Each row identifies a saved request in desktop Cloud View; its example contains
+the observed sanitized response, actual status, headers and scenario description.
+
+| Check | Saved scenario | Method | HTTP | Result | Postman request ID |
+|---|---|---|---:|---|---|
+| S3-A01 | Anonymous appointment detail | GET | 401 | PASS | `9ab9282c-9f8b-8471-f82a-373840749b21` |
+| S3-A02 | Anonymous Past list | GET | 401 | PASS | `e0f9b28f-4b7b-6c16-9042-05f01bd3d5a0` |
+| S4-V01 | Anonymous patient visit list | GET | 401 | PASS | `1028e57e-2b1b-7de7-c822-ad90cdbafc29` |
+| S4-S01 | Anonymous specimen list | GET | 401 | PASS | `957c3d02-5db3-0768-0db4-2f8ea42e98b5` |
+| S4-R01 | Anonymous patient result list | GET | 401 | PASS | `eae5fb0e-1fc7-ab65-94cf-61387b7e9201` |
+| S4-R02 | Anonymous PDF report | GET | 401 | PASS | `c27853d3-4882-57b5-b5a9-ee3f16560bf7` |
+| S3-A03 | Anonymous cancellation without CSRF | POST | 403 | PASS | `716b4df1-f45b-994f-b183-d1e72f25cbec` |
+| S4-V02 | Anonymous arrival without CSRF | POST | 403 | PASS | `155e9ee0-5dc5-c501-c122-e10694c048aa` |
+| S4-S02 | Anonymous specimen creation without CSRF | POST | 403 | PASS | `63afd403-643e-37ad-2961-22d73f9043c9` |
+| S4-R03 | Anonymous draft creation without CSRF | POST | 403 | PASS | `773cad21-56cf-4a76-bc33-071e6176a753` |
+| SETUP-reviewer-01 | Invite synthetic reviewer | POST | 200 | PASS | `fca11257-67f3-4459-8011-ccaf40e20550` |
+| SETUP-reviewer-02 | Accept synthetic reviewer invitation | POST | 200 | PASS | `ee19e422-7162-440e-a7ff-23e41fdd90c8` |
+| SETUP-reviewer-03 | Authenticate synthetic reviewer | POST | 200 | PASS | `767c670a-c309-4bb6-b8dd-379f45513ce5` |
+| SETUP-technician-01 | Invite synthetic technician | POST | 200 | PASS | `c348f397-2554-446f-a8b0-4ee39d5f8aee` |
+| SETUP-technician-02 | Accept synthetic technician invitation | POST | 200 | PASS | `12c9fa2f-1f94-4c15-b4e3-c5b24d2537e2` |
+| SETUP-technician-03 | Authenticate synthetic technician | POST | 200 | PASS | `c5c19fae-a1a5-4aa0-86a1-75812f5bdf8c` |
+| SETUP-receptionist-01 | Invite synthetic receptionist | POST | 200 | PASS | `c2cc56d3-0218-448d-ba74-1038995350a2` |
+| SETUP-receptionist-02 | Accept synthetic receptionist invitation | POST | 200 | PASS | `cc32fbd1-b89c-4d35-8e68-118b4d08fe05` |
+| SETUP-receptionist-03 | Authenticate synthetic receptionist | POST | 200 | PASS | `cb943bda-7cb0-4c96-94fc-a8aeb01eb600` |
+| SETUP-patient-01 | Invite synthetic patient | POST | 200 | PASS | `f3d4791d-f6d8-4877-9c29-5b4312db4780` |
+| SETUP-patient-02 | Accept synthetic patient invitation | POST | 200 | PASS | `0b493b59-26cc-4af1-ae82-734011a18c21` |
+| SETUP-patient-03 | Authenticate synthetic patient | POST | 200 | PASS | `f397920a-f0a9-468a-8ba5-69e71a0a4cb5` |
+| SETUP-foreignPatient-01 | Invite synthetic foreignPatient | POST | 200 | PASS | `0107086c-13fe-412f-8e82-3ae395362929` |
+| SETUP-foreignPatient-02 | Accept synthetic foreignPatient invitation | POST | 200 | PASS | `c5a42be7-42fe-47aa-aa9b-09911a8bd0e7` |
+| SETUP-foreignPatient-03 | Authenticate synthetic foreignPatient | POST | 200 | PASS | `02899aff-d5f4-4b14-8022-ea1c61f3fad8` |
+| SETUP-admin-01 | Invite synthetic admin | POST | 200 | PASS | `8520c7a5-1df4-4f4e-a9dc-a1066cb8a5f4` |
+| SETUP-admin-02 | Accept synthetic admin invitation | POST | 200 | PASS | `5d2c6fe6-d9dc-435d-b8c1-962a79b9c1c5` |
+| SETUP-admin-03 | Authenticate synthetic admin | POST | 200 | PASS | `9981b5e4-69c5-45b3-a2b1-e4b5ca13a71f` |
+| SETUP-patient-04 | Create synthetic linked patient profile patient | POST | 201 | PASS | `ae1ef641-682d-4b4f-973b-fb1396b1d769` |
+| SETUP-foreignPatient-04 | Create synthetic linked patient profile foreignPatient | POST | 201 | PASS | `20b9fd10-674a-428f-be34-f9fb84df7186` |
+| SETUP-CATALOG-01 | Create clearly synthetic panel | POST | 201 | PASS | `52b9343d-4e2c-4c81-9412-f54b2fc51f8f` |
+| SETUP-PARAM-1 | Define synthetic numeric parameter | POST | 201 | PASS | `c7ff1936-2e0f-4702-a4a8-0cd71650745c` |
+| SETUP-PARAM-2 | Define synthetic text parameter | POST | 201 | PASS | `1aab2d37-e20c-4e06-a94f-d2c3c8b05180` |
+| S3-01 | Create dedicated patient order | POST | 201 | PASS | `ad03b802-6ef8-46b5-a150-874f178eb87b` |
+| S3-02 | Create dedicated appointment type | POST | 201 | PASS | `8b4a1d71-3f46-4ebd-bde9-c0538c1fc2b6` |
+| S3-03A | Create dedicated capacity-one slot 1 | POST | 201 | PASS | `e11abc18-a802-41b4-bd00-226b2380c6bd` |
+| S3-03B | Create dedicated capacity-one slot 2 | POST | 201 | PASS | `9e9bc2b3-05d9-46b4-8c6b-827ee2e6e976` |
+| S3-04 | Discover both dedicated slots before booking | GET | 200 | PASS | `0bcea393-da33-41b9-8391-2d7f60b21cbe` |
+| S3-05 | Book dedicated slot A | POST | 201 | PASS | `0814da8d-5c4f-418f-adab-6285beb8891d` |
+| S3-06 | Capacity after initial booking | GET | 200 | PASS | `7d6dc093-82e1-4b49-bc4d-bd4c62e1debf` |
+| S3-07 | Reschedule alternatives exclude current slot | GET | 200 | PASS | `5cbfed31-c787-4dbc-b9a4-4abd1f8ddb3b` |
+| S3-08 | Foreign patient cannot read booking | GET | 404 | PASS | `6a3ca4d3-61ad-4f01-9a3c-15b7be0bd52d` |
+| S3-09 | Technician cannot list appointments | GET | 403 | PASS | `5e6a4cc4-978a-452e-8339-59e70ccdbb7f` |
+| S3-10 | Reschedule to slot B | POST | 200 | PASS | `992f428b-906a-406b-911c-9e9222e1d46b` |
+| S3-11 | Exact immediate reschedule retry | POST | 200 | PASS | `d7a6236f-f11c-42d2-9e18-9b458dee1982` |
+| S3-12 | Stale conflicting reschedule rejected | POST | 409 | PASS | `b3e34e91-c358-41ab-8cb6-44ec170ec9a0` |
+| S3-13 | Reschedule releases A and consumes B | GET | 200 | PASS | `9f477f1a-a832-4e43-947a-76a5700a9754` |
+| S3-14 | Cancel moved appointment | POST | 200 | PASS | `15340834-b3e2-4324-9db9-95cc63719880` |
+| S3-15 | Cancellation retry retains original metadata | POST | 200 | PASS | `51e47b58-18a2-49e6-9361-8d52919c7584` |
+| S3-16 | Cancellation releases capacity once | GET | 200 | PASS | `63791c0b-9100-49ce-b161-72d7040e47ef` |
+| S3-17 | Cancelled booking appears in Past | GET | 200 | PASS | `b5db0498-d5da-487b-a1e3-18ff480a74c9` |
+| S3-18 | Appointment cancellation leaves order pending | GET | 200 | PASS | `38191ba3-5878-419c-a097-3b9c2d741ce3` |
+| S3-19 | Rebook with fresh creation key | POST | 201 | PASS | `3209ace3-66f7-4856-afd7-ab610eed2a32` |
+| S3-20 | Rebooking consumes slot capacity | GET | 200 | PASS | `7cb996d8-169c-437e-b6a5-817725035d83` |
+| S3-21 | Linked pending order cancellation | POST | 200 | PASS | `c6ddc0c9-be84-47bb-a978-9c486d3c0c74` |
+| S3-22 | Linked order cancellation cascades to booking | GET | 200 | PASS | `7461cbfe-1afc-4893-9de8-2acb19a750fe` |
+| S3-23 | Order cascade releases capacity | GET | 200 | PASS | `d24bba7e-1202-40c2-a917-f23a94a18f3b` |
+| S3-24 | Earlier cancellation metadata survives cascade | GET | 200 | PASS | `5592fbbb-1013-45db-b199-454a71f83345` |
+| S3-E01 | Alternatives for supplied confirmed fixture | GET | 200 | PASS | `16970fc5-601a-42ae-b7e4-59e17ad99af8` |
+| S3-E02 | Reschedule supplied fixture to dedicated slot A | POST | 200 | PASS | `11511d03-85af-4eeb-a2fa-93c0509a6cfb` |
+| S3-E03 | Cancel supplied fixture with staff reason | POST | 200 | PASS | `d67ca172-bb49-4493-b225-71d9d980bd3b` |
+| S3-E04 | Rebook supplied test order with fresh key | POST | 201 | PASS | `3d2030f2-424f-4515-8c5a-6b011c75931b` |
+| S3-E05 | Cancel supplied linked test order | POST | 200 | PASS | `102d9bdd-bafd-46e7-9879-77c0df4b4c8e` |
+| S3-E06 | Creation replay proves supplied booking cascade state | POST | 200 | PASS | `e4081d33-467c-4cc7-9c9d-c83d1cf13e78` |
+| S3-E07 | Supplied fixture cascade releases dedicated capacity | GET | 200 | PASS | `2831d692-dfe2-40cb-83d9-bb537eaf2c2d` |
+| S4-01 | Create dedicated results order | POST | 201 | PASS | `528f709c-fc5e-43c4-9cac-f0cdaed75e4e` |
+| S4-02 | Book arrival-linked appointment | POST | 201 | PASS | `cbe4e07d-3e4b-458f-943d-689eb41ee405` |
+| S4-03 | Pending results before any visit | GET | 200 | PASS | `bf241988-1619-40ac-b42f-f17c9e47b189` |
+| S4-04 | Record actual synthetic verification arrival | POST | 201 | PASS | `de8ac9a0-e80e-4470-badb-0436b1d85c45` |
+| S4-05 | Exact arrival retry returns same visit | POST | 200 | PASS | `26c0ad57-f9e7-4e8d-bcf3-5556ea51aacf` |
+| S4-06 | Arrival checks in linked appointment | GET | 200 | PASS | `57e33de5-4cf2-474a-a766-d048ca17251d` |
+| S4-07 | Checked-in appointment retains capacity | GET | 200 | PASS | `d6f77ac3-fc44-4941-a5a8-40a876f6500b` |
+| S4-08 | Processing order cancellation denied | POST | 409 | PASS | `cbd87eee-acbf-438c-9d6a-6924f9cf1fba` |
+| S4-09 | Direct checked-in cancellation denied | POST | 409 | PASS | `ad30408a-f280-4012-837c-fd566100c34d` |
+| S4-10 | Patient owns actual visit detail | GET | 200 | PASS | `d0b61fde-3e6c-4521-a064-d0861c1f86d2` |
+| S4-11 | Patient visit list is order-filtered | GET | 200 | PASS | `8053e363-45b8-453d-871f-08b223e1c4b0` |
+| S4-12 | Foreign patient visit concealed | GET | 404 | PASS | `9bb7b944-10a8-4054-8a8d-4c897f150308` |
+| S4-13 | Patient cannot create visit | POST | 403 | PASS | `8691931b-ea84-4e68-8060-c896fb2e5092` |
+| S4-14 | Register specimen for actual visit | POST | 201 | PASS | `4ac7f309-1e2f-429d-86ef-9e8658383c1a` |
+| S4-15 | Exact specimen registration retry | POST | 200 | PASS | `b300f4ec-c15e-4a1c-81ee-c5da8357e4f5` |
+| S4-16 | Generic ADMIN has no clinical specimen access | GET | 403 | PASS | `142a2be3-7754-4845-a383-7a543345d7b7` |
+| S4-17 | Receptionist has no clinical specimen access | GET | 403 | PASS | `354217cc-055b-4328-a8fb-02e3ea47bad0` |
+| S4-18 | Receive registered specimen | POST | 200 | PASS | `80b336a0-b31b-4411-9555-004386d2ad6b` |
+| S4-19 | Attest explicit item suitability | POST | 200 | PASS | `4465213c-fbc4-4e34-b819-e44ac7cd76a7` |
+| S4-20 | Authorized reviewer may inspect clinical specimens | GET | 200 | PASS | `1d8171c5-6ffb-492b-a9d9-2e10c915cdfc` |
+| S4-21 | Register separate rejection fixture | POST | 201 | PASS | `32d7df95-e901-4cd8-86f0-0bd0d24ffe25` |
+| S4-22 | Reject specimen with retained reason | POST | 200 | PASS | `57be391d-b4a1-4bf1-9c98-f11fb580a70d` |
+| S4-23 | Register explicit replacement specimen | POST | 201 | PASS | `807eff86-6a11-4552-ad09-90a2bc1635d3` |
+| S4-24 | Receive replacement independently | POST | 200 | PASS | `cc3c307f-ca4e-4ba5-80b5-b1eaf36863ca` |
+| S4-25 | Attest replacement independently | POST | 200 | PASS | `7932d41c-e02d-47a5-9b55-325effad2bca` |
+| S4-26 | Create technician draft with parameter snapshots | POST | 201 | PASS | `b36ba9e7-cde4-4631-962a-9a3013a0ce01` |
+| S4-27 | Exact draft creation retry | POST | 200 | PASS | `ce6363c2-26da-4b0f-8d0d-20ee17d0928b` |
+| S4-28 | Patient cannot read staff draft endpoint | GET | 403 | PASS | `ed248b23-cd63-4f73-8409-01d4ad9147a1` |
+| S4-29 | Patient draft detail concealed | GET | 404 | PASS | `a3ffdd2f-22a7-469d-9fff-dc19f0d09d7a` |
+| S4-30 | Patient draft PDF concealed | GET | 404 | PASS | `fd53349b-36df-4883-839f-e8adb24f8fc4` |
+| S4-31 | Incomplete draft cannot be approved | POST | 409 | PASS | `194c06e9-4333-4c74-9a6a-a83f8225b8d2` |
+| S4-32 | Fill every snapshotted synthetic parameter | PUT | 200 | PASS | `4be81d5d-770c-4c99-9fe1-75bf15617df3` |
+| S4-33 | Stale draft revision rejected | PUT | 409 | PASS | `f3fed4fa-6c57-4f5a-8614-f46ac95545a0` |
+| S4-34 | Technician author cannot approve | POST | 403 | PASS | `f5b414ed-95ca-498c-b34d-e55e8fe546d0` |
+| S4-35 | Generic ADMIN cannot approve | POST | 403 | PASS | `139823d5-6ec0-4aaa-8ce3-06f3d39fa3ea` |
+| S4-36 | Reviewer cannot edit technician draft | PUT | 403 | PASS | `119d10b0-595b-44d0-b2fc-4362183a5216` |
+| S4-37 | Unapproved draft cannot publish | POST | 409 | PASS | `8c118f55-a2aa-44d4-a82b-c48cadec32f9` |
+| S4-38 | Independent authorized reviewer approves | POST | 200 | PASS | `bc50daf0-174b-47bf-a192-70406e490e28` |
+| S4-39 | Approved specimen evidence cannot be rejected | POST | 409 | PASS | `52f811c7-d25a-4a3d-be12-dac74c578f04` |
+| S4-40 | Approved result remains hidden from patient | GET | 404 | PASS | `b558eccc-6a06-42d1-be58-37518e3f6e14` |
+| S4-41 | Editing approval returns result to draft | PUT | 200 | PASS | `b0ed37ca-0857-457c-b433-fb96e0316909` |
+| S4-42 | Invalidated approval cannot publish | POST | 409 | PASS | `1bc55789-7761-4b7f-837c-66daa7f03a39` |
+| S4-43 | Reapprove invalidated draft independently | POST | 200 | PASS | `de2021d2-f5f7-4d71-a19b-ab3f7d90fee9` |
+| S4-44 | Publish approved initial result | POST | 200 | PASS | `1d05a723-dee8-459a-8920-b83bb5030163` |
+| S4-45 | Publication alone leaves open-visit order processing | GET | 200 | PASS | `033ed0bc-bda3-4b21-8c70-0701c0832f05` |
+| S4-46 | Available results combine search and category | GET | 200 | PASS | `51617eb9-721a-4f4b-968f-72f15a622f02` |
+| S4-47 | Pending filter excludes published item | GET | 200 | PASS | `d654b538-8440-4ed8-813a-19f61562c0a5` |
+| S4-48 | Second category returns same item once | GET | 200 | PASS | `156afeb4-5687-4c86-bf83-35ad330c57b3` |
+| S4-49 | Full published patient detail | GET | 200 | PASS | `6f325563-03fb-4888-8451-a9ac22fd58ef` |
+| S4-50 | Foreign published result concealed | GET | 404 | PASS | `b2657477-26e0-4743-93dc-a0cf44388c58` |
+| S4-51 | Published result cannot be edited | PUT | 409 | PASS | `4bbb31d6-f533-42f2-a8f4-07d941d9718c` |
+| S4-52 | Initial patient publication history | GET | 200 | PASS | `8f23d364-fb80-4fbb-bc45-de8a9c807700` |
+| S4-53 | Download actual initial published PDF | GET | 200 | PASS | `e5636845-c9d9-43db-bb51-58652113796a` |
+| S4-54 | Foreign patient PDF concealed | GET | 404 | PASS | `95b2a8c7-1970-4c43-b44f-019184740d3d` |
+| S4-55 | Complete actual verification visit | POST | 200 | PASS | `ce8830f6-fe35-4ef6-8709-c1d53a696ae0` |
+| S4-56 | Visit closure completes linked appointment | GET | 200 | PASS | `408280e6-4368-4f02-85c1-0525d36b4452` |
+| S4-57 | Visit closure releases capacity | GET | 200 | PASS | `e94e2958-c015-40bd-93a0-a00a9808f569` |
+| S4-58 | Patient visit exposes current published link | GET | 200 | PASS | `464ab493-a24c-4d19-b19e-75fa3b72cd6f` |
+| S4-59 | Create correction of current publication | POST | 201 | PASS | `bd7c32aa-0454-49ec-916f-16ff76bd2ef3` |
+| S4-60 | Exact correction creation retry | POST | 200 | PASS | `13f7855e-b77e-4f8b-ad9b-04762dc97681` |
+| S4-61 | Working correction preserves current publication | GET | 200 | PASS | `ddc4ad55-b4b9-439c-a7fe-ff496116fc9b` |
+| S4-62 | Patient history excludes correction draft | GET | 200 | PASS | `2a3a086c-f6a1-400c-94e0-39decec25530` |
+| S4-63 | Patient correction draft concealed | GET | 404 | PASS | `48503485-362d-49c5-9241-fbf687ad6f62` |
+| S4-64 | Edit complete correction parameter set | PUT | 200 | PASS | `387fb964-c00d-4481-b8fd-ce54b8d8548d` |
+| S4-65 | Independently approve correction | POST | 200 | PASS | `4bb6e7ba-2dcd-4ca7-8049-9bdb5b0adfeb` |
+| S4-66 | Publish correction atomically | POST | 200 | PASS | `e49506ea-93f2-4893-9d20-5bf4a8c61eee` |
+| S4-67 | Patient Available points to correction | GET | 200 | PASS | `bc27d3ab-63af-496b-a776-11eb52a9aceb` |
+| S4-68 | Old publication retained and superseded | GET | 200 | PASS | `f0404e29-7388-41e5-bf3d-674c917c87f5` |
+| S4-69 | Published history contains both versions only | GET | 200 | PASS | `a32782c5-bc16-495c-9a46-85c9fce293c2` |
+| S4-70 | Download superseded initial PDF | GET | 200 | PASS | `4b4f4af0-2d51-49d8-91e6-f54ced32de49` |
+| S4-71 | Download current corrected PDF | GET | 200 | PASS | `564ccf22-b180-4ceb-a1f8-ab3bf5509a46` |
+| S4-72 | Published evidence remains protected | POST | 409 | PASS | `b4c6eb08-bb8c-4a5a-99f6-aa093b5952eb` |
+| S4-73 | Cross-order suitability denied | POST | 409 | PASS | `7488cb5f-d616-4212-bed4-c81c512027cd` |
+| S4-74 | Repeated patient result filter rejected | GET | 400 | PASS | `ac7515a5-f363-4ed5-b5e4-4c02f1f17275` |
+| S4-75 | String decimal is rejected by strict JSON | PUT | 400 | PASS | `8946ee81-e0fd-407f-81f7-915055e45c50` |
+| S4-N01 | Create dedicated no-show order | POST | 201 | PASS | `87534623-0e28-450e-bfd3-f8c3bf853d44` |
+| S4-N02 | Publish near-term real-time no-show fixture | POST | 201 | PASS | `405fe5e0-7fdd-42a0-b875-8cf782063502` |
+| S4-N03 | Book dedicated no-show fixture | POST | 201 | PASS | `3095b4a0-35fa-47bf-8eae-aa89145dcf13` |
+| S4-N04 | No-show before actual slot end denied | POST | 409 | PASS | `01acfc65-5766-4534-afc8-532d40012633` |
+| S4-N05 | Mark actual elapsed unvisited appointment no-show | POST | 200 | PASS | `22049dba-e8e5-48dd-ae26-1f73810ea3cc` |
+| S4-N06 | No-show retry preserves version | POST | 200 | PASS | `d3a638a1-a5de-4001-9110-aea43f108845` |
+| S4-N07 | No-show appears in patient Past | GET | 200 | PASS | `4cbd67ba-0c75-4bf8-b86d-ac08d60ab8c2` |
+| S4-N08 | No-show releases actual elapsed slot capacity | GET | 200 | PASS | `105a454f-2c46-46a7-9c21-36a7a3a44858` |
+| S4-N09 | Retain no-show fixture while cancelling its pending test order | POST | 200 | PASS | `fa2a57c8-521d-47b5-8001-f5e94ca14f72` |
+| S4-N10 | Order cleanup retains no-show appointment history | GET | 200 | PASS | `2eab316e-e173-4470-b61a-8672fd8cac34` |
+| S4-F01 | Final current publication after original email settings restored | GET | 200 | PASS | `e57ca752-1370-486c-8446-5823b2552b57` |
+| S4-F02 | Final staff read of retained original version | GET | 200 | PASS | `e8a96538-eaa0-40c5-bb7f-94d40764519c` |
+| S4-F03 | Independent reviewer clinical grant survives restart | GET | 200 | PASS | `8aaf39ac-7ccd-457b-abdb-90cb167dbfb3` |
+
 ## Stage 4 verification (2026-10-30)
 
 Branch backend-hmood. Initial pending-decision documentation is preserved; the

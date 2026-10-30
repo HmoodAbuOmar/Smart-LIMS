@@ -6,6 +6,7 @@ import com.smartlims.results.service.ResultDraftService;
 import com.smartlims.results.service.ResultPublicationService;
 import com.smartlims.results.service.ResultListService;
 import com.smartlims.results.service.PatientResultReadService;
+import com.smartlims.results.service.HealthTrendService;
 import com.smartlims.results.report.ResultReportRenderer;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
@@ -16,7 +17,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping(path="/api/results",produces=MediaType.APPLICATION_JSON_VALUE)
 public class ResultController {
  private final ResultDraftService drafts;private final ResultPublicationService publications;private final ResultListService lists;private final PatientResultReadService reads;private final ResultReportRenderer reports;
- public ResultController(ResultDraftService drafts,ResultPublicationService publications,ResultListService lists,PatientResultReadService reads,ResultReportRenderer reports){this.drafts=drafts;this.publications=publications;this.lists=lists;this.reads=reads;this.reports=reports;}
+ private final HealthTrendService trends;
+ public ResultController(ResultDraftService drafts,ResultPublicationService publications,ResultListService lists,PatientResultReadService reads,ResultReportRenderer reports,HealthTrendService trends){this.drafts=drafts;this.publications=publications;this.lists=lists;this.reads=reads;this.reports=reports;this.trends=trends;}
+ @GetMapping("/me/trends/biomarkers") public ResponseEntity<?> biomarkers(@RequestParam MultiValueMap<String,String> query,JwtAuthenticationToken actor){return ok(trends.biomarkers(actor,LaboratoryQuery.of(query,"search")));}
+ @GetMapping("/me/trends") public ResponseEntity<?> trend(@RequestParam MultiValueMap<String,String> query,JwtAuthenticationToken actor){return ok(trends.trend(actor,LaboratoryQuery.of(query,"seriesId","period","fromDate","toDate")));}
  @GetMapping(path="/me/{id}/report",produces=MediaType.APPLICATION_PDF_VALUE) public ResponseEntity<byte[]> report(@PathVariable String id,JwtAuthenticationToken actor){var r=reads.get(actor,id);byte[] pdf=reports.render(r);return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).header("Cache-Control","private, no-store").header("Content-Disposition",ContentDisposition.attachment().filename("result-"+r.id()+"-v"+r.versionNumber()+".pdf").build().toString()).contentLength(pdf.length).body(pdf);}
  @GetMapping("/me/{id}") public ResponseEntity<?> getMe(@PathVariable String id,JwtAuthenticationToken actor){return ok(reads.get(actor,id));}
  @GetMapping("/me/{id}/history") public ResponseEntity<?> history(@PathVariable String id,@RequestParam MultiValueMap<String,String> query,JwtAuthenticationToken actor){return ok(reads.history(actor,id,LaboratoryQuery.of(query)));}

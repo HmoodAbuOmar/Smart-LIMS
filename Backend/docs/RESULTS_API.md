@@ -1,5 +1,11 @@
 # Results API Contract — Stage 4
 
+Stage 5 additive patient reads: `GET /api/results/me/trends/biomarkers` and
+`GET /api/results/me/trends`. See [MEDICAL_HISTORY_API.md](MEDICAL_HISTORY_API.md)
+for owned numeric series, time windows, chart/table projections and arithmetic
+changes. These use current publications only; the Stage 4 detail/history/report
+routes below continue to expose authorized retained versions unchanged.
+
 Status: Stage 4 DONE, 2026-10-30. Final isolated suite: 319 tests/44 suites,
 zero failures/errors/skips; see [verification](TESTING.md#stage-4-verification-2026-10-30).
 Owner manual checks/commit/deployment remain separate.

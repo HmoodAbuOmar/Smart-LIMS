@@ -1,5 +1,12 @@
 # Visits API Contract — Stage 4
 
+Stage 5 additive patient reads: `GET /api/visits/me/archive`,
+`GET /api/visits/me/archive/tests` and `GET /api/visits/me/archive/{id}`.
+See [MEDICAL_HISTORY_API.md](MEDICAL_HISTORY_API.md) for completed visit archive
+eligibility, search/date/test/stored-flag filters, paging and published details.
+These stricter archive views do not change Stage 4's general visit list/detail
+semantics or payloads; real specimen evidence associates archive publications.
+
 Stage 4 DONE, 2026-10-30. Tasks 19–27; final isolated suite 319/319, zero failures/
 errors/skips. Evidence: TESTING.md#stage-4-verification-2026-10-30. Exact manual
 workflow: RESULTS_API.md#manual-http-verification. No deployment claim.
