@@ -76,6 +76,7 @@ main { overflow-x: clip; background: var(--medical-off-white); }
 .button-primary,
 .site-header .nav-cta,
 .tech-hero__button--primary,
+.patient-auth .auth-submit,
 main .final-cta .button-primary {
   color: var(--button-primary-text);
   background: var(--button-primary-bg);
@@ -86,6 +87,8 @@ main .final-cta .button-primary {
 .button-primary:not(:disabled):hover,
 .site-header .nav-cta:not(:disabled):hover,
 .tech-hero__button--primary:not(:disabled):hover,
+.patient-auth .auth-submit:not(:disabled):hover,
+.patient-auth .workflow-choice:hover .patient-choice-action,
 main .final-cta .button-primary:not(:disabled):hover {
   color: var(--button-primary-text);
   background: var(--button-primary-hover-bg);
@@ -93,7 +96,8 @@ main .final-cta .button-primary:not(:disabled):hover {
   box-shadow: var(--button-primary-shadow);
 }
 .button-primary:focus-visible,
-.tech-hero__button--primary:focus-visible {
+.tech-hero__button--primary:focus-visible,
+.patient-auth .auth-submit:focus-visible {
   outline: 2px solid var(--medical-mint);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--medical-deep);
@@ -202,7 +206,8 @@ main .platform-section .role-label > svg:first-child {
 .insights-section::before {
   background: var(--medical-off-white);
 }
-.insights-copy .eyebrow, .insights-copy h2 span, .insights-copy .teal-link { color: var(--color-emerald); }
+.insights-copy .eyebrow, .insights-copy h2 span,
+.insights-copy .teal-link { color: var(--color-emerald); }
 .insights-copy .text-link:hover { color: var(--color-navy); }
 .check-list { color: var(--text-secondary-light); }
 .check-list svg { color: var(--text-on-dark); background: var(--color-emerald); }
@@ -278,7 +283,8 @@ blockquote { color: var(--medical-secondary); }
 .final-cta .button:not(.button-primary):hover { background: var(--color-muted-green); }
 .cta-decoration { color: var(--color-mint); opacity: .05; }
 .site-footer { color: var(--text-on-dark); background: var(--color-navy); }
-.footer-top p, .footer-top > div > a:not(.brand), .footer-top button, .footer-bottom { color: var(--color-muted-green); }
+.footer-top p, .footer-top > div > a:not(.brand), .footer-top button,
+.footer-bottom { color: var(--color-muted-green); }
 .footer-bottom { border-color: var(--border-dark); }
 .footer-bottom svg { color: var(--color-muted-green); }
 .footer-top a:hover, .footer-top button:hover { color: var(--medical-white); text-decoration-color: var(--medical-fresh); }
@@ -288,54 +294,7 @@ blockquote { color: var(--medical-secondary); }
 }
 
 /* Shared field colors; exclude input types that are buttons or non-text controls. */
-.chart-controls select {
-  background: var(--field-background);
-  color: var(--medical-deep);
-  caret-color: var(--medical-deep);
-
-  &:focus {
-    background: var(--field-background);
-    outline: none;
-    box-shadow: var(--field-focus-glow);
-  }
-  &:focus:not([aria-invalid='true']) { border-color: var(--field-focus-border); }
-
-  &:is(:autofill, :-webkit-autofill) {
-    background: var(--field-background);
-    -webkit-text-fill-color: var(--medical-deep);
-    box-shadow: 0 0 0 1000px var(--field-background) inset;
-  }
-  &:is(:autofill, :-webkit-autofill):focus {
-    box-shadow: 0 0 0 1000px var(--field-background) inset, var(--field-focus-glow);
-  }
-}
-
-/* Authentication controls: shared palette, scoped to the split card. */
-
-
-
-
-
-
-.patient-auth .auth-submit {
-  color: var(--button-primary-text);
-  background: var(--button-primary-bg);
-  border-color: var(--button-primary-bg);
-  box-shadow: none;
-  transition: background .225s ease, color .225s ease, border-color .225s ease, box-shadow .225s ease, transform .225s ease;
-}
-.patient-auth .auth-submit:not(:disabled):hover {
-  color: var(--button-primary-text);
-  background: var(--button-primary-hover-bg);
-  border-color: var(--button-primary-hover-bg);
-  box-shadow: var(--button-primary-shadow);
-}
-.patient-auth .auth-submit:focus-visible {
-  outline: 2px solid var(--medical-mint);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--medical-deep);
-}
-:root body .patient-auth :is(input:not(:where([type='button'], [type='submit'], [type='reset'], [type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='image'], [type='hidden'])), textarea, select) {
+:root body :is(input:not(:where([type='button'], [type='submit'], [type='reset'], [type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='image'], [type='hidden'])), textarea, select) {
   background: var(--field-background);
   color: var(--medical-deep);
   caret-color: var(--medical-deep);

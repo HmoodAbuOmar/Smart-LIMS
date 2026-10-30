@@ -1,0 +1,13 @@
+/* Patient-file choices reuse the authentication surfaces and controls. */
+.patient-file-options .patient-choice-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--medical-border-light);
+  border-radius: 12px;
+  background: var(--medical-mint);
+  color: var(--medical-green);
+}
+.patient-file-options .patient-choice-icon svg { display: block; }
+.patient-file-options .patient-choice-action { margin-block-start: 4px; }

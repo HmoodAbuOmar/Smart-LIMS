@@ -1,3 +1,5 @@
 .smartlims-approved-logo { object-fit: contain; filter: brightness(0) invert(1); }
 .brand .landing-brand-logo { display: block; width: 150px; height: 64px; object-fit: contain; }
 .showcase-brand .showcase-approved-logo { display: block; width: 110px; height: 55px; object-fit: contain; }
+.portal-report .portal-report-brand { background: var(--medical-deep); color: var(--medical-mint); padding: 14px 18px; border-radius: 10px; }
+.portal-report .portal-report-brand p { color: var(--medical-mint); }
