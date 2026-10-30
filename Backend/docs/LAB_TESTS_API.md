@@ -1,8 +1,36 @@
 # Lab Tests API
 
-Traceability: R-CAT-01 and R-NFR-01; existing slice T-CAT-00 in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). Parameters (R-CAT-02; T-CAT-01/02/03) and reference ranges (R-CAT-03; T-REF-01/02/03) remain planned. Extend this contract and close their decisions before implementing them; the existing endpoints below do not manage either feature.
+Traceability: R-CAT-01/R-CAT-02 and R-NFR-01 in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). Stage 4 implements the approved parameter slice below; automatic reference_ranges remains deferred. No clinical definitions/ranges are seeded.
 
-Implemented catalog endpoints use `/api/lab-tests` and JSON. Test Parameters and Reference Ranges are separate modules. Schema names follow `DATABASE_DESIGN.md` (`active`, not `is_active`). Flyway V4 defines the base catalog and remains unchanged.
+Stage 4 approved decisions: [RESULTS_API.md](RESULTS_API.md) governs manual references/
+flags and publication. Existing sampleType is descriptive, not compatibility.
+Patient result filters use current catalog categories; order snapshots remain original.
+
+## Stage 4 parameter contract (approved 2026-10-29)
+
+Reuse the same lab_tests UUIDs and retained FKs. ADMIN alone creates/replaces
+definitions; ADMIN/RECEPTIONIST/LAB_TECHNICIAN may list them (no patient parameter
+endpoint). GET/POST /api/lab-tests/{testId}/parameters and PUT
+/api/lab-tests/{testId}/parameters/{id}. GET uses page/size and includeInactive=true
+for staff; default active-only; displayOrder/code/UUID ascending. Definition fields:
+id,labTestId,code,name,resultType=NUMERIC/TEXT,unit nullable,method nullable,
+displayOrder>=0,required,active,version,createdAt,updatedAt. Create body has code,
+name,resultType,unit,method,displayOrder,required,active; optional expectedVersion
+must be absent/null. PUT additionally requires expectedVersion>=0 and preserves
+code/test identity. Code normalized uppercase [A-Z0-9][A-Z0-9_-]{0,29}, unique per
+test including inactive; name<=150 nonblank, unit<=40, method<=100, strict strings/
+integers/booleans, no unknown fields. Used definitions cannot have clinical fields
+rewritten: retain/deactivate and create a new stable code instead; active may change.
+Snapshot rows in already-created drafts/publications never follow catalog changes.
+No deletion/seeding or automatic clinical ranges. Current category vocabulary/
+assignment behavior and original order snapshots remain unchanged. Standard errors:
+404 LAB_TEST_NOT_FOUND/PARAMETER_NOT_FOUND; 409 PARAMETER_CHANGED,
+PARAMETER_IN_USE, PARAMETER_CODE_CONFLICT; strict invalid fields→400.
+
+Implemented catalog endpoints use `/api/lab-tests` and JSON. Schema names follow
+DATABASE_DESIGN.md (`active`, not `is_active`). V4 remains unchanged. Old parameter/
+reference planning statements below are superseded for this Stage 4 manual-reference
+slice by RESULTS_API.md; automatic reference_ranges remains deferred.
 
 Stage 1 catalog implementation (2026-10-28): POST/PUT accept category arrays persisted through the Task 2 `LabTest.categories` mapping and V6 table. PUT replaces the complete set; PATCH status preserves assignments. Every test response includes the full array in contract order, or `[]`. V1-V6 are unchanged. Task 4 adds singular category membership filtering and patient active-only list visibility. Task 5 enforces patient active-only details, returning the same 404 as a missing test for inactive records while retaining staff access. Storage, assignment, list, and final detail/regression verification are recorded separately in [TESTING.md](TESTING.md).
 

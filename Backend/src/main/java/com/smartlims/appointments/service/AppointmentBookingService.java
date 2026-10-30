@@ -46,7 +46,7 @@ public class AppointmentBookingService {
         var type=types.findById(typeId).filter(AppointmentType::isActive).orElseThrow(()->AppointmentException.conflict("APPOINTMENT_TYPE_UNAVAILABLE"));
         var slot=slots.findForUpdate(slotId).orElseThrow(()->AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE"));
         var now=Instant.now();
-        if(!slot.isActive()||!slot.getStartsAt().isAfter(now)||appointments.countBySlot_IdAndStatus(slotId,AppointmentStatus.CONFIRMED)>=slot.getCapacity()||appointments.patientConflict(order.getPatient().getId(),slotId,null))throw AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE");
+        if(!slot.isActive()||!slot.getStartsAt().isAfter(now)||appointments.countActiveBySlot(slotId)>=slot.getCapacity()||appointments.patientConflict(order.getPatient().getId(),slotId,null))throw AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE");
         var appointment=appointments.saveAndFlush(new Appointment(order,slot,type,account,key));entities.refresh(appointment);
         return new AppointmentResponses.Booking(AppointmentMapping.detail(appointment,now),true);
     }
@@ -60,6 +60,6 @@ public class AppointmentBookingService {
         return availability.available(order.getPatient().getId(),null,null,query);
     }
     private void requireBookable(TestOrder order) {
-        if(order.getStatus()!=OrderStatus.PENDING || appointments.existsByOrder_IdAndStatus(order.getId(),AppointmentStatus.CONFIRMED))throw AppointmentException.conflict("ORDER_NOT_BOOKABLE");
+        if(order.getStatus()!=OrderStatus.PENDING || appointments.existsActiveOrder(order.getId()))throw AppointmentException.conflict("ORDER_NOT_BOOKABLE");
     }
 }

@@ -70,7 +70,7 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         for (Role role : Role.values()) {
             UserAccount account = active(role.name().toLowerCase(Locale.ROOT), role);
             actors.put(role, account);

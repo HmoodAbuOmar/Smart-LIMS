@@ -77,7 +77,7 @@ abstract class AppointmentTestSupport extends IsolatedPostgresTest {
 
     @BeforeEach
     void workflowFixtures() {
-        jdbc.execute("TRUNCATE TABLE appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             var account = account(role.name().toLowerCase(Locale.ROOT), role);
             actors.put(role, account);

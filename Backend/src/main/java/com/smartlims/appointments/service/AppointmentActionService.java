@@ -52,7 +52,7 @@ public class AppointmentActionService {
         var now=Instant.now().truncatedTo(ChronoUnit.MICROS);requireMove(a,now);
         if(oldId.equals(targetId))return AppointmentMapping.detail(a,now);
         var target=slots.findById(targetId).orElseThrow(()->AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE"));
-        if(!target.isActive()||!target.getStartsAt().isAfter(now)||appointments.countBySlot_IdAndStatus(targetId,AppointmentStatus.CONFIRMED)>=target.getCapacity()||appointments.patientConflict(a.getOrder().getPatient().getId(),targetId,key))throw AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE");
+        if(!target.isActive()||!target.getStartsAt().isAfter(now)||appointments.countActiveBySlot(targetId)>=target.getCapacity()||appointments.patientConflict(a.getOrder().getPatient().getId(),targetId,key))throw AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE");
         history.save(new AppointmentReschedule(a,target,account,now));a.move(target);appointments.flush();entities.refresh(a);
         return AppointmentMapping.detail(a,now);
     }
@@ -62,6 +62,7 @@ public class AppointmentActionService {
         if(account.getRole()!=Role.PATIENT && body.reason()==null)throw AppointmentException.invalid("reason");
         var a=locked(account,key);
         if(a.getStatus()==AppointmentStatus.CANCELLED)return AppointmentMapping.detail(a,Instant.now());
+        if(a.getStatus()!=AppointmentStatus.CONFIRMED)throw AppointmentException.conflict("APPOINTMENT_NOT_CHANGEABLE");
         slots.findForUpdate(a.getSlot().getId()).orElseThrow(()->AppointmentException.missing("APPOINTMENT_SLOT"));
         var now=Instant.now().truncatedTo(ChronoUnit.MICROS);
         if(!a.getSlot().getStartsAt().isAfter(now))throw AppointmentException.conflict("APPOINTMENT_NOT_CHANGEABLE");

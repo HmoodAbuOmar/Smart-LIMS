@@ -1,5 +1,16 @@
 # Appointments API
 
+Stage 4 integration (DONE 2026-10-30; final isolated suite 319/319): actual arrival
+through VISITS_API.md records CHECKED_IN; administrative visit close records
+COMPLETED; ADMIN/RECEPTIONIST may mark an unvisited CONFIRMED appointment NO_SHOW
+at/after slot end. Active capacity/order membership now means CONFIRMED or
+CHECKED_IN. Only future CONFIRMED appointments retain direct reschedule/cancel
+eligibility. Visit states are retained, never inferred from time; NO_SHOW and
+COMPLETED release capacity. Upcoming remains future CONFIRMED, Past its complement.
+All changes use a new V9 migration and existing order→coordination→appointment→slot
+locking. Old Stage 3 two-state/deferral statements below are historical for that
+stage and are superseded only by this expressly authorized visit foundation.
+
 Status: Stage 3 DONE, 2026-10-29. All documented endpoints/rules are implemented.
 One complete isolated `.\mvnw.cmd test` invocation passed 273 tests across 34 suites,
 zero failures/errors/skips, finished 23:16:44 +02:00. See

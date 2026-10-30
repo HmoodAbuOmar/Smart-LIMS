@@ -25,6 +25,12 @@ public class Appointment {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "cancelled_by") private UserAccount cancelledBy;
     @Column(name = "cancelled_at") private Instant cancelledAt;
     @Column(name = "cancellation_reason", columnDefinition = "text") private String cancellationReason;
+    @Column(name="checked_in_at") private Instant checkedInAt;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="checked_in_by") private UserAccount checkedInBy;
+    @Column(name="completed_at") private Instant completedAt;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="completed_by") private UserAccount completedBy;
+    @Column(name="no_show_at") private Instant noShowAt;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="no_show_by") private UserAccount noShowBy;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     public Appointment(TestOrder order, AppointmentSlot slot, AppointmentType type, UserAccount actor, UUID key) {
@@ -32,6 +38,9 @@ public class Appointment {
         this.typeNameSnapshot = type.getName(); this.createdBy = actor; this.idempotencyKey = key;
     }
     public void move(AppointmentSlot target) { this.slot = target; }
+    public void checkIn(UserAccount actor,Instant at){status=AppointmentStatus.CHECKED_IN;checkedInBy=actor;checkedInAt=at;}
+    public void completeVisit(UserAccount actor,Instant at){status=AppointmentStatus.COMPLETED;completedBy=actor;completedAt=at;}
+    public void noShow(UserAccount actor,Instant at){status=AppointmentStatus.NO_SHOW;noShowBy=actor;noShowAt=at;}
     public void cancel(UserAccount actor, Instant at, String reason) {
         status = AppointmentStatus.CANCELLED; cancelledBy = actor; cancelledAt = at; cancellationReason = reason;
     }

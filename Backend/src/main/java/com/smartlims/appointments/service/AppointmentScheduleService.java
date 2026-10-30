@@ -55,7 +55,7 @@ public class AppointmentScheduleService {
     public AppointmentResponses.Slot updateSlot(Authentication actor,String id,@NotNull @Valid AppointmentRequests.SlotUpdate body) {
         access.current(actor,Role.ADMIN,Role.RECEPTIONIST); var key=AppointmentQuery.uuid(id,"id");
         slots.lockSchedule(); var slot=slots.findForUpdate(key).orElseThrow(()->AppointmentException.missing("APPOINTMENT_SLOT"));
-        long count=appointments.countBySlot_IdAndStatus(key,AppointmentStatus.CONFIRMED);
+        long count=appointments.countActiveBySlot(key);
         if (body.capacity()<count) throw AppointmentException.conflict("APPOINTMENT_SCHEDULE_CONFLICT");
         slot.setCapacity(body.capacity()); slot.setActive(body.active()); slots.flush();
         return AppointmentMapping.slot(slot,count);
@@ -64,6 +64,6 @@ public class AppointmentScheduleService {
     public AppointmentResponses.Page<AppointmentResponses.Slot> schedule(Authentication actor,AppointmentQuery query) {
         access.current(actor,Role.ADMIN,Role.RECEPTIONIST); var range=query.range();
         Specification<AppointmentSlot> filter=(r,q,c)->c.and(c.greaterThanOrEqualTo(r.get("startsAt"),range[0]),c.lessThan(r.get("startsAt"),range[1]));
-        return AppointmentMapping.page(AppointmentPages.find(slots,filter,query,Sort.by("startsAt","id")), s->AppointmentMapping.slot(s,appointments.countBySlot_IdAndStatus(s.getId(),AppointmentStatus.CONFIRMED)));
+        return AppointmentMapping.page(AppointmentPages.find(slots,filter,query,Sort.by("startsAt","id")), s->AppointmentMapping.slot(s,appointments.countActiveBySlot(s.getId())));
     }
 }

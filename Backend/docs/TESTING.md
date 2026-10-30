@@ -1,5 +1,166 @@
 # Database-backed test setup
 
+## Stage 4 verification (2026-10-30)
+
+Branch backend-hmood. Initial pending-decision documentation is preserved; the
+owner approved S4-RES-D01–D05 on 2026-10-29. Before coding, inspected V4/V6/V7/V8,
+LabTest/OrderItem mappings and retained FKs, catalog/order repositories and their
+snapshot/persistence/migration tests. No parallel catalog was introduced.
+
+Independently reverified the saved disposable PostgreSQL 16 cluster: pg_ctl and
+loopback listener PID 17724; psql confirmed smartlims_auth_regression, postgres,
+127.0.0.1:55432 and actual data_directory
+C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df,
+matching saved SMARTLIMS_TEST_POSTGRES_DATA and process -D. Development service
+PID 5464 is separate and was not accessed. Unchanged local Maven mapping/Surefire
+guard selects only that isolated URL. Synthetic data and fake email; compatibility
+tests create/drop only their own guarded smartlims_migration_* databases.
+
+Task 20 initial focused command:
+`.\mvnw.cmd '-Dtest=LaboratoryFoundationTest,AppointmentMigrationTest' test`.
+6/6, zero failures/errors/skips, BUILD SUCCESS, exit 0; 41.615 s; finished
+2026-10-30 00:03:10 +02:00. Verified fresh/upgrade V9 migrations, all new ORM
+mappings, existing catalog/parameter identity and retained FKs, role/input/revision
+checks, explicit reviewer allowlist and current-role/eligibility enforcement.
+Additional used-definition/V8-row preservation evidence follows. No full-suite
+or deployment claim yet; V1–V8 and existing dependency versions are unchanged.
+
+Task 20 completion: `.\mvnw.cmd '-Dtest=LaboratoryFoundationTest,ResultMigrationTest' test`
+— 6/6, zero failures/errors/skips, BUILD SUCCESS, exit 0; 34.882 s; finished
+2026-10-30 00:05:07 +02:00. Used-definition immutability/deactivation and invalid
+value-type constraint verified. V8-to-V9 upgrade retained actual synthetic catalog,
+categories, patient/order/item, appointment type/slot/booking rows and every V1–V8
+migration metadata row; new clinical tables remain empty. Task 20 DONE.
+
+Task 21: `.\mvnw.cmd '-Dtest=VisitWorkflowTest,AppointmentBookingTest,AppointmentCancellationTest,AppointmentRescheduleTest' test`
+— 27/27 (6 new visit + 21 appointment), zero failures/errors/skips, BUILD SUCCESS,
+exit 0; 52.868 s; finished 2026-10-30 00:10:15 +02:00. Real arrival/visit-item links,
+owned administrative detail, actual order visit availability, PENDING→IN_PROGRESS,
+CHECKED_IN shared occupancy/direct-action blocking, visit/appointment completion
+without invented result completion, no-show end/visited guards, exact creation
+retry, cross-order/role/ownership rejection, arrival-versus-cancel and aggregate
+rollback pass. Task 21 DONE; no full-stage/deployment claim.
+
+Task 22: `.\mvnw.cmd '-Dtest=SampleWorkflowTest' test` — 5/5, zero
+failures/errors/skips, BUILD SUCCESS, exit 0; 38.566 s; finished 2026-10-30
+00:14:04 +02:00. Explicit receipt/suitability and actual visit/item links,
+separate nullable collection time, clinical authority, cross-order rejection,
+required rejection reasons, retained receipt/replacement history, exact creation
+retry, concurrent receipt and receipt/attestation rollback pass. Task 22 DONE.
+
+Task 23: `.\mvnw.cmd '-Dtest=ResultDraftTest' test` — 5/5, zero failures/
+errors/skips, BUILD SUCCESS, exit 0; 39.263 s; finished 2026-10-30 00:19:37 +02:00.
+Verified existing parameter/unit/method/required snapshots do not follow catalog
+changes, decimal values and explicitly supplied references/flags, real visit/
+definition prerequisites, technician-only authorship, patient staff-route denial,
+strict JSON, exact retry, concurrent creation/value-only edits, incomplete parameter
+sets and transaction rollback. Task 23 DONE.
+
+Task 24: `.\mvnw.cmd '-Dtest=ResultPublicationTest' test` — 10/10, zero
+failures/errors/skips, BUILD SUCCESS, exit 0; 41.890 s; finished 2026-10-30
+00:23:13 +02:00. Independent explicit reviewer policy (including author role change),
+required measurements and received/attested specimen prerequisites, approval
+invalidation/protected evidence, immutable published patient/value/specimen/
+attribution snapshots and SQL child/event guards, reasoned corrections/retry/current
+swap, all-item/all-visit order completion, publication/visit-close and approval/
+rejection contention, atomic replacement rollback pass. Task 24 DONE.
+
+Task 25: `.\mvnw.cmd '-Dtest=PatientResultListTest' test` — 5/5, zero failures/
+errors/skips, BUILD SUCCESS, exit 0; 38.927 s; finished 2026-10-30 00:26:01 +02:00.
+Tab membership/pre-visit pending, per-item/repeated-test identity, publication date/
+actions, real visit linkage, correction draft/current publication, cancelled pending
+omission/published retention, literal percent/underscore/backslash search, current
+multi-category filtering/unique totals, paging/large offsets, strict queries,
+ownership/profile absence and clinical-only staff queue pass. Task 25 DONE.
+
+Task 26: initial PatientResultReportTest runs passed 4/4 at 00:34:55 (44.039 s)
+and 00:39:01 (1:06), but visual review rejected Arabic shaping despite successful
+Unicode extraction/font embedding. Diagnostic typography rendering isolated the
+bundled font's shared default GSUB/KUR language-table offset. Selecting that exact
+default alias restored contextual joining; no font bytes or clinical content changed.
+Two intermediate local typography-test compilation failures (wrong diagnostic
+interface package at 00:47:36, UTF-8 BOM at 00:52:28) were corrected; neither was
+a passing verification or database test execution. Diagnostic-only render checks
+were not used to mark acceptance complete.
+
+Final focused command:
+`.\mvnw.cmd '-Dtest=ReportTypographyTest,PatientResultReportTest' '-Dsmartlims.report.qa-dir=tmp/pdfs' test`
+— **6/6**, zero failures/errors/skips, BUILD SUCCESS, exit 0; **38.846 s**;
+finished **2026-10-30 00:53:27 +02:00**. Owned published/superseded details/history,
+same-404 foreign/unpublished reports (including PDF Accept), complete snapshots,
+12-parameter multipage output/last content, XML escaping, embedded fonts,
+regular/bold lam-alef single-glyph regression, supplied local identity/logo and
+external/invalid-logo denial pass. Rendered and visually inspected both complete
+synthetic report pages plus the regular/bold Arabic ligature page: Arabic joining,
+mixed direction, labels, content, margins and page breaks accepted with no clipping.
+QA contains only synthetic data and is optional via the explicit property. Task 26
+DONE. Full-stage suite and deployment remain separate.
+
+Task 27 focused security/concurrency: `.\mvnw.cmd '-Dtest=LaboratoryConcurrencySecurityTest' test`
+— 3/3, zero failures/errors/skips, BUILD SUCCESS, exit 0; 33.721 s; finished
+2026-10-30 00:55:13 +02:00. Arrival/no-show contention leaves exactly one actual
+outcome/event, duplicate concurrent publication leaves one current version and
+publication event, cookie draft/review writes require CSRF, and disabling the
+reviewer invalidates the prior JWT before publication. Full suite follows after
+final source/contract review.
+
+Task 27 final verification: independently rechecked pg_ctl status, process -D,
+loopback listener and an explicit psql connection immediately before the full run.
+PostgreSQL 16.15 PID 17724, 127.0.0.1:55432/smartlims_auth_regression, postgres;
+actual data_directory matched saved SMARTLIMS_TEST_POSTGRES_DATA:
+C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df.
+Development service PID 5464 was distinct and untouched. The unchanged machine-local
+Maven/Surefire URL and isolation guard selected only this disposable instance.
+Compatibility tests used only their own guarded smartlims_migration_* databases.
+
+Ran directly from Backend, branch backend-hmood, after all production/test changes:
+
+```powershell
+.\mvnw.cmd test
+```
+
+**319 tests across 44 suites, 0 failures, 0 errors, 0 skips; BUILD SUCCESS, exit 0.**
+Finished **2026-10-30 01:02:18 +02:00**; Maven duration **3 minutes 31 seconds**.
+All 44 Surefire XML reports were freshly written (00:59:13–01:02:18), independently
+parsed and summed to 319/0/0/0. This is one green complete invocation on final code.
+No follow-up code fix/rerun was needed for this invocation. Earlier focused-run
+compile/visual issues remain explicitly recorded above, not erased by this pass.
+
+| Group | Suites | Passing tests |
+|---|---:|---:|
+| Existing appointments | 7 | 37 |
+| Existing authentication/provisioning/browser security | 7 | 55 |
+| Existing catalog | 6 | 43 |
+| Existing orders | 8 | 73 |
+| Existing patients/linking/migration compatibility | 5 | 64 |
+| Application context | 1 | 1 |
+| New Stage 4 laboratory/results/visits/specimens/reports | 10 | 46 |
+| Total | 44 | 319 |
+
+Stage acceptance review:
+
+| Requirement | Outcome |
+|---|---|
+| S4-RES-R01/R02 list and screen fields/actions | PASS: owned per-item tabs, pre-visit pending/cancelled omission/published retention, original names/current categories, literal search, deterministic unique counts/pages, zone report date and real action/visit eligibility. |
+| S4-RES-R03 published details/history/reports | PASS: same-404 ownership/unpublished concealment, complete snapshots, immutable versions/atomic replacement, superseded access, authorized PDF with supplied data, Arabic joining/bidi and accepted visual layout. |
+| S4-RES-R04 real visits | PASS: explicit staff-recorded selected-item links, one order/multiple visits, unique optional appointment, owned details and authorized publication links; no fabricated attendance/payment data. |
+| S4-RES-R05/R06 clinical workflow/foundations | PASS: ADMIN definitions, technician drafts, explicit independently authorized ADMIN review, approval invalidation, reasoned corrections, received/attested same-order specimen evidence and retained rejection/replacement events; no clinical seeds/automatic interpretation. |
+| S4-RES-R07 security/consistency | PASS: strict inputs/roles/ownership/CSRF/current eligibility; retry/stale-write/rollback and booking, arrival/cancel/no-show, edit/approve/publish/reject/visit-close contention; correct active capacity and all-items/all-visits order completion. |
+| S4-RES-R08 preservation/evidence | PASS: 273 existing plus 46 new cases green in the same full run. V8-to-V9 synthetic rows/FKs/history preserved. V1–V8, isolation guard and local Maven mapping unchanged. Exact manual HTTP bodies/routes in RESULTS_API.md. |
+
+Task 27 and Stage 4 DONE. Diff/encoding/whitespace review passed, including all new
+text files. Existing test edits only extend explicit fixture cleanup and latest
+migration expectations; no behavioral assertions/guards were weakened. No frontend,
+Postman artifact/tool/client, unrelated stage, commit/push or deployment. Optional
+synthetic PDF QA files were removed after visual inspection; tests regenerate them
+only with the explicit QA property. The implementation plan remains local-only.
+
+Remaining handoff: owner manual HTTP checks/review/commit and environment deployment.
+No implementation blocker remains. Configure eligible reviewer ADMIN UUIDs explicitly;
+blank grants no clinical review. Clinical definitions/references/specimen attestations
+and optional identity/logo must be supplied by authorized people. No live HTTP-server
+flow, external email delivery or development/production V9 application is claimed.
+
 ## Stage 3 verification (2026-10-29)
 
 Current branch backend-hmood. The saved disposable PostgreSQL 16 cluster was stopped;

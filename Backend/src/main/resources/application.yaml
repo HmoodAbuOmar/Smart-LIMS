@@ -32,6 +32,11 @@ spring:
       "[mail.smtp.writetimeout]": 5000
 
 smartlims:
+  laboratory:
+    authorized-admin-ids: ${SMARTLIMS_LABORATORY_AUTHORIZED_ADMIN_IDS:}
+    report:
+      identity: ${SMARTLIMS_REPORT_LABORATORY_IDENTITY:}
+      logo-path: ${SMARTLIMS_REPORT_LOGO_PATH:}
   auth:
     jwt:
       secret-base64: ${AUTH_JWT_SECRET_BASE64}

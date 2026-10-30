@@ -1,6 +1,15 @@
 # Smart-LIMS Database Design
 
 Status: implemented-schema inventory plus carried-forward design for unimplemented features.
+Stage 4 approved design (2026-10-29): decisions S4-RES-D01–D05 supersede earlier
+pending/proposed paragraphs for this slice. See RESULTS_API.md, VISITS_API.md,
+SAMPLES_API.md and the Stage 4 storage section below. Stage 4 DONE, 2026-10-30:
+final isolated full suite 319 tests/44 suites, zero failures/errors/skips, finished
+01:02:18 +02:00. [Actual evidence](TESTING.md#stage-4-verification-2026-10-30).
+Owner review/manual checks/commit and deployment remain separate.
+No clinical ranges/definitions seeded; automatic reference_ranges remains deferred.
+Earlier pending-decision notes are superseded by approved S4-RES-D01–D05.
+V9 implements the agreed structures without historical clinical/visit backfill.
 Stage 3 update (2026-10-29): V8 and appointment APIs implement the owner-approved
 Asia/Jerusalem schedule, retained CONFIRMED/CANCELLED bookings, capacity/retry/history
 rules and atomic order-cancellation cascade. Stage 3 is DONE: final full isolated
@@ -16,9 +25,88 @@ Stage 2 Task 10 cancellation update: 2026-10-28; eligible role/ownership/state/r
 Stage 2 Task 6 design review: 2026-10-28; ORDERS_API.md and sections 4.7-4.8 reconcile order states, retry identity, snapshots and cancellation; no code, migration, test or database operation.
 Task 2 source update: 2026-10-28; V6 adds category persistence/mapping only. Verification is recorded separately in [TESTING.md](TESTING.md#task-2-category-persistence-verification-2026-10-28); this does not establish development/production migration status or future category API behavior.
 Requirements, decisions, task IDs and completion evidence: [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). The scope is confirmed; unimplemented column/state/workflow proposals still require the applicable decision and API contract before coding. This design is not evidence of deployed functionality.
-Planned results allow unfilled draft measurements and preserve required-parameter snapshots per version; results are not implemented yet.
-Migration integration: canonical source is V1-V8. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. Later migration source/isolated-test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
+Results allow unfilled draft measurements and preserve required-parameter snapshots; only reviewed publications are patient-visible.
+Migration integration: canonical source is V1–V9. Saved operator evidence records V1-V5 development reconciliation completed on 2026-10-26; earlier pending-reconciliation wording is obsolete for that recorded state. Later migration source/isolated-test execution is separate from that historical development evidence. See section 1.1 for evidence and limits.
 Intended repository path: `Backend/docs/DATABASE_DESIGN.md`.
+
+## Stage 4 storage and relationship trace (approved 2026-10-29)
+
+V9__results_visits_samples.sql is additive; V1–V8 remain unchanged. The detailed
+RESULTS_API.md, VISITS_API.md and SAMPLES_API.md contracts supersede old proposed
+clinical/reference/visit paragraphs for this slice. Isolated verification passed;
+V9 is not claimed applied to development/production databases.
+
+| Existing relationship inspected before coding | Stage 4 reuse |
+|---|---|
+| V4 lab_tests.id, code/name/availability/sampleType and LabTest entity | Canonical test identity; no second test table. sampleType remains descriptive. |
+| V6 lab_test_categories FK/membership + LabTestCategory enum | Current seven-category filter, no historical backfill. |
+| V7 order_items.lab_test_id retained FK, OrderItem @Immutable snapshots, OrderItem→TestOrder→Patient | Ordered-test/result identity and immutable original name/code/price. All existing items required. |
+| LabTestRepository shared snapshot/write locks, order creation transactions, catalog/order persistence/migration tests | Same catalog locking conventions; new parameter snapshot creation takes existing shared catalog lock. |
+| V8 appointments FKs, state/cancellation checks, partial active-order index, coordination lock | New migration expands constraints/states; no V8 rewrite. CHECKED_IN still consumes capacity. |
+
+New tables, all retained NO ACTION FKs:
+
+- test_parameters: existing lab_test_id; stable unique(test,code), NUMERIC/TEXT,
+  name/unit/method/display-order/required/active, optimistic version and timestamps.
+  ADMIN manages definitions. Once used, clinical fields are immutable; active may
+  change. No automatic reference_ranges table or clinical seeds.
+- visits: existing order_id, optional unique appointment_id, VIS- sequence number,
+  OPEN/COMPLETED, supplied actual arrival/completion and authenticated recording/
+  completion actors; version/timestamps; durable creator/key/hash retry identity.
+  visit_items retains selected existing order item IDs, PK(visit,item), reverse
+  item index. Same-order membership checked under the order lock.
+- samples: visit_id (order/patient derived from real visit), SMP- sequence barcode,
+  REGISTERED/RECEIVED/REJECTED, type/container, nullable actual collection time,
+  receipt/rejection actor/time/reason, retained optional replacement FK, row version
+  and creator/key/hash. No invented collection location or compatibility rule.
+- specimen_attestations: positive explicit sample/item suitability, original actor/
+  time, unique(sample,item). Require received specimen and actual same-order visit
+  membership; no automatic clinical matching.
+- test_results: existing order_item_id, DRAFT/APPROVED/PUBLISHED, clinical version
+  number distinct from optimistic version, previous publication FK/reason,
+  is_current marker, author and approved/published actor/time/name snapshots,
+  measurement time, patient name/number/DOB snapshots, patient-facing explanation,
+  serialized JSON specimen snapshots (TEXT with JSON-array CHECK), original retry
+  identity. Partial unique current and partial unique DRAFT/APPROVED per item;
+  unique(item,clinical version), retained previous_result_id, no author self-approval.
+- result_values: result and existing parameter FKs; independent definition/type/
+  unit/method/requiredness/order snapshots; decimal NUMERIC(38,12) values and supplied
+  bounds, comparator/text/reference/flag/notes; unique(result,parameter), strict
+  value/type/null/comparator/finite/range checks. Optional unreported rows stay NULL.
+- result_specimens: retained result/sample FKs, PK(result,sample), reverse sample
+  index. Same-order eligibility/attestation verified under shared order lock.
+  Approval stores exact specimen/visit/receipt/attestation snapshots; publication
+  rechecks eligibility without rewriting approved evidence.
+- laboratory_events: append-only workflow-local history, exactly one result/sample/
+  visit/appointment FK, event kind, authenticated actor/name snapshot, occurred and
+  recorded times, optional reason. This is required lifecycle evidence, not an
+  unrelated general audit subsystem. SQL prevents UPDATE/DELETE of events.
+
+SQL also protects published parent and child content; only the old current marker,
+technical version/update time may change on supersession. FK retention prevents
+history loss. Approval/publication metadata and specimen snapshot consistency are
+checked. Service constraints cover complete expected parameters, current eligibility,
+same-order links, historical author/editor self-approval and aggregate completion.
+
+Transactions: creation retries take a PostgreSQL transaction advisory identity lock
+(operation,creator,key) before any order lock; hash collisions only serialize extra
+work. All clinical/visit writes then lock the existing order. Result/sample/visit
+rows follow; parameter snapshots take catalog locks last. Definition management
+locks catalog only and never acquires an order afterwards. No account/patient row
+lock is acquired after order. Appointment-affecting visit writes preserve
+order→coordination→appointment→slot order. Arrival/cancellation/no-show and
+publish/edit/reject/visit-close races serialize; no independent commits or capacity
+counters. CONFIRMED/CHECKED_IN count capacity; COMPLETED/NO_SHOW/CANCELLED release it.
+Patient overlap checks remain valid because all published slots are non-overlapping.
+
+Publication flushes the old current marker before setting the new one inside one
+transaction; no intermediate state is committed. Reconsider order completion on
+publication and visit close: every existing item needs a current publication and
+every visit must be closed. Correction drafts leave old publications current.
+No order reopening or published recall policy is invented. Rejection of protected
+approved/published specimen evidence conflicts; invalidate an unpublished approval
+first. Reports read retained authorized data in a consistent read transaction,
+with current/superseded labelling, never live clinical definitions.
 
 ## 1. Scope and implementation status
 
@@ -32,12 +120,10 @@ This document inventories the current schema and preserves the proposed database
 - Patient name, birth date, gender, and phone are required; address is optional; phone numbers are not unique.
 - Initial monetary currency: ILS.
 - Payments are recorded manually or by external transaction reference; no payment gateway is included in this baseline.
-- The original inventory lists 22 business tables; 10 are now implemented, 10 remain
-  planned for core workflow, two are deferred for AI. Stage 3 also adds supporting
-  appointment_types and appointment_reschedules (12 implemented business/support
-  tables total). appointment_coordination, flyway_schema_history and the patient/
-  order sequences are technical objects. Isolated verification does not establish
-  development/production migration status.
+- V1–V9 implement 21 business/support tables; appointment_coordination,
+  flyway_schema_history and sequences are technical. Payments, automatic reference
+  matching, notifications, general audit and AI remain outside this stage.
+  Isolated verification does not establish development/production migration status.
 - V1–V7 implement users, email_action_tokens, patients, lab_tests, patient_link_tokens,
   lab_test_categories, test_orders and order_items. V8 adds appointment_types,
   appointment_slots, appointments, appointment_reschedules and technical coordination.
@@ -57,6 +143,7 @@ This document inventories the current schema and preserves the proposed database
 | V6__lab_test_categories.sql | Empty category assignment table; composite PK, catalog FK, seven-value CHECK, reverse membership index | R-CAT-01/R-NFR-01; Stage 1 Task 2; isolated-test evidence in TESTING.md |
 | V7__orders.sql | Order sequence, headers/items, retry uniqueness, snapshot/cancellation checks, retained FKs and lookup indexes | R-ORD-01/R-NFR-01; Stage 2 Task 7; isolated-test evidence in TESTING.md |
 | V8__appointments.sql | Types, explicit non-overlapping slots, coordination, retained appointments/retry/cancellation and reschedule history | S3-APT-R01–R07; Stage 3 Tasks 13–18; isolated-test evidence in TESTING.md |
+| V9__results_visits_samples.sql | Existing-test parameters, actual visits/items, specimens/attestations, immutable result versions/values/specimen links, workflow events and additive appointment visit states | S4-RES-R01–R08; Stage 4 Tasks 20–27; isolated evidence in TESTING.md |
 
 The private `Smart-LIMS-DB-Backups` directory retains `reconciliation-result-20261026-221059.json`, `flyway-before-20261026-221059.csv`, `flyway-after-20261026-221059.csv`, `validation-normal-20261026-221059.log`, and the backup archive. These are historical operator artifacts, inspected as files only in this review:
 
@@ -72,7 +159,7 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 - Table/column names use snake_case.
 - `Nullable: No` means NOT NULL; primary keys are inherently NOT NULL.
 - Every standalone `id` is UUID, generated following the existing application convention.
-- `result_samples` and `lab_test_categories` use composite primary keys.
+- result_specimens, visit_items and lab_test_categories use composite primary keys.
 - All event timestamps use TIMESTAMPTZ. Display times using Asia/Jerusalem where appropriate.
 - `created_at` defaults to CURRENT_TIMESTAMP. `updated_at` defaults to CURRENT_TIMESTAMP on insertion and must be updated by the application on subsequent writes; a DEFAULT alone does not maintain it.
 - Money uses NUMERIC(12,2) and BigDecimal. Laboratory numeric values use NUMERIC; reject NaN and infinity at the input boundary.
@@ -90,24 +177,28 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 2 | `email_action_tokens` | Implemented V1 | Account verification/invitation tokens; RESET_PASSWORD is allowed by the schema but current recovery uses users fields. |
 | 3 | `patients` | Implemented V3 | Laboratory patient profiles. A profile may exist without a login account. |
 | 4 | `lab_tests` | Implemented V4 | Orderable laboratory tests, their current prices, and preparation instructions. |
-| 5 | `test_parameters` | Planned; T-CAT-02/03 | Individual measurements within a test, such as WBC or HGB within CBC. |
+| 5 | `test_parameters` | Implemented V9 | ADMIN-managed NUMERIC/TEXT definitions on existing tests. |
 | 6 | `reference_ranges` | Planned; T-REF-02/03 | Approved numeric or textual reference ranges by parameter, age, sex, and validity period. |
 | 7 | `test_orders` | Implemented V7; Stage 2 Task 7 persistence only | The main laboratory order belonging to a patient. |
 | 8 | `order_items` | Implemented V7; Stage 2 Task 7 persistence only | The individual tests selected within an order, including historical name and price snapshots. |
 | 9 | `appointment_slots` | Stage 3 V8; verified DONE | Explicit shared-capacity non-overlapping booking periods. |
-| 10 | `appointments` | Stage 3 V8; verified DONE | Retained order-linked bookings; one CONFIRMED per order. |
+| 10 | `appointments` | V8/V9 | Retained bookings/visit states; one CONFIRMED or CHECKED_IN per order. |
 | 11 | `payments` | Planned; T-PAY-02/03 | Payment and refund records. This design does not integrate a payment gateway. |
-| 12 | `samples` | Planned; T-SMP-02/03 | Physical samples collected for an order, including receipt, rejection, and replacement tracking. |
-| 13 | `sample_tests` | Planned; T-SMP-02 | Many-to-many links between physical samples and ordered tests. |
-| 14 | `test_results` | Planned; T-RES-02 to T-RES-05 | Result versions for one ordered test, with validation, publication, and correction history. |
-| 15 | `result_samples` | Planned; T-RES-02 | The exact sample-to-test links used by each result version. |
-| 16 | `result_values` | Planned; T-RES-02/03 | Individual measured values and historical parameter/reference snapshots within a result version. |
+| 12 | `samples` | Implemented V9 | Real visit-linked registration/receipt/rejection/replacement. |
+| 13 | `specimen_attestations` | Implemented V9 | Explicit suitable specimen/item links with actor/time. |
+| 14 | `test_results` | Implemented V9 | Independent approval/publication and corrections per item. |
+| 15 | `result_specimens` | Implemented V9 | Retained exact specimens per result version. |
+| 16 | `result_values` | Implemented V9 | Values and historical manual-reference/definition snapshots. |
 | 17 | `notifications` | Planned; T-NTF-02/03 | User notifications and delivery/retry state. |
 | 18 | `audit_logs` | Planned; T-AUD-02/03 | Append-only records of important business actions. |
 | 19 | `symptom_assessments` | Deferred AI; T-AI-01 | Patient symptom-analysis sessions for the later test-suggestion feature. |
 | 20 | `suggested_tests` | Deferred AI; T-AI-01 | Laboratory tests suggested by a symptom assessment. |
 | 21 | `patient_link_tokens` | Implemented V5 | Short-lived, single-use capabilities for verified patient account/profile linking. |
 | 22 | `lab_test_categories` | Implemented V6; Stage 1 Task 2 | Zero-to-many fixed category assignments per test; composite key prevents duplicate membership. Task 3 implements assignment/response arrays; Task 4 implements membership filtering and patient list availability. |
+
+Additional implemented tables: appointment_types, appointment_reschedules (V8),
+visits, visit_items and laboratory_events (V9). The latter is workflow history,
+not the wider proposed audit_logs subsystem.
 
 ## 4. Table specifications
 
@@ -253,7 +344,7 @@ Implementation status: implemented in main's unchanged V4__lab_tests.sql. The cu
 **Rules and relationships**
 
 - Implemented: code is trimmed/uppercased and constrained to the LAB_TESTS_API format; currency is ILS. ADMIN writes; staff lists include either state, while PATIENT lists are active-only and reject active=false with 403. Task 5 enforces PATIENT active-only detail access: inactive and missing records return the same 404; staff retain inactive details. PUT preserves availability; PATCH changes it. No delete endpoint exists.
-- Planned R-CAT-02: a simple test has one parameter; a panel has multiple parameters. The current basic catalog does not enforce a parameter count because parameters are not implemented.
+- Stage 4 parameters reuse this catalog identity. One ordered item may contain many parameters; no clinical definitions or minimum panel size are inferred.
 - price must be >= 0. Use NUMERIC(12,2) and Java BigDecimal for money. Initial currency is ILS. [S2]
 - sample_type is the default sample description; multiple required specimen types are handled by laboratory workflow in the initial scope.
 - Current catalog supports deactivation. V7 order items retain catalog references and code/name/price snapshots; Task 8 creation copies these under shared catalog locks.
@@ -287,9 +378,10 @@ Task 1 evidence remains the source/contract and screenshot review on 2026-10-27,
 
 ### 4.5. `test_parameters`
 
-Individual measurements within a test, such as WBC or HGB within CBC.
+Implemented V9; S4-RES-D01/D02 and LAB_TESTS_API.md govern definitions/snapshots.
 
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Individual ADMIN-supplied definitions within an existing test, with no clinical
+seeds. V9 also stores optimistic version BIGINT NOT NULL DEFAULT 0.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -299,21 +391,25 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 | `name` | `VARCHAR(150)` | No | - | Display name |
 | `result_type` | `VARCHAR(10)` | No | CHECK | NUMERIC or TEXT |
 | `unit` | `VARCHAR(40)` | Yes | - | Measurement unit |
-| `method` | `VARCHAR(100)` | Yes | - | Measurement or payment method |
+| `method` | `VARCHAR(100)` | Yes | - | Supplied measurement method |
 | `display_order` | `INTEGER` | No | CHECK >= 0 | Display sequence |
-| `is_required` | `BOOLEAN` | No | DEFAULT TRUE | Required for result validation |
-| `active` | `BOOLEAN` | No | DEFAULT TRUE | Availability state |
+| `is_required` | `BOOLEAN` | No | Explicit input | Required for result approval |
+| `active` | `BOOLEAN` | No | Explicit input | Availability state |
 | `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Last modification time |
 
 **Rules and relationships**
 
 - UNIQUE(lab_test_id, code). result_type is NUMERIC or TEXT. display_order must be >= 0.
-- is_required and active default to TRUE. Do not share one parameter row across different parent tests in the initial scope.
+- is_required and active are explicit ADMIN inputs. Do not share one parameter row across parent tests.
 - Use one unit and one method per parameter. Once used, a change that alters its meaning requires a new parameter and deactivation of the old one.
 - Historical result snapshots preserve the old display name, code, unit, method, value type, and ordering.
 
 ### 4.6. `reference_ranges`
+
+Deferred automatic-reference proposal, expressly excluded by S4-RES-D01.
+Stage 4 stores manually supplied references/flags in result_values. The following
+target is not implemented or authorized by this stage.
 
 Approved numeric or textual reference ranges by parameter, age, sex, and validity period.
 
@@ -449,17 +545,18 @@ capacity/cross-order patient overlap; SQL partial uniqueness guards active order
 
 ### 4.10. `appointments`
 
-Order-linked retained bookings, Stage 3 approved design. Active explicitly means
-CONFIRMED even after start. Only CONFIRMED/CANCELLED are stored in this stage.
+Order-linked retained bookings. V9 expands V8 with actual visit transitions.
+Active means CONFIRMED or CHECKED_IN, including after slot start; both consume
+capacity. CANCELLED/COMPLETED/NO_SHOW retain history without consuming capacity.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
 | `id` | `UUID` | No | PK | Record identifier |
-| `order_id` | `UUID` | No | FK test_orders.id; partial UNIQUE WHERE status=CONFIRMED | Parent laboratory order |
+| `order_id` | `UUID` | No | FK test_orders.id; partial UNIQUE for CONFIRMED/CHECKED_IN | Parent laboratory order |
 | `slot_id` | `UUID` | No | FK appointment_slots.id | Selected booking period |
 | `type_id` | `UUID` | No | FK appointment_types.id | Retained appointment type |
 | `type_name_snapshot` | `VARCHAR(150)` | No | Trimmed nonblank | Original display name |
-| `status` | `VARCHAR(20)` | No | DEFAULT CONFIRMED; two-value CHECK | Business workflow state |
+| `status` | `VARCHAR(20)` | No | DEFAULT CONFIRMED; five-state CHECK | Business workflow state |
 | `version` | `BIGINT` | No | DEFAULT 0; >=0 | Optimistic revision |
 | `created_by` | `UUID` | No | FK users.id | Authenticated creator |
 | `idempotency_key` | `UUID` | No | UNIQUE(created_by,idempotency_key) | Durable original booking retry |
@@ -489,7 +586,20 @@ CONFIRMED even after start. Only CONFIRMED/CANCELLED are stored in this stage.
   never cancels order. Existing order-only cancellations behave as before.
 - Indexes cover order, slot/status, creator/key, type, cancellation actor and event
   actor/slots. Order patient indexes support owned lists; no child join duplication.
-- Visit transitions/general audit subsystem remain deferred. No clock-driven statuses.
+- V9 adds check-in/completion/no-show actor/time pairs with state checks.
+  Actual visit arrival/closure and explicit elapsed unvisited no-show are the
+  only new transition paths. No clock-driven transitions or general audit subsystem.
+
+### 4.10a. Real visits and visit_items (V9)
+
+Implemented; VISITS_API.md and the Stage 4 storage section define exact behavior.
+visits retains order_id and optional unique appointment_id, sequence visit_number,
+OPEN/COMPLETED status, version, actual arrival/completion times and recording/
+completing actors, timestamps and creator/key/hash. visit_items retains selected
+existing item IDs; PK(visit,item), same-order membership checked under order lock.
+Arrival starts IN_PROGRESS and checks in a linked CONFIRMED appointment. Visit
+closure completes that CHECKED_IN appointment; order completion additionally needs
+all current publications and all visits closed. No attendance backfill or payments.
 
 ### 4.11. `payments`
 
@@ -523,161 +633,54 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 - idempotency_key is required and UNIQUE. Retrying an identical operation returns the existing record; reusing the key with different data returns a conflict.
 - CONFIRMED records confirmed_by and confirmed_at. Confirmed transactions are immutable; refunds are new records. Cash can be recorded and confirmed in one transaction.
 
-### 4.12. `samples`
+### 4.12. samples (V9)
 
-Physical samples collected for an order, including receipt, rejection, and replacement tracking.
+Implemented; SAMPLES_API.md and V9 define exact columns/checks. samples retains
+visit_id; order/patient derive from the real visit. Server SMP- barcode, type/
+container, REGISTERED/RECEIVED/REJECTED state, nullable actual collected_at,
+receipt/rejection actors/times/reason, replaces_sample_id, creator/key/hash,
+version and timestamps. Creation does not assert collection or a collector.
+Replacements point to rejected same-order records. Receipt/suitability are explicit
+separate operations. Approved/published specimen evidence cannot be rewritten.
 
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+### 4.13. specimen_attestations (V9)
 
-| Column | PostgreSQL type | Nullable | Key / default | Meaning |
-|---|---|---|---|---|
-| `id` | `UUID` | No | PK | Record identifier |
-| `order_id` | `UUID` | No | FK test_orders.id | Parent laboratory order |
-| `barcode` | `VARCHAR(50)` | No | UNIQUE | Unique sample identifier |
-| `sample_type` | `VARCHAR(40)` | No | - | Sample type |
-| `container_type` | `VARCHAR(60)` | Yes | - | Tube or container description |
-| `status` | `VARCHAR(15)` | No | DEFAULT COLLECTED | Business workflow state |
-| `collected_by` | `UUID` | No | FK users.id | Sample collector |
-| `collected_at` | `TIMESTAMPTZ` | No | - | Collection time |
-| `received_by` | `UUID` | Yes | FK users.id | Sample receiver |
-| `received_at` | `TIMESTAMPTZ` | Yes | - | Receipt time |
-| `rejected_by` | `UUID` | Yes | FK users.id | Sample rejection actor |
-| `rejected_at` | `TIMESTAMPTZ` | Yes | - | Rejection time |
-| `rejection_reason` | `TEXT` | Yes | - | Rejection explanation |
-| `replaces_sample_id` | `UUID` | Yes | FK samples.id | Previous replaced sample |
-| `notes` | `TEXT` | Yes | - | Optional notes |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
-| `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Last modification time |
+Replaces the unimplemented sample_tests proposal. Retained sample_id/order_item_id,
+actor/time, unique(sample,item) record explicit positive suitability. Require
+RECEIVED status and actual visit membership of the same-order item. No automatic
+compatibility. Links/history survive rejection/replacement.
 
-**Rules and relationships**
+### 4.14. test_results (V9)
 
-- barcode is server-generated and unique. status is COLLECTED, RECEIVED, or REJECTED.
-- RECEIVED requires received_by and received_at. REJECTED requires rejected_by, rejected_at, and rejection_reason.
-- Receipt and rejection times cannot precede collected_at. Validate physical sample/container suitability for the ordered tests.
-- A replacement creates a new sample with replaces_sample_id pointing to the old one from the same order. Prevent self-reference and replacement cycles.
-- Do not validate a new result using a rejected sample. Keep old samples and result history rather than overwriting them.
+Implemented; RESULTS_API.md defines behavior. Retained order_item_id, clinical
+version_number, optimistic version, previous_result_id/correction_reason,
+DRAFT/APPROVED/PUBLISHED, is_current, author/review/publication actors and times/name
+snapshots, measured_at, patient name/number/birth-date snapshots, explanation,
+JSON specimen snapshots, creator/key/hash and timestamps. Unique(item,version),
+partial unique current and working versions. SQL guards immutable publications;
+services enforce independent review and eligible received/attested specimens.
+Editing approved content returns to DRAFT with retained events. Corrections need
+a reason/new review. Current swap is atomic under order lock. No VALIDATED state,
+automatic clinical reference selection or report_file_key; PDFs generate on demand.
 
-### 4.13. `sample_tests`
+### 4.15. result_specimens (V9)
 
-Many-to-many links between physical samples and ordered tests.
+Replaces the unimplemented result_samples/sample_test_id proposal. Composite
+PK(result_id,sample_id), retained FKs and reverse sample index. Same-order item/
+suitability and real visit membership are checked at approval/publication.
+Approval snapshots collection/receipt/attestation/visit evidence. Published links
+are immutable; replacements never silently alter them.
 
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+### 4.16. result_values (V9)
 
-| Column | PostgreSQL type | Nullable | Key / default | Meaning |
-|---|---|---|---|---|
-| `id` | `UUID` | No | PK | Record identifier |
-| `sample_id` | `UUID` | No | FK samples.id | Physical sample |
-| `order_item_id` | `UUID` | No | FK order_items.id | Ordered test item |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
-
-**Rules and relationships**
-
-- UNIQUE(sample_id, order_item_id). A sample can serve several items, and an item can use several samples.
-- The sample and order item must belong to the same order. Enforce this in the service transaction or with a database trigger; a cross-table CHECK is not sufficient. [S1]
-- Do not delete links referenced by result_samples. A replacement sample uses a new link.
-
-### 4.14. `test_results`
-
-Result versions for one ordered test, with validation, publication, and correction history.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
-
-| Column | PostgreSQL type | Nullable | Key / default | Meaning |
-|---|---|---|---|---|
-| `id` | `UUID` | No | PK | Record identifier |
-| `order_item_id` | `UUID` | No | FK order_items.id | Ordered test item |
-| `status` | `VARCHAR(15)` | No | DEFAULT DRAFT | Business workflow state |
-| `version_number` | `INTEGER` | No | CHECK > 0 | Result revision number |
-| `previous_result_id` | `UUID` | Yes | UNIQUE; FK test_results.id | Previous published revision |
-| `is_current` | `BOOLEAN` | No | DEFAULT FALSE | Current published revision marker |
-| `entered_by` | `UUID` | No | FK users.id | Result author |
-| `measured_at` | `TIMESTAMPTZ` | No | - | Relevant measurement time |
-| `validated_by` | `UUID` | Yes | FK users.id | Result validator |
-| `validated_at` | `TIMESTAMPTZ` | Yes | - | Validation time |
-| `published_by` | `UUID` | Yes | FK users.id | Result publisher |
-| `published_at` | `TIMESTAMPTZ` | Yes | - | Publication time |
-| `correction_reason` | `TEXT` | Yes | - | Reason for correction |
-| `patient_name_snapshot` | `VARCHAR(120)` | Yes | - | Patient name shown on report |
-| `patient_number_snapshot` | `VARCHAR(30)` | Yes | - | Patient number shown on report |
-| `birth_date_snapshot` | `DATE` | Yes | - | Birth date used for report |
-| `gender_snapshot` | `VARCHAR(10)` | Yes | - | Sex category used for report |
-| `explanation` | `TEXT` | Yes | - | Reviewed patient-facing explanation |
-| `report_file_key` | `TEXT` | Yes | - | Private report storage reference |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
-| `updated_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Last modification time |
-
-**Rules and relationships**
-
-- status values: DRAFT, VALIDATED, PUBLISHED. version_number > 0. UNIQUE(order_item_id, version_number).
-- Use a partial UNIQUE index ON (order_item_id) WHERE is_current, and another ON (order_item_id) WHERE status IN ('DRAFT', 'VALIDATED').
-- Results belong to an order item rather than a single sample link. result_samples records all used sample links. This is a project design decision informed by HL7 report/specimen separation, not an HL7 SQL requirement. [S5]
-- The first version has no previous_result_id. A correction references the latest published version for the same item, records a reason, and increments the version number.
-- Lock the order item during version allocation and publication to prevent concurrent draft creation or branching corrections.
-- Validation checks required parameters, eligible received samples, reference selection, and report snapshots. Record validated_by and validated_at.
-- Proposed: editing a VALIDATED version returns it to DRAFT and clears its validation metadata. Whether one technician may enter, validate, and publish must be resolved in D-RES before implementation; this proposal grants no new permission.
-- Publication requires validation. In one transaction, set the old published version is_current = FALSE and the new one TRUE. is_current implies status = PUBLISHED.
-- Published values, samples, snapshots, and publication metadata must not be overwritten. Only the current-version marker changes when superseded.
-- Patient name/number, birth date, and gender snapshots are required before publication. Validation/publication timestamps and actors are required for their respective states.
-- Patients access only their own published results. Historical versions must be clearly marked as superseded. report_file_key references a private authorized download.
-
-### 4.15. `result_samples`
-
-The exact sample-to-test links used by each result version.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
-
-| Column | PostgreSQL type | Nullable | Key / default | Meaning |
-|---|---|---|---|---|
-| `result_id` | `UUID` | No | Composite PK; FK test_results.id | Result version |
-| `sample_test_id` | `UUID` | No | Composite PK; FK sample_tests.id | Used sample-to-item link |
-
-**Rules and relationships**
-
-- PRIMARY KEY(result_id, sample_test_id). Each link must target the same order_item_id as the result.
-- A validated or published laboratory result requires at least one suitable received sample in this project scope.
-- Keep the exact sample links for each result version. Do not change published links when replacement samples are collected.
-
-### 4.16. `result_values`
-
-Individual measured values and historical parameter/reference snapshots within a result version.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
-
-| Column | PostgreSQL type | Nullable | Key / default | Meaning |
-|---|---|---|---|---|
-| `id` | `UUID` | No | PK | Record identifier |
-| `result_id` | `UUID` | No | FK test_results.id | Result version |
-| `parameter_id` | `UUID` | No | FK test_parameters.id | Measurement parameter |
-| `reference_range_id` | `UUID` | Yes | FK reference_ranges.id | Selected reference range |
-| `numeric_value` | `NUMERIC` | Yes | - | Numeric measurement |
-| `numeric_comparator` | `VARCHAR(2)` | Yes | CHECK | Optional numeric boundary operator |
-| `text_value` | `TEXT` | Yes | - | Text measurement |
-| `parameter_code_snapshot` | `VARCHAR(30)` | No | - | Historical parameter code |
-| `parameter_name_snapshot` | `VARCHAR(150)` | No | - | Historical parameter name |
-| `result_type_snapshot` | `VARCHAR(10)` | No | CHECK | Historical value type |
-| `unit_snapshot` | `VARCHAR(40)` | Yes | - | Historical measurement unit |
-| `method_snapshot` | `VARCHAR(100)` | Yes | - | Historical measurement method |
-| `display_order_snapshot` | `INTEGER` | No | CHECK >= 0 | Historical display sequence |
-| `is_required_snapshot` | `BOOLEAN` | No | - | Whether this parameter was required for this result version |
-| `normal_min_snapshot` | `NUMERIC` | Yes | - | Historical lower reference limit |
-| `normal_max_snapshot` | `NUMERIC` | Yes | - | Historical upper reference limit |
-| `normal_text_snapshot` | `TEXT` | Yes | - | Historical text reference |
-| `flag` | `VARCHAR(20)` | No | DEFAULT NOT_EVALUATED | Result interpretation flag |
-| `notes` | `TEXT` | Yes | - | Optional notes |
-
-**Rules and relationships**
-
-- UNIQUE(result_id, parameter_id). The parameter must belong to the catalog test selected in the order item.
-- A DRAFT may contain an unfilled parameter row with both numeric_value and text_value NULL. At most one value may be set. When a value is supplied, NUMERIC allows only numeric_value and TEXT allows only a nonblank text_value. numeric_comparator requires numeric_value. Use result_type_snapshot to validate the stored value type.
-- When validating or publishing, every row with is_required_snapshot = TRUE must contain a value of the correct type. Optional unfilled rows may remain NULL and are displayed as not reported; they are never interpreted as zero or normal.
-- numeric_comparator is NULL for an exact number, or <, <=, >, >= for a bounded result. Do not store <5 as an exact measurement of 5.
-- For an uncertain comparison use NOT_EVALUATED rather than guessing. Reject non-finite numeric inputs.
-- reference_range_id, when present, must belong to parameter_id. Copy name, code, value type, unit, method, display order, and reference limits into snapshots.
-- flag values: NORMAL, HIGH, LOW, ABNORMAL, NOT_EVALUATED. Do not invent critical thresholds or automatic textual interpretations without approved rules.
-- Create one result_values row for every active parameter when creating the first draft, copying the catalog definition and is_required into is_required_snapshot. Initial measurement fields and reference fields may remain NULL. This persists the expected parameter set instead of depending on a later catalog query.
-- A correction copies the previous published parameter rows and their required/type/unit/method snapshots; it does not silently adopt a changed catalog definition. Recalculate reference selection only when the relevant measurement context changes, and preserve the superseded published version.
-- Do not silently add or remove parameter rows from an existing draft when the catalog changes. Explicit reconciliation, if needed, must occur before validation and be audited.
-- Published values and their snapshots are immutable; correction creates values in a new result version. [S4]
+Retained result_id/parameter_id, unique(result,parameter), independent definition
+code/name/NUMERIC-or-TEXT/unit/method/order/required snapshots; decimal
+numeric_value/comparator or text_value; supplied reference_text/min/max, flag and
+patient-facing notes. NUMERIC(38,12) stores decimals, never formatted strings.
+Manually supplied flags: NORMAL/HIGH/LOW/ABNORMAL/NOT_EVALUATED. Optional empty
+rows remain NULL/NOT_EVALUATED. SQL and DTO/service checks enforce types, finite
+precision, comparator/value consistency and minimum<=maximum when both supplied.
+No clinical interpretation. Published values and snapshots are immutable.
 
 ### 4.17. `notifications`
 
@@ -786,7 +789,7 @@ Implementation status: deferred AI, absent from V1-V5; outside core implementati
 
 ## 5. Relationship summary
 
-Links involving planned/deferred tables below are proposed relationships, not existing foreign keys. Implemented relationships are defined by the V1-V6 inventory in section 1.1.
+Links involving planned/deferred tables below are proposed relationships, not existing foreign keys. Implemented relationships are defined by V1–V9 and the Stage 4 storage section.
 
 | Parent | Child / link | Cardinality or rule |
 |---|---|---|
@@ -797,21 +800,24 @@ Links involving planned/deferred tables below are proposed relationships, not ex
 | patients | test_orders | One patient to many orders |
 | lab_tests | lab_test_categories | Zero to many unique assignments per test; FK lab_test_id |
 | Fixed category vocabulary | lab_test_categories | Zero to many tests per identifier; category CHECK, no category lookup table; PK(lab_test_id, category) prevents duplicate membership |
-| lab_tests | test_parameters | One test to one or more parameters |
+| lab_tests | test_parameters | Zero to many ADMIN definitions; drafting requires at least one active definition |
 | test_parameters | reference_ranges | One parameter to multiple demographic/time ranges |
 | test_orders | order_items | One order to one or more test items |
 | lab_tests | order_items | One catalog test referenced by many ordered items |
-| test_orders | appointments | Many retained appointments; at most one CONFIRMED per order |
+| test_orders | appointments | Many retained appointments; at most one CONFIRMED/CHECKED_IN per order |
 | appointment_slots | appointments | Many appointments up to capacity |
 | test_orders | payments | Multiple payments/refunds |
 | payments | payments | Refund points to original payment |
-| test_orders | samples | Multiple physical samples |
-| samples / order_items | sample_tests | Many-to-many association |
+| test_orders | visits | Multiple real visits |
+| appointments | visits | Zero or one actual visit |
+| visits / order_items | visit_items | Explicit same-order visit membership |
+| visits | samples | Multiple physical specimens |
+| samples / order_items | specimen_attestations | Explicit positive suitability with actor/time |
 | order_items | test_results | Multiple result versions |
-| test_results / sample_tests | result_samples | Used specimens per result version |
+| test_results / samples | result_specimens | Exact retained specimens per result version |
 | test_results | result_values | Multiple parameter measurements |
 | test_parameters | result_values | Parameter referenced by many measurements |
-| reference_ranges | result_values | Optional selected reference per measurement |
+| result/visit/sample/appointment | laboratory_events | Append-only lifecycle events; exactly one target per row |
 | users | notifications | Multiple notifications per recipient |
 | users | audit_logs | Multiple events; system actor may be NULL |
 | patients | symptom_assessments | Multiple assessment sessions |
@@ -833,15 +839,15 @@ Additional recommended indexes:
 - Stage 2 implemented V7: `order_items(order_id, lab_test_id)` UNIQUE, covering order_id FK/loading, plus `order_items(lab_test_id)` for its retained catalog FK.
 - `test_parameters(lab_test_id, code)` UNIQUE.
 - `reference_ranges(parameter_id, gender, valid_from)`.
-- Stage 3 V8: partial UNIQUE `appointments(order_id) WHERE status='CONFIRMED'`,
+- Stage 3 V8 partial appointment uniqueness is expanded by V9 to CONFIRMED/CHECKED_IN;
   `appointments(slot_id,status)`, creator/key retry uniqueness, retained type/actor/
   original-slot FKs and reschedule history; see sections 4.9–4.10.
 - `payments(order_id, status)` and `payments(original_payment_id)`.
-- `samples(order_id)` and `samples(replaces_sample_id)`.
-- `sample_tests(sample_id, order_item_id)` UNIQUE and `sample_tests(order_item_id)`.
+- samples(visit_id), samples(replaces_sample_id), visits(order_id), unique visits(appointment_id).
+- specimen_attestations(sample_id,order_item_id) UNIQUE and reverse item index.
 - `test_results(order_item_id, version_number)` UNIQUE.
-- Partial UNIQUE indexes on `test_results(order_item_id)` for current publication and outstanding draft/validation, as described above.
-- `result_samples(result_id, sample_test_id)` PK and `result_samples(sample_test_id)`.
+- Partial UNIQUE indexes on test_results(order_item_id) for current publication and working DRAFT/APPROVED.
+- result_specimens(result_id,sample_id) PK and reverse sample index; visit_items reverse item index.
 - `result_values(result_id, parameter_id)` UNIQUE and `result_values(parameter_id)`.
 - `notifications(user_id, read_at)` and `notifications(delivery_status, next_attempt_at)`.
 - Audit indexes listed in the audit table section.
@@ -852,7 +858,7 @@ Concurrency controls must cover every write path:
 1. Stage 2 creation: current account, patient, then selected catalog rows in stable UUID order; successful retry lookup precedes fresh catalog admission. Cancellation locks its order and never takes account/patient locks afterward. See section 4.7 and ORDERS_API.md.
 2. Stage 3 booking/actions: order row→appointment coordination→appointment→slots in lexical UUID order before capacity checks/writes; see sections 4.9–4.10.
 3. Lock order/payment rows before payment or refund amount checks.
-4. Lock ordered test items before allocating result revisions or publishing.
+4. Stage 4 locks the existing order before result/specimen/visit operations; retry identity advisory locks precede orders. Definition snapshots take catalog locks last. See the detailed Stage 4 transaction design above.
 5. Lock parameters before reference-range overlap checks and writes.
 6. Use stable lock ordering when a transaction touches several records.
 
@@ -865,30 +871,25 @@ Existing patient/catalog/account permissions are defined by their implemented co
 - Derive created_by, entered_by, collected_by, validated_by, and other actor fields from authenticated context, not untrusted request fields.
 - A patient may access only their own linked profile, orders, appointments, and published results.
 - Receptionist/admin manage patient profiles, orders, appointments, and recorded payments.
-- Technician/admin manage laboratory samples and results; technician access to patient information must serve laboratory work.
-- Admin manages catalog tests, parameters, reference ranges, booking slots, and audit access.
+- LAB_TECHNICIAN authors drafts; explicitly authorized ADMIN independently reviews/publishes. Only these clinical actors manage specimens; generic ADMIN status grants no review authority.
+- ADMIN manages catalog/parameters; ADMIN/RECEPTIONIST publishes explicit slots. Automatic reference ranges/general audit remain deferred.
 - Preserve the existing CORS, CSRF, JWT, and cookie-security configuration.
 - Deactivate catalogs and cancel orders/items instead of deleting referenced history.
 - Profile linking must not be automated using names or phone numbers alone. Phase 2 implements the controlled authenticated/verified token workflow described in section 4.3a and PATIENTS_API.md section 15.
 
-## 8. End-to-end example
+## 8. End-to-end implemented workflow
 
-This illustrates the wider planned workflow only. Orders are implemented in V7;
-Stage 3 V8 implements appointments as described in sections 4.9–4.10. Payments,
-samples, results, notification persistence and general audit persistence remain planned.
-
-The short IDs below illustrate relationships; actual identifiers are UUIDs. No medical reference values or prices are specified.
-
-1. Account U1 has role PATIENT. Patient profile P1 links to U1. A walk-in profile could instead have user_id = NULL.
-2. Catalog test T1 is CBC. Parameters C1 = WBC and C2 = HGB both reference T1. Reference R1 belongs to C2.
-3. Order O1 belongs to P1. Item I1 belongs to O1 and references T1, with historical code/name/price snapshots.
-4. Optional appointment A1 links O1 to slot SL1. A walk-in order needs no appointment row.
-5. Payment PAY1 records the order payment and confirmation.
-6. Sample S1 belongs to O1. Link ST1 connects S1 to I1. If needed, sample S2 and link ST2 serve the same item.
-7. Result RES1 belongs to I1, version 1, initially DRAFT. result_samples links RES1 to ST1 and ST2 if both were used.
-8. result_values records the measurements for C1 and C2, their selected references, and historical snapshots.
-9. A technician validates RES1, then publishes it; is_current becomes TRUE. Notifications and audit events are recorded.
-10. A correction creates RES2 for I1, referencing RES1 through previous_result_id. RES1 stays published history, and RES2 becomes current only when published.
+See the exact synthetic HTTP walkthrough in RESULTS_API.md. An existing patient
+owns an order/item for the canonical catalog test. ADMIN defines parameters.
+Staff record an actual visit and selected items; arrival starts processing and
+checks in an optional appointment. Laboratory staff register/receive specimens
+and explicitly attest suitability. A technician records decimal/text draft values
+and supplied references/flags. An independent explicitly authorized ADMIN approves
+and publishes. The patient accesses the publication with real visit/specimen links.
+Administrative closure and all-item current publication together complete the
+order. Corrections retain the old publication until replacement atomically
+publishes. No payment/notification/general audit data or medical interpretation
+is fabricated.
 
 ## 9. Incremental implementation plan
 

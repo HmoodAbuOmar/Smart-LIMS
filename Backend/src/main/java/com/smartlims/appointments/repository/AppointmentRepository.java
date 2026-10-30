@@ -12,7 +12,11 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID>,
     Optional<Appointment> findByOrder_IdAndStatus(UUID order, AppointmentStatus status);
     boolean existsByOrder_IdAndStatus(UUID order, AppointmentStatus status);
     long countBySlot_IdAndStatus(UUID slot, AppointmentStatus status);
-    @Query("select count(a)>0 from Appointment a where a.order.patient.id=:patient and a.slot.id=:slot and a.status=com.smartlims.appointments.entity.AppointmentStatus.CONFIRMED and (:exclude is null or a.id<>:exclude)")
+    @Query("select count(a)>0 from Appointment a where a.order.id=:order and a.status in (com.smartlims.appointments.entity.AppointmentStatus.CONFIRMED,com.smartlims.appointments.entity.AppointmentStatus.CHECKED_IN)")
+    boolean existsActiveOrder(@Param("order") UUID order);
+    @Query("select count(a) from Appointment a where a.slot.id=:slot and a.status in (com.smartlims.appointments.entity.AppointmentStatus.CONFIRMED,com.smartlims.appointments.entity.AppointmentStatus.CHECKED_IN)")
+    long countActiveBySlot(@Param("slot") UUID slot);
+    @Query("select count(a)>0 from Appointment a where a.order.patient.id=:patient and a.slot.id=:slot and a.status in (com.smartlims.appointments.entity.AppointmentStatus.CONFIRMED,com.smartlims.appointments.entity.AppointmentStatus.CHECKED_IN) and (:exclude is null or a.id<>:exclude)")
     boolean patientConflict(@Param("patient") UUID patient, @Param("slot") UUID slot, @Param("exclude") UUID exclude);
     @Query("select a.order.id from Appointment a where a.id=:id")
     Optional<UUID> orderId(@Param("id") UUID id);

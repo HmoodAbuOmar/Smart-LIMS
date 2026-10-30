@@ -22,7 +22,7 @@ class AppointmentMigrationTest {
     }
     Flyway migrations(String target) { var c=Flyway.configure().dataSource(url,"postgres","").locations("classpath:db/migration");if(target!=null)c.target(target);return c.load(); }
     @Test void freshMigrationAndConstraintsWithoutSeeds() throws Exception {
-        var f=migrations(null);assertEquals(8,f.migrate().migrationsExecuted);f.validate();assertEquals(0,f.migrate().migrationsExecuted);
+        var f=migrations(null);assertEquals(9,f.migrate().migrationsExecuted);f.validate();assertEquals(0,f.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"postgres","");var s=c.createStatement()) {
             for(String table:List.of("appointment_types","appointment_slots","appointments","appointment_reschedules"))try(var r=s.executeQuery("SELECT count(*) FROM "+table)){assertTrue(r.next());assertEquals(0,r.getInt(1));}
             s.executeUpdate("INSERT INTO appointment_slots(id,starts_at,ends_at,capacity) VALUES ('00000000-0000-0000-0000-000000000001','2030-01-01T10:00:00Z','2030-01-01T11:00:00Z',1)");
@@ -37,7 +37,7 @@ class AppointmentMigrationTest {
             s.executeUpdate("INSERT INTO users(id,full_name,email,role,origin) VALUES ('00000000-0000-0000-0000-000000000001','Synthetic','synthetic@example.invalid','ADMIN','ADMIN_INVITATION')");
             try(var r=s.executeQuery("SELECT version||':'||checksum FROM flyway_schema_history ORDER BY installed_rank")){while(r.next())before.add(r.getString(1));}
         }
-        var f=migrations(null);assertEquals(1,f.migrate().migrationsExecuted);f.validate();
+        var f=migrations(null);assertEquals(2,f.migrate().migrationsExecuted);f.validate();
         try(var c=DriverManager.getConnection(url,"postgres","");var s=c.createStatement()) {
             List<String> after=new ArrayList<>();try(var r=s.executeQuery("SELECT version||':'||checksum FROM flyway_schema_history WHERE version::integer<=7 ORDER BY installed_rank")){while(r.next())after.add(r.getString(1));}assertEquals(before,after);
             try(var r=s.executeQuery("SELECT full_name,email FROM users")){assertTrue(r.next());assertEquals("Synthetic",r.getString(1));assertEquals("synthetic@example.invalid",r.getString(2));assertFalse(r.next());}

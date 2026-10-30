@@ -1,5 +1,17 @@
 # Orders API Contract
 
+Stage 4 integration (DONE 2026-10-30; final isolated suite 319/319): an actual
+staff-recorded visit moves PENDING→IN_PROGRESS under the order lock. Booking alone
+still does not start processing. Order cancellation remains PENDING-only and
+therefore cannot pass a committed arrival. IN_PROGRESS→COMPLETED requires a
+current published result for every existing order item and all actual visits
+administratively closed, checked on publication/visit close. All existing items
+are required; no optional-item flag exists. Visit completion alone does not imply
+results complete. visitDetailsAvailable now reflects a real visits relationship;
+GET /api/visits/me?orderId={id} returns those owned visits, potentially multiple.
+No invented visit URL, payments, refunds or changed historical order snapshots.
+The detailed RESULTS_API.md/VISITS_API.md supersede earlier future-workflow notes.
+
 Stage 3 integration (2026-10-29): cancelling a PENDING order atomically cancels its
 CONFIRMED appointment, if any, and releases capacity even after slot start. Copy
 the order cancellation actor/time/reason; retain both records. Order eligibility,

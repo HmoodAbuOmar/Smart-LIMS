@@ -14,7 +14,7 @@ public final class AppointmentMapping {
     public static AppointmentResponses.Slot slot(AppointmentSlot s,long occupied) { return new AppointmentResponses.Slot(s.getId(),s.getStartsAt(),s.getEndsAt(),s.getCapacity(),s.getCapacity()-occupied,s.isActive(),LAB_ZONE.getId()); }
     public static AppointmentResponses.Detail detail(Appointment a, Instant now) {
         var slot=a.getSlot(); var local=slot.getStartsAt().atZone(LAB_ZONE);
-        String reason=a.getStatus()==AppointmentStatus.CANCELLED?"CANCELLED":!slot.getStartsAt().isAfter(now)?"STARTED":null;
+        String reason=a.getStatus()!=AppointmentStatus.CONFIRMED?a.getStatus().name():!slot.getStartsAt().isAfter(now)?"STARTED":null;
         boolean cancel=reason==null, move=cancel && a.getOrder().getStatus()==OrderStatus.PENDING;
         if (cancel && !move) reason="ORDER_NOT_PENDING";
         return new AppointmentResponses.Detail(a.getId(),a.getOrder().getId(),slot.getId(),a.getType().getId(),a.getTypeNameSnapshot(),slot.getStartsAt(),slot.getEndsAt(),LAB_ZONE.getId(),local.toLocalDate(),local.toLocalTime(),local.getOffset().toString(),a.getStatus(),a.getVersion(),move,cancel,reason,a.getCreatedAt(),a.getUpdatedAt(),a.getCancelledAt(),a.getCancellationReason());
