@@ -12,6 +12,10 @@ import './Hero.css'
 import './theme.css'
 import './styles/refinements/index.css'
 
+// Vite removes both dynamic imports and branches from production bundles.
+
+const DevelopmentPortal = import.meta.env.DEV ? lazy(() => import('./dev/DevelopmentPortal.jsx')) : null
+const DevelopmentWalkthrough = import.meta.env.DEV ? lazy(() => import('./dev/PatientPreview.jsx')) : null
 const PortalEntry = lazy(() => import('./portal/PortalEntry.jsx'))
 
 function AppRouter() {
@@ -31,6 +35,14 @@ function AppRouter() {
     '#/patient/file/link': 'linkFile', '#/patient/dashboard': 'dashboard',
   }
   const emailRoutes = { '#/verify-email': 'verification', '#/forgot-password': 'forgotPassword', '#/reset-password': 'resetPassword' }
+  // Never capture a real verification callback; the production token controller
+  // must still validate links, including when testing against a future backend.
+  if (import.meta.env.DEV) {
+    const frontendRoutes = ['#/signup', '#/login', '#/verify-email', '#/onboarding/file', '#/onboarding/file/new', '#/onboarding/file/link', '#/onboarding/dashboard']
+    const verificationCallback = route === '#/verify-email' && (new URLSearchParams(window.location.search).has('token') || new URLSearchParams(hash.split('?')[1] || '').has('token'))
+    if (frontendRoutes.includes(route) && !verificationCallback) return <Suspense fallback={null}><DevelopmentWalkthrough route={hash} /></Suspense>
+  }
+  if (import.meta.env.DEV && route.startsWith('#/__portal/')) return <Suspense fallback={null}><DevelopmentPortal route={hash.slice('#/__portal/'.length)} onNavigate={path => { window.location.hash = `/__portal/${path}` }} /></Suspense>
   if (/^#\/patient\/(dashboard|profile|tests|review|orders|book|payment|booking-confirmation|appointments|results|history|notifications)(\/|$)/.test(route)) return <Suspense fallback={null}><PortalEntry route={hash.slice('#/patient/'.length)} /></Suspense>
   if (Object.hasOwn(emailRoutes, route)) return <AuthPage key={hash} mode="login" step={emailRoutes[route]} registration={registration} />
   if (Object.hasOwn(onboardingRoutes, route)) return <AuthPage key={hash} mode="login" step={onboardingRoutes[route]}><PatientOnboarding step={onboardingRoutes[route]} /></AuthPage>

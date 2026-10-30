@@ -7,7 +7,21 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "test:i18n": "node scripts/check-localization.mjs",
+    "test:auth": "node scripts/check-auth.mjs",
+    "preview": "vite preview",
+    "test:portal": "node scripts/check-portal-model.mjs",
+    "test:portal:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:booking": "node scripts/check-booking-model.mjs",
+    "test:booking:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:history": "node scripts/check-history-model.mjs",
+    "test:history:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:patient-facing": "node scripts/check-patient-facing.mjs",
+    "test:patient-facing:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:walkthrough:browser": "node scripts/check-development-preview.mjs",
+    "test:restored-data:browser": "node scripts/check-restored-data.mjs",
+    "test:health-charts:browser": "node scripts/check-health-charts.mjs",
+    "test:hosted-payment": "node scripts/check-hosted-payment.mjs"
   },
   "dependencies": {
     "i18next": "^26.4.7",
