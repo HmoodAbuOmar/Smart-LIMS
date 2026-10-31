@@ -9,7 +9,9 @@ public record RegistrationRequest(
         @NotBlank @jakarta.validation.constraints.Email @Size(max = 120) String email,
         @NotNull String password,
         @NotNull String confirmPassword) {
-    public RegistrationRequest { email = email == null ? null : email.strip(); }
+    public RegistrationRequest {
+        email = email == null ? null : email.strip();
+    }
 
     @Override
     public String toString() {

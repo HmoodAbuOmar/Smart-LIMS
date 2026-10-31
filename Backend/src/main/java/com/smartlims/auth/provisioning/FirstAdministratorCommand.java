@@ -9,7 +9,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 
 public final class FirstAdministratorCommand {
-    private FirstAdministratorCommand() {}
+    private FirstAdministratorCommand() {
+    }
 
     public static void run(String[] args) {
         SpringApplication application = new SpringApplication(SmartLimsApplication.class);

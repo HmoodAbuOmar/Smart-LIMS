@@ -6,10 +6,13 @@ import com.smartlims.labtests.exception.LabTestException;
 import com.smartlims.labtests.mapper.LabTestMapper;
 import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.service.LabTestService;
+
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,7 +28,7 @@ import static org.mockito.Mockito.*;
 class LabTestServiceTest {
     private final LabTestRepository repository = mock(LabTestRepository.class);
     private final LabTestService service = new LabTestService(repository, new LabTestMapper());
-    private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null);
+    private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null, List.of());
 
     private Authentication actor(String role) {
         return new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null,
@@ -109,5 +112,42 @@ class LabTestServiceTest {
                 () -> service.get(actor("PATIENT"), "1-1-1-1-1")).getStatus());
         assertEquals(HttpStatus.NOT_FOUND, assertThrows(LabTestException.class,
                 () -> service.get(actor("PATIENT"), UUID.randomUUID().toString())).getStatus());
+    }
+
+    @Test
+    void rejectsPatientInactiveListAtServiceBoundaryBeforeQuerying() {
+        var query = LabTestQueryRequest.fromQueryParameters(Map.of("active", List.of("false")));
+        var error = assertThrows(LabTestException.class, () -> service.list(actor("PATIENT"), query));
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
+        assertEquals("FORBIDDEN", error.getCode());
+        assertNull(error.getField());
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(LabTestException.class,
+                () -> service.list(null, query)).getStatus());
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void inactiveDetailUsesMissingErrorBeforeMappingAndStaffRetainAccess() {
+        UUID id = UUID.randomUUID();
+        LabTest test = new LabTest("DETAIL", "Synthetic detail", "Synthetic description", BigDecimal.ONE,
+                "SYNTHETIC", "Synthetic preparation");
+        test.setActive(false);
+        when(repository.findById(id)).thenReturn(Optional.of(test));
+        LabTestMapper protectedMapper = mock(LabTestMapper.class);
+        var protectedService = new LabTestService(repository, protectedMapper);
+        var hidden = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), id.toString()));
+        var missing = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), UUID.randomUUID().toString()));
+        assertEquals(HttpStatus.NOT_FOUND, hidden.getStatus());
+        assertEquals(missing.getCode(), hidden.getCode());
+        assertEquals(missing.getMessage(), hidden.getMessage());
+        assertNull(hidden.getField());
+        verifyNoInteractions(protectedMapper);
+        for (String role : List.of("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")) {
+            assertEquals("DETAIL", service.get(actor(role), id.toString()).code());
+        }
+        test.setActive(true);
+        assertEquals("DETAIL", service.get(actor("PATIENT"), id.toString()).code());
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(LabTestException.class,
+                () -> service.get(actor("UNSUPPORTED"), id.toString())).getStatus());
     }
 }

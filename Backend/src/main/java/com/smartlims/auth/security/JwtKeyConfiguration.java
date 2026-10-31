@@ -1,10 +1,12 @@
 package com.smartlims.auth.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+
 import java.time.Duration;
 import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,7 +32,8 @@ public class JwtKeyConfiguration {
     SecretKey jwtSecret(@Value("${smartlims.auth.jwt.secret-base64}") String supplied) {
         try {
             byte[] decoded = Base64.getDecoder().decode(supplied);
-            if (decoded.length < 32) throw new IllegalArgumentException("Key is too short");
+            if (decoded.length < 32)
+                throw new IllegalArgumentException("Key is too short");
             return new SecretKeySpec(decoded, "HmacSHA256");
         } catch (RuntimeException error) {
             throw new IllegalStateException("JWT signing key configuration is invalid", error);

@@ -2,8 +2,10 @@ package com.smartlims.patients.entity;
 
 import com.smartlims.auth.entity.UserAccount;
 import jakarta.persistence.*;
+
 import java.time.Instant;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -48,5 +50,7 @@ public class PatientLinkToken {
         return consumedAt == null && revokedAt == null && expiresAt.isAfter(now);
     }
 
-    public void consume(Instant now) { consumedAt = now; }
+    public void consume(Instant now) {
+        consumedAt = now;
+    }
 }

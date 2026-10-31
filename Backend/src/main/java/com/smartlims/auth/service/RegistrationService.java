@@ -10,8 +10,10 @@ import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.EmailActionTokenRepository;
 import com.smartlims.auth.repository.UserAccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
+
 import java.time.Duration;
 import java.time.Instant;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,8 +33,8 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
 
     public RegistrationService(UserAccountRepository users, EmailActionTokenRepository tokens,
-            VerificationEmailSender emailSender, EmailIdentity emailIdentity, PasswordPolicy passwordPolicy,
-            VerificationTokens verificationTokens, PasswordEncoder passwordEncoder) {
+                               VerificationEmailSender emailSender, EmailIdentity emailIdentity, PasswordPolicy passwordPolicy,
+                               VerificationTokens verificationTokens, PasswordEncoder passwordEncoder) {
         this.users = users;
         this.tokens = tokens;
         this.emailSender = emailSender;

@@ -1,5 +1,7 @@
 # Smart-LIMS registration contract
 
+Traceability: R-AUTH-01/02, R-NFR-01; T-AUTH-01 (existing slice), T-AUTH-02 (remaining contract work) in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). This document currently specifies registration, not the full authentication/users API. Detailed existing behavior remains in the local [authentication requirements](../AUTH_REQUIREMENTS.md); complete the shareable login/recovery/invitation/users contracts before extending those features. No new behavior is introduced here.
+
 `POST /api/auth/register` accepts `Content-Type: application/json` with these required fields:
 
 ```json
@@ -45,4 +47,4 @@ Email confirmation remains `GET /api/auth/confirm-email?userId=...&token=...`, u
 
 The account's `fullName` and the patient profile's `fullName` are separate values. Profile creation, linking, and updates do not synchronize them in either direction. Creating a patient profile still requires its own `fullName`, `dateOfBirth`, `gender`, and `phoneNumber`; address remains optional. See [Patients API](PATIENTS_API.md) for all patient endpoints.
 
-Regression test code covers confirmation errors, unchanged password boundaries, null account details, email verification and login, independent profile names, required profile phone, and administrative username handling. Tests were not run for this registration change, as requested.
+Regression test code covers confirmation errors, unchanged password boundaries, null account details, email verification and login, independent profile names, required profile phone, and administrative username handling. Tests were not run during the original registration edit; the later historical full run recorded in [TESTING.md](TESTING.md#verification-after-launcher-removal-2026-10-27) passed 141 tests across 17 suites, including RegistrationTest. No tests were run during this documentation review; real SMTP/browser integration remains unverified.

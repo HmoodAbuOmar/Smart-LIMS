@@ -34,7 +34,7 @@ class LabTestErrorHandlerTest {
     @Test
     void bodyValidationUsesFieldErrors() throws Exception {
         mvc.perform(post("/api/lab-tests").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"code\":\"CBC\",\"name\":\"CBC\",\"price\":1.001,\"sampleType\":\"Blood\"}"))
+                        .content("{\"code\":\"CBC\",\"name\":\"CBC\",\"price\":1.001,\"sampleType\":\"Blood\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.price").value("Invalid value."))
                 .andExpect(jsonPath("$.fields").doesNotExist());
@@ -50,7 +50,7 @@ class LabTestErrorHandlerTest {
     @Test
     void malformedJsonHasEmptyFieldErrors() throws Exception {
         mvc.perform(patch("/api/lab-tests/test/status").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"active\":\"false\"}"))
+                        .content("{\"active\":\"false\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_JSON"))
                 .andExpect(jsonPath("$.fieldErrors").isMap())

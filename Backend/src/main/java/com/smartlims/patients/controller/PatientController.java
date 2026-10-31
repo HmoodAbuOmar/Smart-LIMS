@@ -21,6 +21,25 @@ public class PatientController {
         this.patients = patients;
     }
 
+    @GetMapping("/me/profile")
+    public ResponseEntity<PatientSelfProfileResponse> getMyProfile(@RequestParam MultiValueMap<String, String> query,
+                                                                   JwtAuthenticationToken authentication) {
+        rejectProfileQuery(query);
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(patients.getMyProfile(authentication));
+    }
+
+    @PutMapping(path = "/me/profile", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PatientSelfProfileResponse> updateMyProfile(@RequestParam MultiValueMap<String, String> query,
+                                                                      @Valid @RequestBody UpdatePatientRequest request, JwtAuthenticationToken authentication) {
+        rejectProfileQuery(query);
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(patients.updateMyProfile(authentication, request));
+    }
+
+    private void rejectProfileQuery(MultiValueMap<String, String> query) {
+        if (!query.isEmpty())
+            throw new com.smartlims.patients.exception.PatientValidationException(query.keySet().iterator().next());
+    }
+
     @GetMapping("/me")
     public PatientResponse getMe(JwtAuthenticationToken authentication) {
         return patients.getMe(authentication);
@@ -28,14 +47,14 @@ public class PatientController {
 
     @PostMapping(path = "/me", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<PatientResponse> createMe(@Valid @RequestBody CreatePatientRequest request,
-            JwtAuthenticationToken authentication) {
+                                                    JwtAuthenticationToken authentication) {
         PatientResponse patient = patients.createMe(authentication, request);
         return ResponseEntity.created(URI.create("/api/patients/" + patient.id())).body(patient);
     }
 
     @PostMapping("/{id}/link-tokens")
     public ResponseEntity<PatientLinkTokenResponse> issueLinkToken(@PathVariable String id,
-            JwtAuthenticationToken authentication) {
+                                                                   JwtAuthenticationToken authentication) {
         return ResponseEntity.status(201).header("Cache-Control", "no-store").header("Pragma", "no-cache")
                 .body(patients.issueLinkToken(authentication, id));
     }

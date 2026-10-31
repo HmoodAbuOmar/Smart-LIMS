@@ -3,6 +3,7 @@ package com.smartlims.auth.email;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
@@ -17,8 +18,8 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
     private final String frontendBaseUrl;
 
     public SmtpVerificationEmailSender(ObjectProvider<JavaMailSender> mailSender,
-            @Value("${smartlims.auth.email.from:}") String from,
-            @Value("${smartlims.auth.email.frontend-base-url:}") String frontendBaseUrl) {
+                                       @Value("${smartlims.auth.email.from:}") String from,
+                                       @Value("${smartlims.auth.email.frontend-base-url:}") String frontendBaseUrl) {
         this.mailSender = mailSender;
         this.from = from;
         this.frontendBaseUrl = frontendBaseUrl;
@@ -54,7 +55,7 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
     }
 
     private void send(String recipient, String token, String path, String subject, String introduction,
-            String queryPrefix) {
+                      String queryPrefix) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null || from.isBlank() || frontendBaseUrl.isBlank()) {
             throw new MailDeliveryException();
@@ -89,13 +90,16 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
 
     private void plain(String recipient, String subject, String body) {
         JavaMailSender sender = mailSender.getIfAvailable();
-        if (sender == null || from.isBlank()) throw new MailDeliveryException();
+        if (sender == null || from.isBlank())
+            throw new MailDeliveryException();
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(recipient);
         message.setSubject(subject);
         message.setText(body);
-        try { sender.send(message); } catch (MailException | IllegalArgumentException e) {
+        try {
+            sender.send(message);
+        } catch (MailException | IllegalArgumentException e) {
             throw new MailDeliveryException();
         }
     }

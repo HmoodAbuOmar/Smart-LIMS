@@ -3,9 +3,11 @@ package com.smartlims.auth.repository;
 import com.smartlims.auth.entity.EmailActionToken;
 import com.smartlims.auth.entity.EmailActionPurpose;
 import com.smartlims.auth.entity.UserAccount;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -22,5 +24,5 @@ public interface EmailActionTokenRepository extends JpaRepository<EmailActionTok
     @Query("update EmailActionToken t set t.consumedAt = :now where t.id = :id and "
             + "t.purpose = :purpose and t.consumedAt is null and t.expiresAt > :now")
     int consumeIfValid(@Param("id") UUID id, @Param("purpose") EmailActionPurpose purpose,
-            @Param("now") Instant now);
+                       @Param("now") Instant now);
 }

@@ -6,7 +6,9 @@ import com.smartlims.auth.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+
 import java.util.UUID;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,9 +29,9 @@ public class AuthController {
     private final CookieCsrfTokenRepository csrf;
 
     public AuthController(RegistrationService registration, LoginService login,
-            CurrentAccountService current, PasswordRecoveryService recovery,
-            AccountManagementService accounts, AccessCookieFactory cookies,
-            CookieCsrfTokenRepository csrf) {
+                          CurrentAccountService current, PasswordRecoveryService recovery,
+                          AccountManagementService accounts, AccessCookieFactory cookies,
+                          CookieCsrfTokenRepository csrf) {
         this.registration = registration;
         this.login = login;
         this.current = current;
@@ -48,7 +50,7 @@ public class AuthController {
 
     @PostMapping(path = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegistrationRequest request,
-            HttpServletRequest httpRequest) {
+                                                    HttpServletRequest httpRequest) {
         registration.register(request, httpRequest);
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(new MessageResponse("Registration successful. Please check your email to confirm your account."));
@@ -69,7 +71,7 @@ public class AuthController {
 
     @PostMapping(path = "/cookie-login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CookieLoginResponse> cookieLogin(@Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+                                                           HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         LoginService.IssuedLogin issued = login.login(request);
         CsrfToken token = csrf.generateToken(httpRequest);
         csrf.saveToken(token, httpRequest, httpResponse);
@@ -109,7 +111,12 @@ public class AuthController {
                 .body(new MessageResponse("Password set successfully."));
     }
 
-    public record TokenResponse(String token) {}
-    public record CookieLoginResponse(boolean success, AccountResponse user) {}
-    public record SuccessResponse(boolean success) {}
+    public record TokenResponse(String token) {
+    }
+
+    public record CookieLoginResponse(boolean success, AccountResponse user) {
+    }
+
+    public record SuccessResponse(boolean success) {
+    }
 }

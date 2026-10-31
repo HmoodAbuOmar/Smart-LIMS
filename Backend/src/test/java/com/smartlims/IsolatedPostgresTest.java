@@ -2,14 +2,13 @@ package com.smartlims;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest
-@ActiveProfiles("local")
 @EnabledIfEnvironmentVariable(named = "SMARTLIMS_TEST_DATABASE_URL",
         matches = "jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/smartlims_auth_regression")
 public abstract class IsolatedPostgresTest {

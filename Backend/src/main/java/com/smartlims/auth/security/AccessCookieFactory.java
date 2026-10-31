@@ -1,6 +1,7 @@
 package com.smartlims.auth.security;
 
 import java.time.Duration;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -11,7 +12,7 @@ public class AccessCookieFactory {
     private final Duration lifetime;
 
     public AccessCookieFactory(@Value("${smartlims.auth.browser.secure-cookies:true}") boolean secure,
-            @Value("${smartlims.auth.jwt.duration-minutes:60}") long durationMinutes) {
+                               @Value("${smartlims.auth.jwt.duration-minutes:60}") long durationMinutes) {
         this.secure = secure;
         this.lifetime = Duration.ofMinutes(durationMinutes);
     }

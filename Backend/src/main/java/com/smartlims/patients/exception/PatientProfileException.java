@@ -27,6 +27,11 @@ public class PatientProfileException extends RuntimeException {
                 "Invalid or expired patient linking token.");
     }
 
-    public HttpStatus getStatus() { return status; }
-    public String getCode() { return code; }
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getCode() {
+        return code;
+    }
 }

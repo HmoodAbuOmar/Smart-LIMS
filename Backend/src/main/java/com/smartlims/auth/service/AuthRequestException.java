@@ -14,7 +14,15 @@ public class AuthRequestException extends RuntimeException {
         this.field = field;
     }
 
-    public HttpStatus getStatus() { return status; }
-    public String getCode() { return code; }
-    public String getField() { return field; }
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getField() {
+        return field;
+    }
 }

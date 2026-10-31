@@ -16,12 +16,14 @@ import com.smartlims.patients.exception.PatientForbiddenException;
 import com.smartlims.patients.exception.PatientProfileException;
 import com.smartlims.patients.service.PatientService;
 import jakarta.servlet.http.Cookie;
+
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -56,21 +58,30 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
             """;
     private static final CreatePatientRequest REQUEST = new CreatePatientRequest("Synthetic Profile",
             LocalDate.of(2000, 1, 1), PatientGender.UNKNOWN, "000001", "Example Address");
-    @Autowired MockMvc mvc;
-    @Autowired UserAccountRepository users;
-    @Autowired PatientService service;
-    @Autowired VerificationTokens hashes;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired JwtEncoder encoder;
-    @Autowired JsonMapper json;
-    @Autowired TransactionTemplate transactions;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    UserAccountRepository users;
+    @Autowired
+    PatientService service;
+    @Autowired
+    VerificationTokens hashes;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    JwtEncoder encoder;
+    @Autowired
+    JsonMapper json;
+    @Autowired
+    TransactionTemplate transactions;
+    @MockitoBean
+    VerificationEmailSender email;
     private final Map<Role, UserAccount> actors = new EnumMap<>(Role.class);
     private final Map<Role, String> credentials = new EnumMap<>(Role.class);
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         for (Role role : Role.values()) {
             UserAccount account = active(role.name().toLowerCase(Locale.ROOT), role);
             actors.put(role, account);
@@ -97,7 +108,9 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
         return new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + account.getRole())), jwt.getSubject());
     }
 
-    private JwtAuthenticationToken actor(Role role) { return actor(actors.get(role)); }
+    private JwtAuthenticationToken actor(Role role) {
+        return actor(actors.get(role));
+    }
 
     private MockHttpServletRequestBuilder bearer(MockHttpServletRequestBuilder request, Role role) {
         return request.header("Authorization", "Bearer " + credentials.get(role));
@@ -108,7 +121,9 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(new LinkPatientRequest(token)));
     }
 
-    private PatientResponse walkIn() { return service.create(actor(Role.ADMIN), REQUEST); }
+    private PatientResponse walkIn() {
+        return service.create(actor(Role.ADMIN), REQUEST);
+    }
 
     private JsonNode response(MvcResult result) {
         return json.readTree(new String(result.getResponse().getContentAsByteArray(), java.nio.charset.StandardCharsets.UTF_8));
@@ -125,7 +140,7 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
         error(bearer(get("/api/patients/me"), Role.PATIENT), 404, "PATIENT_PROFILE_NOT_LINKED");
         UserAccount before = users.findById(actors.get(Role.PATIENT).getId()).orElseThrow();
         MvcResult created = mvc.perform(bearer(post("/api/patients/me"), Role.PATIENT)
-                .contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isCreated())
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.fullName").value("Synthetic Profile"))
                 .andExpect(jsonPath("$.phoneNumber").value("000001")).andReturn();
         JsonNode profile = response(created);
@@ -446,16 +461,28 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
     }
 
     private String outcome(Supplier<?> operation) {
-        try { operation.get(); return "ok"; }
-        catch (PatientProfileException error) { return error.getCode(); }
+        try {
+            operation.get();
+            return "ok";
+        } catch (PatientProfileException error) {
+            return error.getCode();
+        }
     }
 
     private <T> List<T> together(Callable<T> first, Callable<T> second) throws Exception {
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Future<T> a = executor.submit(() -> { ready.countDown(); assertTrue(start.await(10, TimeUnit.SECONDS)); return first.call(); });
-            Future<T> b = executor.submit(() -> { ready.countDown(); assertTrue(start.await(10, TimeUnit.SECONDS)); return second.call(); });
+            Future<T> a = executor.submit(() -> {
+                ready.countDown();
+                assertTrue(start.await(10, TimeUnit.SECONDS));
+                return first.call();
+            });
+            Future<T> b = executor.submit(() -> {
+                ready.countDown();
+                assertTrue(start.await(10, TimeUnit.SECONDS));
+                return second.call();
+            });
             assertTrue(ready.await(10, TimeUnit.SECONDS));
             start.countDown();
             return List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS));

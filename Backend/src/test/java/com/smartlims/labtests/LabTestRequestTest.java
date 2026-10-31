@@ -4,9 +4,11 @@ import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.exception.LabTestException;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -29,6 +31,27 @@ class LabTestRequestTest {
         assertNull(request.description());
         assertEquals("ILS", request.currency());
         assertEquals(new BigDecimal("25.50"), request.price());
+        assertEquals(List.of(), request.categories());
+    }
+
+    @Test
+    void validatesCategorySetsBeforeConversionAndPreservesExactIdentifiers() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            for (String value : List.of("null", "[]", "[\"THYROID\",\"BLOOD_TESTS\"]")) {
+                var request = json.readValue(BODY.replace("25.50", "25.50,\"categories\":" + value), LabTestRequest.class);
+                assertTrue(validator.validate(request).isEmpty());
+            }
+            for (String value : List.of("[null]", "[\"THYROID\",\"THYROID\"]", "[\"thyroid\"]",
+                    "[\"THYROID \"]", "[\"\"]", "[\"All\"]")) {
+                var request = json.readValue(BODY.replace("25.50", "25.50,\"categories\":" + value), LabTestRequest.class);
+                assertTrue(validator.validate(request).stream().anyMatch(v -> v.getPropertyPath().toString().equals("categories")));
+            }
+        }
+        for (String value : List.of("\"THYROID\"", "1", "true", "{}", "[1]", "[true]", "[{}]", "[[]]")) {
+            assertThrows(Exception.class, () -> json.readValue(
+                    BODY.replace("25.50", "25.50,\"categories\":" + value), LabTestRequest.class));
+        }
     }
 
     @Test
@@ -68,6 +91,7 @@ class LabTestRequestTest {
         assertEquals(20, defaults.size());
         assertEquals("name,asc", defaults.sort());
         assertNull(defaults.active());
+        assertNull(defaults.category());
         for (var query : List.of(Map.of("size", List.of("0")), Map.of("size", List.of("101")),
                 Map.of("page", List.of("-1")), Map.of("page", List.of("9999999999999")),
                 Map.of("sort", List.of("description,asc")), Map.of("sort", List.of("name,ASC")),
@@ -75,5 +99,21 @@ class LabTestRequestTest {
                 Map.of("search", List.of("x".repeat(151))))) {
             assertThrows(LabTestException.class, () -> LabTestQueryRequest.fromQueryParameters(query));
         }
+    }
+
+    @Test
+    void acceptsOnlyOneExactCategoryIdentifierAndIgnoresUnknownKeys() {
+        for (var category : com.smartlims.labtests.entity.LabTestCategory.values()) {
+            assertEquals(category, LabTestQueryRequest.fromQueryParameters(
+                    Map.of("category", List.of(category.name()))).category());
+        }
+        for (String value : List.of("", " ", "All", "null", "THYROID,LIVER", "thyroid", " THYROID", "THYROID ", "Blood tests")) {
+            var error = assertThrows(LabTestException.class, () -> LabTestQueryRequest.fromQueryParameters(
+                    Map.of("category", List.of(value))));
+            assertEquals("category", error.getField());
+        }
+        assertEquals("category", assertThrows(LabTestException.class, () -> LabTestQueryRequest.fromQueryParameters(
+                Map.of("category", List.of("THYROID", "THYROID")))).getField());
+        assertNull(LabTestQueryRequest.fromQueryParameters(Map.of("categories", List.of("THYROID"))).category());
     }
 }

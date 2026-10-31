@@ -71,11 +71,46 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests", "/api/lab-tests/{id}")
                         .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/lab-tests/{testId}/parameters").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/lab-tests/{testId}/parameters").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{testId}/parameters/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/patients/me").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/appointment-types").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointment-types").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/appointment-types/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/appointment-slots/schedule").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/appointment-slots").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointment-slots").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/appointment-slots/{id}").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointments").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/me", "/api/appointments/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/{id}/alternatives").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/appointments/{id}/reschedule", "/api/appointments/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+
+                        .requestMatchers(HttpMethod.GET, "/api/results/me/trends", "/api/results/me/trends/biomarkers",
+                                "/api/visits/me/archive", "/api/visits/me/archive/tests", "/api/visits/me/archive/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/results/me", "/api/results/me/{id}", "/api/results/me/{id}/report", "/api/results/me/{id}/history").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/results/versions", "/api/results/work-items", "/api/results/{id}").hasAnyRole("ADMIN", "LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/results", "/api/results/{id}/corrections").hasRole("LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.PUT, "/api/results/{id}").hasRole("LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/results/{id}/approve", "/api/results/{id}/publish").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/samples", "/api/samples/{id}").hasAnyRole("ADMIN", "LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/samples", "/api/samples/{id}/receive", "/api/samples/{id}/attestations", "/api/samples/{id}/reject").hasAnyRole("ADMIN", "LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.GET, "/api/visits/me", "/api/visits/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/visits", "/api/visits/{id}").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/visits", "/api/visits/{id}/complete", "/api/appointments/{id}/no-show").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/orders/me").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/orders/me", "/api/orders/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/orders/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/me", "/api/notifications/me/unread-count").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/me/{id}/read", "/api/notifications/me/read-all").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/patients/me", "/api/patients/me/profile", "/api/patients/me/dashboard").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/patients/me/profile").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/patients/me", "/api/patients/me/link")
                         .hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/patients/{id}/link-tokens")
@@ -126,7 +161,7 @@ public class SecurityConfiguration {
             configuration.setAllowedOrigins(origins);
             configuration.setAllowCredentials(true);
             configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-            configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Authorization"));
+            configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Authorization", "Idempotency-Key"));
             configuration.setExposedHeaders(List.of("Location", "X-Request-Id"));
         }
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
