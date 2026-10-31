@@ -9,7 +9,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 final class OrderRequestFingerprint {
-    private OrderRequestFingerprint() {}
+    private OrderRequestFingerprint() {
+    }
 
     static String hash(boolean self, UUID patientId, List<UUID> testIds) {
         String selection = testIds.stream().map(UUID::toString).sorted()
@@ -18,6 +19,8 @@ final class OrderRequestFingerprint {
                 + "\",\"patientId\":\"" + patientId + "\",\"testIds\":[" + selection + "]}";
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException error) { throw new IllegalStateException("SHA-256 is unavailable.", error); }
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-256 is unavailable.", error);
+        }
     }
 }

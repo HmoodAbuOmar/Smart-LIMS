@@ -49,7 +49,7 @@ public class VisitService {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public VisitService(LaboratoryAccess access, LaboratoryLocks locks, TestOrderRepository orders, OrderItemRepository items, VisitRepository visits, AppointmentRepository appointments, AppointmentSlotRepository slots, LaboratoryEventRepository events, TestResultRepository results, SampleRepository samples, PatientRepository patients, OrderCompletion completion, EntityManager entities,
-            com.smartlims.notifications.service.NotificationPublisher notifications) {
+                        com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access = access;
         this.locks = locks;
         this.orders = orders;
@@ -77,7 +77,8 @@ public class VisitService {
         var selected = LaboratoryInput.ids(body.orderItemIds(), "orderItemIds", 1, 100);
         var at = LaboratoryInput.time(body.arrivedAt(), "arrivedAt");
         var appointmentId = body.appointmentId() == null ? null : LaboratoryInput.uuid(body.appointmentId(), "appointmentId");
-        if (at.isAfter(LaboratoryInput.now())) throw LaboratoryException.invalid("arrivedAt");
+        if (at.isAfter(LaboratoryInput.now()))
+            throw LaboratoryException.invalid("arrivedAt");
         var hash = LaboratoryInput.hash(orderId, appointmentId, selected.stream().map(UUID::toString).sorted().toList(), at);
         locks.retry("visit", user.getId(), key);
         var order = orders.findForUpdate(orderId).orElseThrow(() -> LaboratoryException.missing("ORDER"));
@@ -90,7 +91,8 @@ public class VisitService {
         if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.IN_PROGRESS)
             throw LaboratoryException.conflict("ORDER_NOT_PROCESSABLE");
         var owned = items.findByOrder_Id(orderId).stream().map(OrderItem::getId).toList();
-        if (!owned.containsAll(selected)) throw LaboratoryException.invalid("orderItemIds");
+        if (!owned.containsAll(selected))
+            throw LaboratoryException.invalid("orderItemIds");
         Appointment appointment = null;
         if (appointmentId != null) {
             slots.lockSchedule();
@@ -104,7 +106,8 @@ public class VisitService {
         }
         boolean started = order.getStatus() == OrderStatus.PENDING;
         order.setStatus(OrderStatus.IN_PROGRESS);
-        if (started) notifications.order(order);
+        if (started)
+            notifications.order(order);
         var visit = visits.saveAndFlush(new Visit("VIS-%08d".formatted(visits.nextNumber()), order, appointment, at, user, key, hash, selected));
         events.saveAndFlush(new LaboratoryEvent("visit", visit.getId(), "ARRIVAL", user, at, null));
         entities.refresh(visit);
@@ -120,8 +123,10 @@ public class VisitService {
         var at = LaboratoryInput.time(body.completedAt(), "completedAt");
         if (at.isBefore(visit.getArrivedAt()) || at.isAfter(LaboratoryInput.now()))
             throw LaboratoryException.invalid("completedAt");
-        if (visit.getStatus() == Visit.Status.COMPLETED) return map(visit);
-        if (visit.getVersion() != body.expectedVersion()) throw LaboratoryException.conflict("VISIT_CHANGED");
+        if (visit.getStatus() == Visit.Status.COMPLETED)
+            return map(visit);
+        if (visit.getVersion() != body.expectedVersion())
+            throw LaboratoryException.conflict("VISIT_CHANGED");
         if (visit.getAppointment() != null) {
             slots.lockSchedule();
             var appointment = appointments.findForUpdate(visit.getAppointment().getId()).orElseThrow();
@@ -150,8 +155,10 @@ public class VisitService {
         var a = appointments.findForUpdate(key).orElseThrow();
         slots.findForUpdate(a.getSlot().getId()).orElseThrow();
         var now = LaboratoryInput.now();
-        if (a.getStatus() == AppointmentStatus.NO_SHOW) return AppointmentMapping.detail(a, now);
-        if (a.getVersion() != body.expectedVersion()) throw LaboratoryException.conflict("APPOINTMENT_CHANGED");
+        if (a.getStatus() == AppointmentStatus.NO_SHOW)
+            return AppointmentMapping.detail(a, now);
+        if (a.getVersion() != body.expectedVersion())
+            throw LaboratoryException.conflict("APPOINTMENT_CHANGED");
         if (a.getStatus() != AppointmentStatus.CONFIRMED || visits.existsByAppointment_Id(key) || a.getSlot().getEndsAt().isAfter(now))
             throw LaboratoryException.conflict("APPOINTMENT_STATE_CONFLICT");
         a.noShow(user, now);
@@ -174,7 +181,8 @@ public class VisitService {
     public LaboratoryQuery.PageBody<VisitResponse> list(Authentication actor, LaboratoryQuery query, boolean self) {
         var orderId = query.optionalId("orderId");
         var user = self ? access.current(actor, Role.PATIENT) : access.current(actor, Role.ADMIN, Role.RECEPTIONIST, Role.LAB_TECHNICIAN);
-        if (self && !patients.existsByUser_Id(user.getId())) throw LaboratoryException.notLinked();
+        if (self && !patients.existsByUser_Id(user.getId()))
+            throw LaboratoryException.notLinked();
         Specification<Visit> spec = (r, q, c) -> c.and(orderId == null ? c.conjunction() : c.equal(r.get("order").get("id"), orderId), self ? c.equal(r.get("order").get("patient").get("user").get("id"), user.getId()) : c.conjunction());
         var page = query.find(visits, spec, Sort.by(Sort.Direction.DESC, "arrivedAt").and(Sort.by("id")));
         return LaboratoryQuery.page(page, page.getContent().stream().map(v -> map(v, self)).toList());

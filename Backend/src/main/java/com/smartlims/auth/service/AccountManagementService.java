@@ -10,9 +10,11 @@ import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.EmailActionTokenRepository;
 import com.smartlims.auth.repository.UserAccountRepository;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
 import org.springframework.data.domain.Sort;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -33,9 +35,9 @@ public class AccountManagementService {
     private final AdministratorCoordination administrators;
 
     public AccountManagementService(UserAccountRepository users, EmailActionTokenRepository tokens,
-            VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
-            PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
-            AdministratorCoordination administrators) {
+                                    VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
+                                    PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
+                                    AdministratorCoordination administrators) {
         this.users = users;
         this.tokens = tokens;
         this.values = values;
@@ -55,7 +57,8 @@ public class AccountManagementService {
         if (users.existsByEmail(canonical)) {
             throw new AuthRequestException(HttpStatus.CONFLICT, "EMAIL_IN_USE", "Email already exists.", "email");
         }
-        if (users.existsByUserNameIgnoreCase(name)) throw UserNames.conflict();
+        if (users.existsByUserNameIgnoreCase(name))
+            throw UserNames.conflict();
         UserAccount user;
         try {
             user = users.saveAndFlush(UserAccount.invite(request.fullName().strip(), canonical,
@@ -84,8 +87,9 @@ public class AccountManagementService {
     @Transactional
     public void sendSetPassword(UUID id) {
         UserAccount user = locked(id);
-        if (!user.isEnabled()) throw new AuthRequestException(HttpStatus.FORBIDDEN,
-                "ACCOUNT_BLOCKED", "Your account is blocked.", null);
+        if (!user.isEnabled())
+            throw new AuthRequestException(HttpStatus.FORBIDDEN,
+                    "ACCOUNT_BLOCKED", "Your account is blocked.", null);
         tokens.deleteByUserAndPurpose(user, EmailActionPurpose.ACCEPT_INVITATION);
         String token = values.create();
         tokens.saveAndFlush(EmailActionToken.invitation(user, values.hash(token), Instant.now().plusSeconds(86400)));
@@ -99,13 +103,16 @@ public class AccountManagementService {
         EmailActionToken token = tokens.findByTokenHashAndPurpose(values.hash(rawToken),
                 EmailActionPurpose.ACCEPT_INVITATION).orElseThrow(this::invalidInvite);
         if (!token.getUser().getId().equals(userId) || !user.isEnabled() || tokens.consumeIfValid(token.getId(),
-                EmailActionPurpose.ACCEPT_INVITATION, Instant.now()) != 1) throw invalidInvite();
+                EmailActionPurpose.ACCEPT_INVITATION, Instant.now()) != 1)
+            throw invalidInvite();
         if (user.getPasswordHash() != null && passwords.matches(newPassword, user.getPasswordHash())) {
             throw new AuthRequestException(HttpStatus.BAD_REQUEST, "SAME_PASSWORD",
                     "New password must be different from the old password.", "newPassword");
         }
-        if (user.getInvitationAcceptedAt() == null) user.acceptInvitation(passwords.encode(newPassword), Instant.now());
-        else user.changePassword(passwords.encode(newPassword));
+        if (user.getInvitationAcceptedAt() == null)
+            user.acceptInvitation(passwords.encode(newPassword), Instant.now());
+        else
+            user.changePassword(passwords.encode(newPassword));
         email.sendPasswordChanged(user.getEmail());
     }
 
@@ -115,7 +122,9 @@ public class AccountManagementService {
     }
 
     @Transactional(readOnly = true)
-    public AccountResponse get(UUID id) { return AccountResponse.from(users.findById(id).orElseThrow(this::missing)); }
+    public AccountResponse get(UUID id) {
+        return AccountResponse.from(users.findById(id).orElseThrow(this::missing));
+    }
 
     @Transactional
     public AccountResponse update(UUID id, UpdateAccountRequest request) {
@@ -143,7 +152,8 @@ public class AccountManagementService {
     public AccountResponse setBlocked(UUID actor, UUID id, boolean blocked) {
         administrators.lock();
         UserAccount user = locked(id);
-        if (blocked && actor.equals(id)) throw protectedAdmin();
+        if (blocked && actor.equals(id))
+            throw protectedAdmin();
         guardLastAdmin(user, blocked || user.getRole() != Role.ADMIN);
         user.setEnabled(!blocked);
         return AccountResponse.from(user);
@@ -153,8 +163,10 @@ public class AccountManagementService {
     public AccountResponse changeRole(UUID actor, UUID id, Role role) {
         administrators.lock();
         UserAccount user = locked(id);
-        if (actor.equals(id) && user.getRole() != role) throw protectedAdmin();
-        if (user.getRole() == role) return AccountResponse.from(user);
+        if (actor.equals(id) && user.getRole() != role)
+            throw protectedAdmin();
+        if (user.getRole() == role)
+            return AccountResponse.from(user);
         guardLastAdmin(user, true);
         user.setRole(role);
         email.sendRoleChanged(user.getEmail(), role.name());
@@ -165,7 +177,8 @@ public class AccountManagementService {
     public void delete(UUID actor, UUID id) {
         administrators.lock();
         UserAccount user = locked(id);
-        if (actor.equals(id)) throw protectedAdmin();
+        if (actor.equals(id))
+            throw protectedAdmin();
         guardLastAdmin(user, true);
         users.delete(user);
     }
@@ -173,17 +186,23 @@ public class AccountManagementService {
     private void guardLastAdmin(UserAccount user, boolean removing) {
         if (removing && user.getRole() == Role.ADMIN && user.isEnabled()
                 && user.getEmailVerifiedAt() != null
-                && users.countByRoleAndEnabledTrueAndEmailVerifiedAtIsNotNull(Role.ADMIN) <= 1) throw protectedAdmin();
+                && users.countByRoleAndEnabledTrueAndEmailVerifiedAtIsNotNull(Role.ADMIN) <= 1)
+            throw protectedAdmin();
     }
 
-    private UserAccount locked(UUID id) { return users.findWithLockById(id).orElseThrow(this::missing); }
+    private UserAccount locked(UUID id) {
+        return users.findWithLockById(id).orElseThrow(this::missing);
+    }
+
     private AuthRequestException missing() {
         return new AuthRequestException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found.", null);
     }
+
     private AuthRequestException invalidInvite() {
         return new AuthRequestException(HttpStatus.BAD_REQUEST, "INVALID_INVITATION",
                 "Set-password link is invalid or expired.", null);
     }
+
     private AuthRequestException protectedAdmin() {
         return new AuthRequestException(HttpStatus.BAD_REQUEST, "LAST_ADMIN",
                 "This administrator account cannot be changed.", null);

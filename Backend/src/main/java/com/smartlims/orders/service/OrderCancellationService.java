@@ -11,8 +11,10 @@ import com.smartlims.orders.repository.TestOrderRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +31,7 @@ public class OrderCancellationService {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities, AppointmentOrderCancellation appointments,
-            com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                    com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access = access;
         this.orders = orders;
         this.mapper = mapper;
@@ -43,14 +45,18 @@ public class OrderCancellationService {
         var orderId = access.orderId(id);
         // Read current eligibility/role without introducing account or patient row locks.
         var account = access.current(actor, Role.PATIENT, Role.ADMIN, Role.RECEPTIONIST);
-        if (account.getRole() != Role.PATIENT && request.reason() == null) throw OrderException.invalid("reason");
+        if (account.getRole() != Role.PATIENT && request.reason() == null)
+            throw OrderException.invalid("reason");
         var order = orders.findForUpdate(orderId).orElseThrow(OrderException::missingOrder);
         if (account.getRole() == Role.PATIENT) {
             var owner = order.getPatient().getUser();
-            if (owner == null || !owner.getId().equals(account.getId())) throw OrderException.missingOrder();
+            if (owner == null || !owner.getId().equals(account.getId()))
+                throw OrderException.missingOrder();
         }
-        if (order.getStatus() == OrderStatus.CANCELLED) return mapper.toDetail(order);
-        if (order.getStatus() != OrderStatus.PENDING) throw OrderException.notCancellable();
+        if (order.getStatus() == OrderStatus.CANCELLED)
+            return mapper.toDetail(order);
+        if (order.getStatus() != OrderStatus.PENDING)
+            throw OrderException.notCancellable();
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancelledBy(account);
         // Match database/ORM microsecond precision instead of rounding a later nanosecond upward.

@@ -18,6 +18,7 @@ import com.smartlims.patients.entity.Patient;
 import com.smartlims.patients.entity.PatientGender;
 import com.smartlims.patients.repository.PatientRepository;
 import jakarta.servlet.http.Cookie;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,17 +57,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class OrderCreationTest extends IsolatedPostgresTest {
-    @Autowired MockMvc mvc;
-    @Autowired UserAccountRepository users;
-    @Autowired PatientRepository patients;
-    @Autowired LabTestRepository tests;
-    @MockitoSpyBean TestOrderRepository orders;
-    @Autowired OrderService service;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired JsonMapper json;
-    @Autowired JwtEncoder encoder;
-    @Autowired PlatformTransactionManager transactionManager;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    UserAccountRepository users;
+    @Autowired
+    PatientRepository patients;
+    @Autowired
+    LabTestRepository tests;
+    @MockitoSpyBean
+    TestOrderRepository orders;
+    @Autowired
+    OrderService service;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    JsonMapper json;
+    @Autowired
+    JwtEncoder encoder;
+    @Autowired
+    PlatformTransactionManager transactionManager;
+    @MockitoBean
+    VerificationEmailSender email;
     private final Map<Role, UserAccount> actors = new EnumMap<>(Role.class);
     private final Map<Role, String> tokens = new EnumMap<>(Role.class);
     private Patient own;
@@ -117,7 +130,8 @@ class OrderCreationTest extends IsolatedPostgresTest {
     private MockHttpServletRequestBuilder request(Role role, boolean self, String key, String body) {
         var request = post(self ? "/api/orders/me" : "/api/orders").contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + tokens.get(role)).content(body);
-        if (key != null) request.header("Idempotency-Key", key);
+        if (key != null)
+            request.header("Idempotency-Key", key);
         return request;
     }
 
@@ -131,13 +145,23 @@ class OrderCreationTest extends IsolatedPostgresTest {
         var parsed = json.readTree(response.getContentAsString());
         assertEquals(response.getHeader("X-Request-Id"), parsed.get("requestId").asString());
         assertEquals(Set.of("code", "message", "fieldErrors", "requestId"), json.readValue(response.getContentAsString(), Map.class).keySet());
-        if (field != null) assertTrue(parsed.get("fieldErrors").has(field));
-        else assertEquals(0, parsed.get("fieldErrors").size());
+        if (field != null)
+            assertTrue(parsed.get("fieldErrors").has(field));
+        else
+            assertEquals(0, parsed.get("fieldErrors").size());
     }
 
-    private int count(String table) { return jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class); }
-    private CreateSelfOrderRequest selection(UUID... ids) { return new CreateSelfOrderRequest(Arrays.stream(ids).map(UUID::toString).toList()); }
-    private List<String> key() { return List.of(UUID.randomUUID().toString()); }
+    private int count(String table) {
+        return jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+    }
+
+    private CreateSelfOrderRequest selection(UUID... ids) {
+        return new CreateSelfOrderRequest(Arrays.stream(ids).map(UUID::toString).toList());
+    }
+
+    private List<String> key() {
+        return List.of(UUID.randomUUID().toString());
+    }
 
     @Test
     void patientCreateReturnsCompleteSnapshotDetailAndPersistsOnlyTheLinkedProfile() throws Exception {
@@ -161,7 +185,7 @@ class OrderCreationTest extends IsolatedPostgresTest {
         assertEquals(2, count("order_items"));
         assertEquals(2, count("patients"));
         assertEquals(Set.of("id", "orderNumber", "createdAt", "updatedAt", "testCount", "totalAmount", "currency", "status",
-                "canCancel", "visitDetailsAvailable", "patientId", "items", "cancelledAt", "cancellationReason"),
+                        "canCancel", "visitDetailsAvailable", "patientId", "items", "cancelledAt", "cancellationReason"),
                 json.readValue(result.getResponse().getContentAsString(), Map.class).keySet());
         assertEquals(Set.of("id", "labTestId", "testCode", "testName", "priceAtOrder"),
                 ((Map<?, ?>) ((List<?>) json.readValue(result.getResponse().getContentAsString(), Map.class).get("items")).getFirst()).keySet());
@@ -170,13 +194,14 @@ class OrderCreationTest extends IsolatedPostgresTest {
 
     @Test
     void bothStaffRolesCreateForLinkedOrUnlinkedProfilesWithoutStaffLocation() throws Exception {
-        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST)) for (Patient target : List.of(own, other)) {
-            var request = request(role, false, key().getFirst(), staffBody(target, second.getId()));
-            var result = mvc.perform(request).andExpect(status().isCreated()).andExpect(header().doesNotExist("Location"))
-                    .andExpect(jsonPath("$.totalAmount").value(0.00)).andReturn();
-            assertEquals(target.getId(), detail(result).patientId());
-            assertEquals(detail(result), detail(mvc.perform(request).andExpect(status().isOk()).andExpect(header().doesNotExist("Location")).andReturn()));
-        }
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST))
+            for (Patient target : List.of(own, other)) {
+                var request = request(role, false, key().getFirst(), staffBody(target, second.getId()));
+                var result = mvc.perform(request).andExpect(status().isCreated()).andExpect(header().doesNotExist("Location"))
+                        .andExpect(jsonPath("$.totalAmount").value(0.00)).andReturn();
+                assertEquals(target.getId(), detail(result).patientId());
+                assertEquals(detail(result), detail(mvc.perform(request).andExpect(status().isOk()).andExpect(header().doesNotExist("Location")).andReturn()));
+            }
         assertEquals(4, count("test_orders"));
         assertEquals(2, count("patients"));
     }
@@ -184,7 +209,8 @@ class OrderCreationTest extends IsolatedPostgresTest {
     @Test
     void creationAndPatientReadsHaveExactRolesWhileOtherRoutesStayDenied() throws Exception {
         for (Role role : Role.values()) {
-            if (role != Role.PATIENT) error(mvc.perform(request(role, true, key().getFirst(), body(first.getId()))), 403, "FORBIDDEN", null);
+            if (role != Role.PATIENT)
+                error(mvc.perform(request(role, true, key().getFirst(), body(first.getId()))), 403, "FORBIDDEN", null);
             if (role == Role.PATIENT || role == Role.LAB_TECHNICIAN)
                 error(mvc.perform(request(role, false, key().getFirst(), staffBody(other, first.getId()))), 403, "FORBIDDEN", null);
             for (String path : List.of("/api/orders", "/api/orders/" + UUID.randomUUID())) {
@@ -195,7 +221,7 @@ class OrderCreationTest extends IsolatedPostgresTest {
             mvc.perform(get("/api/orders/me/" + UUID.randomUUID()).header("Authorization", "Bearer " + tokens.get(role)))
                     .andExpect(status().is(role == Role.PATIENT ? 404 : 403));
             mvc.perform(post("/api/orders/" + UUID.randomUUID() + "/cancel").header("Authorization", "Bearer " + tokens.get(role))
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Synthetic cancellation\"}"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Synthetic cancellation\"}"))
                     .andExpect(status().is(role == Role.LAB_TECHNICIAN ? 403 : 404));
         }
         mvc.perform(post("/api/orders/me").contentType(MediaType.APPLICATION_JSON).header("Authorization", "Bearer invalid")
@@ -209,7 +235,7 @@ class OrderCreationTest extends IsolatedPostgresTest {
         jdbc.update("UPDATE patients SET user_id=NULL WHERE id=?", own.getId());
         error(mvc.perform(request(Role.PATIENT, true, key().getFirst(), body(first.getId()))), 404, "PATIENT_PROFILE_NOT_LINKED", null);
         error(mvc.perform(request(Role.ADMIN, false, key().getFirst(), staffBody(other, first.getId())).content(
-                json.writeValueAsString(Map.of("patientId", UUID.randomUUID().toString(), "testIds", List.of(first.getId().toString()))))),
+                        json.writeValueAsString(Map.of("patientId", UUID.randomUUID().toString(), "testIds", List.of(first.getId().toString()))))),
                 404, "PATIENT_NOT_FOUND", null);
         assertEquals(2, count("patients"));
         assertEquals(0, count("test_orders"));
@@ -321,9 +347,11 @@ class OrderCreationTest extends IsolatedPostgresTest {
         String key = key().getFirst();
         UUID id = detail(mvc.perform(request(Role.PATIENT, true, key, body(first.getId()))).andExpect(status().isCreated()).andReturn()).id();
         for (String state : List.of("IN_PROGRESS", "COMPLETED", "CANCELLED")) {
-            if (state.equals("CANCELLED")) jdbc.update("UPDATE test_orders SET status=?,cancelled_by=?,cancelled_at=created_at,"
-                    + "cancellation_reason='Synthetic prior cancellation' WHERE id=?", state, actors.get(Role.ADMIN).getId(), id);
-            else jdbc.update("UPDATE test_orders SET status=? WHERE id=?", state, id);
+            if (state.equals("CANCELLED"))
+                jdbc.update("UPDATE test_orders SET status=?,cancelled_by=?,cancelled_at=created_at,"
+                        + "cancellation_reason='Synthetic prior cancellation' WHERE id=?", state, actors.get(Role.ADMIN).getId(), id);
+            else
+                jdbc.update("UPDATE test_orders SET status=? WHERE id=?", state, id);
             var before = jdbc.queryForMap("SELECT * FROM test_orders WHERE id=?", id);
             var replay = detail(mvc.perform(request(Role.PATIENT, true, key, body(first.getId())))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value(state))
@@ -368,8 +396,9 @@ class OrderCreationTest extends IsolatedPostgresTest {
     @Test
     void maximumSelectionUsesExactTotalsAndOrderNumbersExpandBeyondSixDigits() throws Exception {
         List<String> ids = new ArrayList<>();
-        for (int i = 0; i < 100; i++) ids.add(tests.saveAndFlush(new LabTest("MAX_SYN_" + i, "Synthetic maximum test " + i,
-                null, new BigDecimal("9999999999.99"), "SYNTHETIC", null)).getId().toString());
+        for (int i = 0; i < 100; i++)
+            ids.add(tests.saveAndFlush(new LabTest("MAX_SYN_" + i, "Synthetic maximum test " + i,
+                    null, new BigDecimal("9999999999.99"), "SYNTHETIC", null)).getId().toString());
         // This sequence change is confined to the independently verified disposable test database.
         jdbc.queryForObject("SELECT setval('order_number_seq',1000000,false)", Long.class);
         var result = mvc.perform(request(Role.PATIENT, true, key().getFirst(), json.writeValueAsString(Map.of("testIds", ids))))
@@ -398,14 +427,14 @@ class OrderCreationTest extends IsolatedPostgresTest {
     @Test
     void corsAllowsRetryHeaderOnlyForConfiguredOrigins() throws Exception {
         mvc.perform(options("/api/orders/me").header("Origin", "http://localhost:5173")
-                .header("Access-Control-Request-Method", "POST")
-                .header("Access-Control-Request-Headers", "content-type,authorization,idempotency-key"))
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type,authorization,idempotency-key"))
                 .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
                 .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
                 .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsString("idempotency-key")))
                 .andExpect(header().string("Access-Control-Expose-Headers", "Location, X-Request-Id"));
         mvc.perform(options("/api/orders/me").header("Origin", "https://untrusted.example.invalid")
-                .header("Access-Control-Request-Method", "POST").header("Access-Control-Request-Headers", "Idempotency-Key"))
+                        .header("Access-Control-Request-Method", "POST").header("Access-Control-Request-Headers", "Idempotency-Key"))
                 .andExpect(status().isForbidden());
     }
 
@@ -472,8 +501,14 @@ class OrderCreationTest extends IsolatedPostgresTest {
         List<String> key = key();
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var a = executor.submit(() -> { start.await(); return service.createMe(actor(Role.PATIENT), selection(first.getId(), second.getId()), key); });
-            var b = executor.submit(() -> { start.await(); return service.createMe(actor(Role.PATIENT), selection(second.getId(), first.getId()), key); });
+            var a = executor.submit(() -> {
+                start.await();
+                return service.createMe(actor(Role.PATIENT), selection(first.getId(), second.getId()), key);
+            });
+            var b = executor.submit(() -> {
+                start.await();
+                return service.createMe(actor(Role.PATIENT), selection(second.getId(), first.getId()), key);
+            });
             start.countDown();
             var first = a.get(15, TimeUnit.SECONDS);
             var second = b.get(15, TimeUnit.SECONDS);
@@ -490,11 +525,16 @@ class OrderCreationTest extends IsolatedPostgresTest {
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
             List<Future<String>> results = new ArrayList<>();
-            for (UUID id : List.of(first.getId(), second.getId())) results.add(executor.submit(() -> {
-                start.await();
-                try { service.createMe(actor(Role.PATIENT), selection(id), key); return "CREATED"; }
-                catch (OrderException error) { return error.getCode(); }
-            }));
+            for (UUID id : List.of(first.getId(), second.getId()))
+                results.add(executor.submit(() -> {
+                    start.await();
+                    try {
+                        service.createMe(actor(Role.PATIENT), selection(id), key);
+                        return "CREATED";
+                    } catch (OrderException error) {
+                        return error.getCode();
+                    }
+                }));
             start.countDown();
             assertEquals(Set.of("CREATED", "IDEMPOTENCY_KEY_REUSED"), Set.of(results.get(0).get(15, TimeUnit.SECONDS), results.get(1).get(15, TimeUnit.SECONDS)));
         }
@@ -510,12 +550,16 @@ class OrderCreationTest extends IsolatedPostgresTest {
             for (int i = 0; i < 4; i++) {
                 Role role = i % 2 == 0 ? Role.ADMIN : Role.RECEPTIONIST;
                 List<String> key = key();
-                results.add(executor.submit(() -> { start.await(); return service.create(actor(role),
-                        new CreateStaffOrderRequest(other.getId().toString(), List.of(first.getId().toString())), key).order().id(); }));
+                results.add(executor.submit(() -> {
+                    start.await();
+                    return service.create(actor(role),
+                            new CreateStaffOrderRequest(other.getId().toString(), List.of(first.getId().toString())), key).order().id();
+                }));
             }
             start.countDown();
             Set<UUID> ids = new HashSet<>();
-            for (var result : results) ids.add(result.get(15, TimeUnit.SECONDS));
+            for (var result : results)
+                ids.add(result.get(15, TimeUnit.SECONDS));
             assertEquals(4, ids.size());
         }
         assertEquals(4, count("test_orders"));
@@ -533,20 +577,29 @@ class OrderCreationTest extends IsolatedPostgresTest {
                 changed.setActive(false);
                 tests.flush();
                 locked.countDown();
-                try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
-                catch (InterruptedException error) { throw new IllegalStateException(error); }
+                try {
+                    assertTrue(release.await(10, TimeUnit.SECONDS));
+                } catch (InterruptedException error) {
+                    throw new IllegalStateException(error);
+                }
                 return true;
             }));
             assertTrue(locked.await(5, TimeUnit.SECONDS));
             var creator = executor.submit(() -> {
                 started.countDown();
-                try { service.createMe(actor(Role.PATIENT), selection(first.getId()), key()); return "unexpected success"; }
-                catch (OrderException error) { return error.getCode(); }
+                try {
+                    service.createMe(actor(Role.PATIENT), selection(first.getId()), key());
+                    return "unexpected success";
+                } catch (OrderException error) {
+                    return error.getCode();
+                }
             });
             try {
                 assertTrue(started.await(5, TimeUnit.SECONDS));
                 assertThrows(TimeoutException.class, () -> creator.get(200, TimeUnit.MILLISECONDS));
-            } finally { release.countDown(); }
+            } finally {
+                release.countDown();
+            }
             assertTrue(writer.get(10, TimeUnit.SECONDS));
             assertEquals("ORDER_TEST_UNAVAILABLE", creator.get(10, TimeUnit.SECONDS));
         }

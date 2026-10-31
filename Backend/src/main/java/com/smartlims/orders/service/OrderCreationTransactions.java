@@ -12,10 +12,12 @@ import com.smartlims.orders.repository.TestOrderRepository;
 import com.smartlims.patients.entity.Patient;
 import com.smartlims.patients.repository.PatientRepository;
 import jakarta.persistence.EntityManager;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,8 +34,8 @@ public class OrderCreationTransactions {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public OrderCreationTransactions(UserAccountRepository users, PatientRepository patients,
-            LabTestRepository tests, TestOrderRepository orders, OrderMapper mapper, EntityManager entities,
-            com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                     LabTestRepository tests, TestOrderRepository orders, OrderMapper mapper, EntityManager entities,
+                                     com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.users = users;
         this.patients = patients;
         this.tests = tests;
@@ -47,7 +49,8 @@ public class OrderCreationTransactions {
     public OrderCreationResult create(Authentication actor, boolean self, UUID patientId, List<UUID> testIds, UUID key) {
         Context context = context(actor, self, patientId, testIds);
         OrderCreationResult prior = existing(context, key);
-        if (prior != null) return prior;
+        if (prior != null)
+            return prior;
         // PostgreSQL UUID order is lexical/unsigned; UUID.compareTo uses signed longs instead.
         var selected = testIds.stream().sorted(Comparator.comparing(UUID::toString))
                 .map(id -> tests.findForSnapshot(id).orElseThrow(OrderException::unavailable)).toList();
@@ -70,20 +73,28 @@ public class OrderCreationTransactions {
     }
 
     private Context context(Authentication actor, boolean self, UUID patientId, List<UUID> testIds) {
-        if (actor == null || !actor.isAuthenticated()) throw OrderException.unauthenticated();
+        if (actor == null || !actor.isAuthenticated())
+            throw OrderException.unauthenticated();
         List<Role> allowed = self ? List.of(Role.PATIENT) : List.of(Role.ADMIN, Role.RECEPTIONIST);
         if (allowed.stream().noneMatch(role -> actor.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role)))) throw OrderException.forbidden();
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role))))
+            throw OrderException.forbidden();
         UUID actorId;
-        try { actorId = UUID.fromString(actor.getName()); }
-        catch (IllegalArgumentException | NullPointerException error) { throw OrderException.unauthenticated(); }
+        try {
+            actorId = UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw OrderException.unauthenticated();
+        }
         UserAccount account = users.findWithLockById(actorId).orElseThrow(OrderException::unauthenticated);
-        if (!LoginEligibility.eligible(account)) throw OrderException.unauthenticated();
-        if (!allowed.contains(account.getRole())) throw OrderException.forbidden();
+        if (!LoginEligibility.eligible(account))
+            throw OrderException.unauthenticated();
+        if (!allowed.contains(account.getRole()))
+            throw OrderException.forbidden();
         UUID resolved = self ? patients.findByUser_Id(actorId).orElseThrow(OrderException::notLinked).getId() : patientId;
         Patient patient = patients.findWithLockById(resolved)
                 .orElseThrow(() -> self ? OrderException.notLinked() : OrderException.missingPatient());
-        if (self && (patient.getUser() == null || !patient.getUser().getId().equals(actorId))) throw OrderException.notLinked();
+        if (self && (patient.getUser() == null || !patient.getUser().getId().equals(actorId)))
+            throw OrderException.notLinked();
         return new Context(account, patient, OrderRequestFingerprint.hash(self, resolved, testIds));
     }
 
@@ -95,5 +106,6 @@ public class OrderCreationTransactions {
         }).orElse(null);
     }
 
-    private record Context(UserAccount actor, Patient patient, String hash) {}
+    private record Context(UserAccount actor, Patient patient, String hash) {
+    }
 }

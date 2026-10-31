@@ -8,12 +8,14 @@ import com.smartlims.auth.repository.*;
 import com.smartlims.auth.security.*;
 import com.smartlims.auth.service.*;
 import jakarta.servlet.http.Cookie;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,18 +43,30 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AuthenticationRegressionTest extends IsolatedPostgresTest {
-    @Autowired MockMvc mvc;
-    @MockitoSpyBean UserAccountRepository users;
-    @Autowired EmailActionTokenRepository tokens;
-    @Autowired PasswordEncoder passwords;
-    @Autowired PasswordRecoveryService recovery;
-    @Autowired AccountManagementService accounts;
-    @Autowired LoginService login;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired TransactionTemplate transactions;
-    @Autowired AdministratorCoordination coordination;
-    @Autowired JwtEncoder jwtEncoder;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @MockitoSpyBean
+    UserAccountRepository users;
+    @Autowired
+    EmailActionTokenRepository tokens;
+    @Autowired
+    PasswordEncoder passwords;
+    @Autowired
+    PasswordRecoveryService recovery;
+    @Autowired
+    AccountManagementService accounts;
+    @Autowired
+    LoginService login;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    TransactionTemplate transactions;
+    @Autowired
+    AdministratorCoordination coordination;
+    @Autowired
+    JwtEncoder jwtEncoder;
+    @MockitoBean
+    VerificationEmailSender email;
 
     private final AtomicReference<String> resetCode = new AtomicReference<>();
     private final AtomicReference<String> invitation = new AtomicReference<>();
@@ -63,9 +77,15 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(email);
         reset(users);
-        doAnswer(call -> { resetCode.set(call.getArgument(1)); return null; })
+        doAnswer(call -> {
+            resetCode.set(call.getArgument(1));
+            return null;
+        })
                 .when(email).sendPasswordReset(anyString(), anyString());
-        doAnswer(call -> { invitation.set(call.getArgument(2)); return null; })
+        doAnswer(call -> {
+            invitation.set(call.getArgument(2));
+            return null;
+        })
                 .when(email).sendSetPassword(anyString(), any(UUID.class), anyString());
     }
 
@@ -113,7 +133,8 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     void resetCanSucceedAfterFourFailuresAndRejectsExpiredCode() {
         UserAccount user = active("patient", Role.PATIENT);
         recovery.forgot(user.getEmail());
-        for (int i = 0; i < 4; i++) wrongReset(user);
+        for (int i = 0; i < 4; i++)
+            wrongReset(user);
         recovery.reset(new ResetPasswordRequest(user.getEmail(), resetCode.get(), "newpass1"));
         recovery.forgot(user.getEmail());
         jdbc.update("UPDATE users SET reset_code_expires_at = ? WHERE id = ?",
@@ -126,8 +147,16 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     void concurrentIncorrectResetAttemptsCannotBypassLimit() throws Exception {
         UserAccount user = active("patient", Role.PATIENT);
         recovery.forgot(user.getEmail());
-        runTogether(() -> { for (int i = 0; i < 3; i++) wrongReset(user); return "done"; },
-                () -> { for (int i = 0; i < 3; i++) wrongReset(user); return "done"; });
+        runTogether(() -> {
+                    for (int i = 0; i < 3; i++)
+                        wrongReset(user);
+                    return "done";
+                },
+                () -> {
+                    for (int i = 0; i < 3; i++)
+                        wrongReset(user);
+                    return "done";
+                });
         assertNull(users.findById(user.getId()).orElseThrow().getResetCodeHash());
     }
 
@@ -169,7 +198,8 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         Cookie token = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
         assertNotNull(token);
         request.cookie(token).header("X-XSRF-TOKEN", token.getValue());
-        if (access != null) request.cookie(new Cookie("access_token", access));
+        if (access != null)
+            request.cookie(new Cookie("access_token", access));
         return request;
     }
 
@@ -179,23 +209,28 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
             for (boolean header : List.of(false, true)) {
                 MockHttpServletRequestBuilder loginRequest = post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"emailOrUserName\":\"missing\",\"password\":\"abcdefgh\"}");
-                if (header) loginRequest.header("Authorization", "Bearer " + stale);
-                else loginRequest = csrf(loginRequest, stale);
+                if (header)
+                    loginRequest.header("Authorization", "Bearer " + stale);
+                else
+                    loginRequest = csrf(loginRequest, stale);
                 mvc.perform(loginRequest).andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
                 MockHttpServletRequestBuilder logout = csrf(post("/api/auth/logout"), stale);
-                if (header) logout.header("Authorization", "Bearer " + stale);
+                if (header)
+                    logout.header("Authorization", "Bearer " + stale);
                 mvc.perform(logout).andExpect(status().isOk());
                 for (String path : List.of("register", "cookie-login", "forgot-password", "reset-password", "set-password")) {
                     MockHttpServletRequestBuilder publicRequest = csrf(post("/api/auth/" + path)
                             .contentType(MediaType.APPLICATION_JSON).content("{}"), stale);
-                    if (header) publicRequest.header("Authorization", "Bearer " + stale);
+                    if (header)
+                        publicRequest.header("Authorization", "Bearer " + stale);
                     mvc.perform(publicRequest).andExpect(status().isBadRequest())
                             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
                 }
                 MockHttpServletRequestBuilder confirmation = get("/api/auth/confirm-email").param("token", "stale")
                         .param("userId", UUID.randomUUID().toString()).cookie(new Cookie("access_token", stale));
-                if (header) confirmation.header("Authorization", "Bearer " + stale);
+                if (header)
+                    confirmation.header("Authorization", "Bearer " + stale);
                 mvc.perform(confirmation).andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
                 mvc.perform(get("/api/auth/csrf-token").header("Authorization", "Bearer " + stale)
@@ -239,14 +274,17 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         Supplier<String> second = () -> {
             try {
                 switch (competingFlow) {
-                    case "creation" -> accounts.create(new CreateAccountRequest("Regression Staff", "two@example.invalid",
-                            " race ", "0000000000", Role.RECEPTIONIST));
+                    case "creation" ->
+                            accounts.create(new CreateAccountRequest("Regression Staff", "two@example.invalid",
+                                    " race ", "0000000000", Role.RECEPTIONIST));
                     case "update" -> accounts.update(existing.getId(), new UpdateAccountRequest("Regression Patient",
                             existing.getEmail(), " race ", "0000000000"));
                     default -> throw new IllegalArgumentException();
                 }
                 return "ok";
-            } catch (AuthRequestException failure) { return failure.getCode(); }
+            } catch (AuthRequestException failure) {
+                return failure.getCode();
+            }
         };
         List<String> result = runTogether(first, second);
         assertEquals(1, result.stream().filter("ok"::equals).count());
@@ -259,7 +297,9 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
             accounts.update(account.getId(), new UpdateAccountRequest("Regression Patient",
                     account.getEmail(), " race ", "0000000000"));
             return "ok";
-        } catch (AuthRequestException failure) { return failure.getCode(); }
+        } catch (AuthRequestException failure) {
+            return failure.getCode();
+        }
     }
 
     private String deletedToken() {
@@ -280,7 +320,7 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         mvc.perform(post("/api/auth/cookie-login").cookie(before).header("X-XSRF-TOKEN", "wrong")
                 .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
         MvcResult result = mvc.perform(post("/api/auth/cookie-login").cookie(before)
-                .header("X-XSRF-TOKEN", before.getValue()).contentType(MediaType.APPLICATION_JSON).content(body))
+                        .header("X-XSRF-TOKEN", before.getValue()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andReturn();
         Cookie after = result.getResponse().getCookie("XSRF-TOKEN");
         Cookie access = result.getResponse().getCookie("access_token");
@@ -317,13 +357,13 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         mvc.perform(get("/api/auth/me").header("Authorization", "Basic ignored").cookie(new Cookie("access_token", jwt)))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/cookie-login").header("Authorization", "Bearer " + jwt)
-                .contentType(MediaType.APPLICATION_JSON).content("{}")) .andExpect(status().isForbidden());
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
     }
 
     @Test
     void corsOnlyAllowsConfiguredExactOrigin() throws Exception {
         mvc.perform(options("/api/users").header("Origin", "http://localhost:5173")
-                .header("Access-Control-Request-Method", "POST").header("Access-Control-Request-Headers", "X-XSRF-TOKEN"))
+                        .header("Access-Control-Request-Method", "POST").header("Access-Control-Request-Headers", "X-XSRF-TOKEN"))
                 .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
         mvc.perform(options("/api/users").header("Origin", "https://untrusted.example.invalid")
                 .header("Access-Control-Request-Method", "POST")).andExpect(status().isForbidden());
@@ -355,7 +395,9 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
                 default -> throw new IllegalArgumentException();
             }
             return "ok";
-        } catch (AuthRequestException failure) { return failure.getCode(); }
+        } catch (AuthRequestException failure) {
+            return failure.getCode();
+        }
     }
 
     @Test
@@ -386,10 +428,10 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         String same = "{\"fullName\":\"Updated Profile\",\"email\":\" PATIENT@EXAMPLE.INVALID \","
                 + "\"userName\":\" patient-updated \",\"phoneNumber\":\"0000000000\"}";
         mvc.perform(put("/api/users/" + patient.getId()).header("Authorization", "Bearer " + jwt)
-                .contentType(MediaType.APPLICATION_JSON).content(same)).andExpect(status().isOk())
+                        .contentType(MediaType.APPLICATION_JSON).content(same)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(patient.getEmail()));
         mvc.perform(put("/api/users/" + patient.getId()).header("Authorization", "Bearer " + jwt)
-                .contentType(MediaType.APPLICATION_JSON).content(same.replace(" PATIENT@EXAMPLE.INVALID ", "different@example.invalid")))
+                        .contentType(MediaType.APPLICATION_JSON).content(same.replace(" PATIENT@EXAMPLE.INVALID ", "different@example.invalid")))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("EMAIL_CHANGE_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.fieldErrors.email").exists());
     }
@@ -399,8 +441,12 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         CreateAccountRequest profile = new CreateAccountRequest("Regression Administrator", "first@example.invalid",
                 "first", "0000000000", Role.ADMIN);
         Supplier<String> provision = () -> {
-            try { accounts.provisionFirstAdministrator(profile); return "ok"; }
-            catch (AuthRequestException failure) { return failure.getCode(); }
+            try {
+                accounts.provisionFirstAdministrator(profile);
+                return "ok";
+            } catch (AuthRequestException failure) {
+                return failure.getCode();
+            }
         };
         List<String> results = runTogether(provision, provision);
         assertTrue(results.contains("ok"));
@@ -419,8 +465,16 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Callable<String> one = () -> { ready.countDown(); start.await(); return first.get(); };
-            Callable<String> two = () -> { ready.countDown(); start.await(); return second.get(); };
+            Callable<String> one = () -> {
+                ready.countDown();
+                start.await();
+                return first.get();
+            };
+            Callable<String> two = () -> {
+                ready.countDown();
+                start.await();
+                return second.get();
+            };
             Future<String> a = executor.submit(one);
             Future<String> b = executor.submit(two);
             assertTrue(ready.await(5, TimeUnit.SECONDS));

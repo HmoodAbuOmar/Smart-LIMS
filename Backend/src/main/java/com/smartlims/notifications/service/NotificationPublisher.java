@@ -7,12 +7,17 @@ import com.smartlims.results.entity.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 
-/** Durable in-app records participate in the source transaction, including rollback. */
+/**
+ * Durable in-app records participate in the source transaction, including rollback.
+ */
 @Service
 @Transactional(propagation = Propagation.MANDATORY)
 public class NotificationPublisher {
     private final PatientNotificationRepository notifications;
-    public NotificationPublisher(PatientNotificationRepository notifications) { this.notifications = notifications; }
+
+    public NotificationPublisher(PatientNotificationRepository notifications) {
+        this.notifications = notifications;
+    }
 
     public void order(TestOrder order) {
         String type = "ORDER_" + (order.getStatus().name().equals("PENDING") ? "CREATED" : order.getStatus().name());
@@ -31,7 +36,8 @@ public class NotificationPublisher {
     }
 
     public void publication(TestResult result) {
-        if (result.getStatus() != ResultStatus.PUBLISHED) throw new IllegalStateException("Publication required");
+        if (result.getStatus() != ResultStatus.PUBLISHED)
+            throw new IllegalStateException("Publication required");
         var order = result.getItem().getOrder();
         String type = result.getPrevious() == null ? "RESULT_PUBLISHED" : "RESULT_CORRECTED";
         notifications.insert(order.getPatient().getId(), order.getId(), null, result.getId(), "RESULTS", type,

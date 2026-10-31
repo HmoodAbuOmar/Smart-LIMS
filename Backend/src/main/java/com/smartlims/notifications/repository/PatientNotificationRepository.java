@@ -1,7 +1,9 @@
 package com.smartlims.notifications.repository;
 
 import com.smartlims.notifications.entity.PatientNotification;
+
 import java.util.*;
+
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
@@ -19,7 +21,7 @@ public interface PatientNotificationRepository extends JpaRepository<PatientNoti
     @Query(value = "SELECT n.* FROM patient_notifications n WHERE " + FILTER + "ORDER BY n.created_at DESC,n.id ASC",
             countQuery = "SELECT count(*) FROM patient_notifications n WHERE " + FILTER, nativeQuery = true)
     Page<PatientNotification> page(@Param("user") UUID user, @Param("category") String category,
-            @Param("unread") Boolean unread, Pageable pageable);
+                                   @Param("unread") Boolean unread, Pageable pageable);
 
     @Query(value = "SELECT count(*) FROM patient_notifications n WHERE " + FILTER, nativeQuery = true)
     long countVisible(@Param("user") UUID user, @Param("category") String category, @Param("unread") Boolean unread);
@@ -41,6 +43,6 @@ public interface PatientNotificationRepository extends JpaRepository<PatientNoti
     @Query(value = "INSERT INTO patient_notifications(patient_id,order_id,appointment_id,result_id,category,event_type,event_key,title,message) "
             + "VALUES (:patient,:order,:appointment,:result,:category,:type,:key,:title,:message) ON CONFLICT(event_key) DO NOTHING", nativeQuery = true)
     int insert(@Param("patient") UUID patient, @Param("order") UUID order, @Param("appointment") UUID appointment,
-            @Param("result") UUID result, @Param("category") String category, @Param("type") String type,
-            @Param("key") String key, @Param("title") String title, @Param("message") String message);
+               @Param("result") UUID result, @Param("category") String category, @Param("type") String type,
+               @Param("key") String key, @Param("title") String title, @Param("message") String message);
 }

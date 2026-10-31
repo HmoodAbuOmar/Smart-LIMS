@@ -7,5 +7,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 public record LinkPatientRequest(
         @JsonDeserialize(using = PatientJson.Text.class) @NotBlank @Size(max = 128) String token) {
     @Override
-    public String toString() { return "LinkPatientRequest[token=REDACTED]"; }
+    public String toString() {
+        return "LinkPatientRequest[token=REDACTED]";
+    }
 }

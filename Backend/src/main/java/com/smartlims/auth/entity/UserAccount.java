@@ -8,8 +8,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
 import java.time.Instant;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -117,15 +119,25 @@ public class UserAccount {
         clearResetCode();
     }
 
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-    public void setRole(Role role) { this.role = role; }
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
     public void setProfile(String fullName, String email, String userName, String phoneNumber) {
         this.fullName = fullName;
         this.email = email;
         this.userName = userName;
         this.phoneNumber = phoneNumber;
     }
-    public boolean locked(Instant now) { return lockedUntil != null && lockedUntil.isAfter(now); }
+
+    public boolean locked(Instant now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
     public void failedLogin(Instant now) {
         failedLoginAttempts++;
         if (failedLoginAttempts >= 5) {
@@ -133,22 +145,32 @@ public class UserAccount {
             failedLoginAttempts = 0;
         }
     }
-    public void successfulLogin() { failedLoginAttempts = 0; lockedUntil = null; }
+
+    public void successfulLogin() {
+        failedLoginAttempts = 0;
+        lockedUntil = null;
+    }
+
     public void setResetCode(String hash, Instant expiresAt) {
         resetCodeHash = hash;
         resetCodeExpiresAt = expiresAt;
         resetCodeFailedAttempts = 0;
     }
+
     public void incorrectResetCode() {
-        if (++resetCodeFailedAttempts >= 5) clearResetCode();
+        if (++resetCodeFailedAttempts >= 5)
+            clearResetCode();
     }
+
     public void clearResetCode() {
         resetCodeHash = null;
         resetCodeExpiresAt = null;
         resetCodeFailedAttempts = 0;
     }
 
-    public void markFirstAdministratorInvitation() { origin = AccountOrigin.FIRST_ADMIN_INVITATION; }
+    public void markFirstAdministratorInvitation() {
+        origin = AccountOrigin.FIRST_ADMIN_INVITATION;
+    }
 
     public void changePassword(String passwordHash) {
         this.passwordHash = passwordHash;

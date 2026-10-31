@@ -2,11 +2,13 @@ package com.smartlims.orders.repository;
 
 import com.smartlims.orders.entity.TestOrder;
 import jakarta.persistence.LockModeType;
+
 import java.util.Optional;
 import java.util.Collection;
 import java.util.List;
 import java.math.BigDecimal;
 import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -25,7 +27,9 @@ public interface TestOrderRepository extends JpaRepository<TestOrder, UUID>, Jpa
 
     interface ItemTotals {
         UUID getOrderId();
+
         long getTestCount();
+
         BigDecimal getTotalAmount();
     }
 

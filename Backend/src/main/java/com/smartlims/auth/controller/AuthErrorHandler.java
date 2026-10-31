@@ -3,9 +3,11 @@ package com.smartlims.auth.controller;
 import com.smartlims.auth.email.MailDeliveryException;
 import com.smartlims.auth.service.AuthRequestException;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
@@ -44,12 +46,13 @@ public class AuthErrorHandler {
     }
 
     private ResponseEntity<ApiError> respond(HttpStatus status, String code, String message,
-            Map<String, String> fields, HttpServletResponse response) {
+                                             Map<String, String> fields, HttpServletResponse response) {
         String requestId = UUID.randomUUID().toString();
         response.setHeader("X-Request-Id", requestId);
         return ResponseEntity.status(status).header("Cache-Control", "no-store")
                 .body(new ApiError(code, message, fields, requestId));
     }
 
-    public record ApiError(String code, String message, Map<String, String> fieldErrors, String requestId) {}
+    public record ApiError(String code, String message, Map<String, String> fieldErrors, String requestId) {
+    }
 }

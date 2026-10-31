@@ -6,9 +6,11 @@ import com.smartlims.orders.exception.OrderException;
 import com.smartlims.orders.service.OrderCancellationService;
 import com.smartlims.patients.entity.Patient;
 import jakarta.servlet.http.Cookie;
+
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -20,15 +22,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class OrderCancellationTest extends OrderWorkflowTestSupport {
-    @Autowired OrderCancellationService cancellations;
+    @Autowired
+    OrderCancellationService cancellations;
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder cancel(Role role, UUID id, String body) {
         return bearer(post("/api/orders/" + id + "/cancel").contentType(MediaType.APPLICATION_JSON).content(body), role);
     }
-    private Map<String, Object> stored(UUID id) { return jdbc.queryForMap("SELECT * FROM test_orders WHERE id=?", id); }
+
+    private Map<String, Object> stored(UUID id) {
+        return jdbc.queryForMap("SELECT * FROM test_orders WHERE id=?", id);
+    }
+
     private List<String> items(UUID id) {
         return jdbc.queryForList("SELECT row_to_json(i)::text FROM order_items i WHERE order_id=? ORDER BY id", String.class, id);
     }
+
     private OrderDetailResponse response(org.springframework.test.web.servlet.MvcResult result) {
         return json.readValue(result.getResponse().getContentAsByteArray(), OrderDetailResponse.class);
     }
@@ -68,14 +76,15 @@ class OrderCancellationTest extends OrderWorkflowTestSupport {
 
     @Test
     void bothStaffRolesCancelLinkedOtherAndUnlinkedProfilesWithTrimmedReasons() throws Exception {
-        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST)) for (Patient target : List.of(own, other, unlinked)) {
-            var initial = create(target, first);
-            var result = response(mvc.perform(cancel(role, initial.id(), "{\"reason\":\" Synthetic staff request \"}"))
-                    .andExpect(status().isOk()).andReturn());
-            assertEquals("Synthetic staff request", result.cancellationReason());
-            assertEquals(actors.get(role).getId(), stored(initial.id()).get("cancelled_by"));
-            assertEquals(initial.items(), result.items());
-        }
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST))
+            for (Patient target : List.of(own, other, unlinked)) {
+                var initial = create(target, first);
+                var result = response(mvc.perform(cancel(role, initial.id(), "{\"reason\":\" Synthetic staff request \"}"))
+                        .andExpect(status().isOk()).andReturn());
+                assertEquals("Synthetic staff request", result.cancellationReason());
+                assertEquals(actors.get(role).getId(), stored(initial.id()).get("cancelled_by"));
+                assertEquals(initial.items(), result.items());
+            }
     }
 
     @Test
@@ -97,15 +106,16 @@ class OrderCancellationTest extends OrderWorkflowTestSupport {
 
     @Test
     void missingUnlinkedAndUnownedOrdersAlwaysReturnTheSame404BeforeDisclosingState() throws Exception {
-        for (Patient target : List.of(other, unlinked)) for (String state : List.of("PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED")) {
-            var hidden = create(target, first);
-            state(hidden.id(), state);
-            var before = stored(hidden.id());
-            var result = mvc.perform(cancel(Role.PATIENT, hidden.id(), "{}"));
-            error(result, 404, "ORDER_NOT_FOUND", null);
-            result.andExpect(jsonPath("$.message").value("Order not found."));
-            assertEquals(before, stored(hidden.id()));
-        }
+        for (Patient target : List.of(other, unlinked))
+            for (String state : List.of("PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED")) {
+                var hidden = create(target, first);
+                state(hidden.id(), state);
+                var before = stored(hidden.id());
+                var result = mvc.perform(cancel(Role.PATIENT, hidden.id(), "{}"));
+                error(result, 404, "ORDER_NOT_FOUND", null);
+                result.andExpect(jsonPath("$.message").value("Order not found."));
+                assertEquals(before, stored(hidden.id()));
+            }
         error(mvc.perform(cancel(Role.PATIENT, UUID.randomUUID(), "{}")), 404, "ORDER_NOT_FOUND", null);
         error(mvc.perform(cancel(Role.ADMIN, UUID.randomUUID(), "{\"reason\":\"Synthetic reason\"}")), 404, "ORDER_NOT_FOUND", null);
         var owned = create(own, first);
@@ -117,10 +127,11 @@ class OrderCancellationTest extends OrderWorkflowTestSupport {
     void staffReasonIsRequiredEvenForRepeatsAndPatientBlankReasonRemainsNull() throws Exception {
         var initial = create(own, first);
         var before = stored(initial.id());
-        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST)) for (String body : List.of("{}", "{\"reason\":null}", "{\"reason\":\"\"}", "{\"reason\":\" \\t \"}")) {
-            error(mvc.perform(cancel(role, initial.id(), body)), 400, "VALIDATION_ERROR", "reason");
-            assertEquals(before, stored(initial.id()));
-        }
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST))
+            for (String body : List.of("{}", "{\"reason\":null}", "{\"reason\":\"\"}", "{\"reason\":\" \\t \"}")) {
+                error(mvc.perform(cancel(role, initial.id(), body)), 400, "VALIDATION_ERROR", "reason");
+                assertEquals(before, stored(initial.id()));
+            }
         var cancelled = response(mvc.perform(cancel(Role.PATIENT, initial.id(), "{}")).andExpect(status().isOk()).andReturn());
         assertNull(cancelled.cancellationReason());
         error(mvc.perform(cancel(Role.ADMIN, initial.id(), "{}")), 400, "VALIDATION_ERROR", "reason");
@@ -267,8 +278,14 @@ class OrderCancellationTest extends OrderWorkflowTestSupport {
         var initial = create(own, first, free);
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var patient = executor.submit(() -> { start.await(); return cancellations.cancel(actor(Role.PATIENT), initial.id().toString(), new CancelOrderRequest("Patient synthetic request")); });
-            var staff = executor.submit(() -> { start.await(); return cancellations.cancel(actor(Role.ADMIN), initial.id().toString(), new CancelOrderRequest("Staff synthetic request")); });
+            var patient = executor.submit(() -> {
+                start.await();
+                return cancellations.cancel(actor(Role.PATIENT), initial.id().toString(), new CancelOrderRequest("Patient synthetic request"));
+            });
+            var staff = executor.submit(() -> {
+                start.await();
+                return cancellations.cancel(actor(Role.ADMIN), initial.id().toString(), new CancelOrderRequest("Staff synthetic request"));
+            });
             start.countDown();
             var first = patient.get(15, TimeUnit.SECONDS);
             var second = staff.get(15, TimeUnit.SECONDS);
@@ -297,13 +314,19 @@ class OrderCancellationTest extends OrderWorkflowTestSupport {
             assertTrue(locked.await(5, TimeUnit.SECONDS));
             var cancellation = executor.submit(() -> {
                 started.countDown();
-                try { cancellations.cancel(actor(Role.PATIENT), initial.id().toString(), new CancelOrderRequest(null)); return "unexpected success"; }
-                catch (OrderException error) { return error.getCode(); }
+                try {
+                    cancellations.cancel(actor(Role.PATIENT), initial.id().toString(), new CancelOrderRequest(null));
+                    return "unexpected success";
+                } catch (OrderException error) {
+                    return error.getCode();
+                }
             });
             try {
                 assertTrue(started.await(5, TimeUnit.SECONDS));
                 assertThrows(TimeoutException.class, () -> cancellation.get(200, TimeUnit.MILLISECONDS));
-            } finally { release.countDown(); }
+            } finally {
+                release.countDown();
+            }
             assertTrue(processing.get(10, TimeUnit.SECONDS));
             assertEquals("ORDER_NOT_CANCELLABLE", cancellation.get(10, TimeUnit.SECONDS));
         }
@@ -330,13 +353,19 @@ class OrderCancellationTest extends OrderWorkflowTestSupport {
             try {
                 var cancellation = executor.submit(() -> cancellations.cancel(actor(Role.PATIENT), initial.id().toString(), new CancelOrderRequest(null)));
                 assertEquals("CANCELLED", cancellation.get(5, TimeUnit.SECONDS).status().name());
-            } finally { release.countDown(); }
+            } finally {
+                release.countDown();
+            }
             assertTrue(profileWriter.get(10, TimeUnit.SECONDS));
         }
     }
 
     private void await(CountDownLatch latch) {
-        try { assertTrue(latch.await(10, TimeUnit.SECONDS)); }
-        catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IllegalStateException(error); }
+        try {
+            assertTrue(latch.await(10, TimeUnit.SECONDS));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(error);
+        }
     }
 }

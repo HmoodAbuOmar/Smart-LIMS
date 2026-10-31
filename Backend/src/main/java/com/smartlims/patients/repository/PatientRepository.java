@@ -2,8 +2,10 @@ package com.smartlims.patients.repository;
 
 import com.smartlims.patients.entity.Patient;
 import jakarta.persistence.LockModeType;
+
 import java.util.Optional;
 import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +17,7 @@ public interface PatientRepository extends JpaRepository<Patient, UUID>, JpaSpec
     Optional<Patient> findByIdAndUser_Id(UUID id, UUID userId);
 
     Optional<Patient> findByUser_Id(UUID userId);
+
     boolean existsByUser_Id(UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -2,9 +2,11 @@ package com.smartlims.orders.entity;
 
 import com.smartlims.labtests.entity.LabTest;
 import jakarta.persistence.*;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +19,8 @@ import org.hibernate.annotations.Immutable;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderItem {
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false, updatable = false)
@@ -31,7 +34,8 @@ public class OrderItem {
     private String testNameSnapshot;
     @Column(name = "price_at_order", nullable = false, precision = 12, scale = 2, updatable = false)
     private BigDecimal priceAtOrder;
-    @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     OrderItem(TestOrder order, LabTest test) {

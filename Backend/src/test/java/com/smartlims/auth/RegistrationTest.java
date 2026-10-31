@@ -16,10 +16,12 @@ import com.smartlims.auth.service.LoginService;
 import com.smartlims.auth.service.RegistrationService;
 import com.smartlims.auth.service.VerificationTokens;
 import jakarta.servlet.http.Cookie;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,17 +47,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class RegistrationTest extends IsolatedPostgresTest {
-    @Autowired MockMvc mvc;
-    @Autowired JsonMapper json;
-    @Autowired UserAccountRepository users;
-    @Autowired EmailActionTokenRepository tokens;
-    @Autowired PasswordEncoder passwords;
-    @Autowired RegistrationService registration;
-    @Autowired LoginService login;
-    @Autowired AccountManagementService accounts;
-    @Autowired VerificationTokens hashes;
-    @Autowired JdbcTemplate jdbc;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    JsonMapper json;
+    @Autowired
+    UserAccountRepository users;
+    @Autowired
+    EmailActionTokenRepository tokens;
+    @Autowired
+    PasswordEncoder passwords;
+    @Autowired
+    RegistrationService registration;
+    @Autowired
+    LoginService login;
+    @Autowired
+    AccountManagementService accounts;
+    @Autowired
+    VerificationTokens hashes;
+    @Autowired
+    JdbcTemplate jdbc;
+    @MockitoBean
+    VerificationEmailSender email;
     private final AtomicReference<String> verification = new AtomicReference<>();
 
     @BeforeEach
@@ -63,7 +76,10 @@ class RegistrationTest extends IsolatedPostgresTest {
         jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(email);
         verification.set(null);
-        doAnswer(call -> { verification.set(call.getArgument(2)); return null; })
+        doAnswer(call -> {
+            verification.set(call.getArgument(2));
+            return null;
+        })
                 .when(email).sendVerification(anyString(), any(), anyString());
     }
 
@@ -165,10 +181,10 @@ class RegistrationTest extends IsolatedPostgresTest {
         mvc.perform(get("/api/auth/confirm-email").param("userId", user.getId().toString())
                 .param("token", verification.get())).andExpect(status().isOk());
         mvc.perform(get("/api/auth/confirm-email").param("userId", user.getId().toString())
-                .param("token", verification.get())).andExpect(status().isBadRequest())
+                        .param("token", verification.get())).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
         MvcResult loggedIn = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"emailOrUserName\":\"registered@example.invalid\",\"password\":\"abcdefgh\"}"))
+                        .content("{\"emailOrUserName\":\"registered@example.invalid\",\"password\":\"abcdefgh\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.token").isString()).andReturn();
         String jwt = json.readTree(loggedIn.getResponse().getContentAsString()).get("token").asString();
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk())
@@ -178,8 +194,8 @@ class RegistrationTest extends IsolatedPostgresTest {
         Cookie csrf = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
         assertNotNull(csrf);
         MvcResult cookieLogin = mvc.perform(post("/api/auth/cookie-login").cookie(csrf)
-                .header("X-XSRF-TOKEN", csrf.getValue()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"emailOrUserName\":\"registered@example.invalid\",\"password\":\"abcdefgh\"}"))
+                        .header("X-XSRF-TOKEN", csrf.getValue()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"emailOrUserName\":\"registered@example.invalid\",\"password\":\"abcdefgh\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.userName").isEmpty())
                 .andExpect(jsonPath("$.user.phoneNumber").isEmpty()).andReturn();
         Cookie access = cookieLogin.getResponse().getCookie("access_token");
@@ -239,11 +255,11 @@ class RegistrationTest extends IsolatedPostgresTest {
                 {"fullName":"Profile Name","dateOfBirth":"2000-01-01","gender":"UNKNOWN"}
                 """;
         mvc.perform(post("/api/patients/me").header("Authorization", "Bearer " + jwt)
-                .contentType(MediaType.APPLICATION_JSON).content(demographics)).andExpect(status().isBadRequest())
+                        .contentType(MediaType.APPLICATION_JSON).content(demographics)).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.phoneNumber").exists());
         String complete = demographics.strip().replace("}", ",\"phoneNumber\":\"000001\"}");
         mvc.perform(post("/api/patients/me").header("Authorization", "Bearer " + jwt)
-                .contentType(MediaType.APPLICATION_JSON).content(complete)).andExpect(status().isCreated())
+                        .contentType(MediaType.APPLICATION_JSON).content(complete)).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.fullName").value("Profile Name"));
         UserAccount afterProfile = users.findById(registered.id()).orElseThrow();
         assertEquals("Account Name", afterProfile.getFullName());

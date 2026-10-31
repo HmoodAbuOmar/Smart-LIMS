@@ -4,9 +4,11 @@ import com.smartlims.auth.controller.AuthErrorHandler.ApiError;
 import com.smartlims.orders.controller.OrderController;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -54,7 +56,7 @@ public class OrderErrorHandler {
     }
 
     private ResponseEntity<ApiError> respond(HttpStatus status, String code, String message,
-            Map<String, String> fields, HttpServletResponse response) {
+                                             Map<String, String> fields, HttpServletResponse response) {
         String requestId = UUID.randomUUID().toString();
         response.setHeader("X-Request-Id", requestId);
         return ResponseEntity.status(status).header("Cache-Control", "no-store")

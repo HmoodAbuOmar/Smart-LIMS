@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BrowserSecurityTest {
@@ -30,7 +31,7 @@ class BrowserSecurityTest {
 
     @Test
     void cookieIssuingAndClearingUseCompatibleFlags() {
-        for (boolean secure : new boolean[] {true, false}) {
+        for (boolean secure : new boolean[]{true, false}) {
             var factory = new AccessCookieFactory(secure, 60);
             var environment = new MockEnvironment().withProperty("spring.profiles.active", "local");
             environment.setActiveProfiles("local");
@@ -44,7 +45,7 @@ class BrowserSecurityTest {
             assertFalse(csrf.isHttpOnly());
             assertEquals(secure, csrf.getSecure());
             assertEquals(secure ? "None" : "Lax", csrf.getAttribute("SameSite"));
-            for (var cookie : new org.springframework.http.ResponseCookie[] {factory.issued("test"), factory.cleared()}) {
+            for (var cookie : new org.springframework.http.ResponseCookie[]{factory.issued("test"), factory.cleared()}) {
                 assertTrue(cookie.isHttpOnly());
                 assertEquals(secure, cookie.isSecure());
                 assertEquals(secure ? "None" : "Lax", cookie.getSameSite());

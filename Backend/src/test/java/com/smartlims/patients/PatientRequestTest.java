@@ -6,10 +6,13 @@ import com.smartlims.patients.dto.PatientQueryRequest;
 import com.smartlims.patients.entity.PatientGender;
 import com.smartlims.patients.exception.PatientValidationException;
 import jakarta.validation.Validation;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class PatientRequestTest {

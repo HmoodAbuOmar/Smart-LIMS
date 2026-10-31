@@ -12,7 +12,9 @@ import com.smartlims.samples.entity.Sample;
 import com.smartlims.visits.dto.VisitArchiveResponse;
 import com.smartlims.visits.entity.Visit;
 import com.smartlims.visits.repository.VisitRepository;
+
 import java.util.*;
+
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
@@ -28,7 +30,7 @@ public class VisitArchiveService {
     private final ResultMapping mapping;
 
     public VisitArchiveService(LaboratoryAccess access, PatientRepository patients,
-            VisitRepository visits, TestResultRepository results, ResultMapping mapping) {
+                               VisitRepository visits, TestResultRepository results, ResultMapping mapping) {
         this.access = access;
         this.patients = patients;
         this.visits = visits;
@@ -43,11 +45,15 @@ public class VisitArchiveService {
         var testId = query.optionalId("testId");
         ResultValue.Flag flag = null;
         if (query.values().containsKey("resultStatus")) {
-            try { flag = ResultValue.Flag.valueOf(query.get("resultStatus", "")); }
-            catch (IllegalArgumentException e) { throw LaboratoryException.invalid("resultStatus"); }
+            try {
+                flag = ResultValue.Flag.valueOf(query.get("resultStatus", ""));
+            } catch (IllegalArgumentException e) {
+                throw LaboratoryException.invalid("resultStatus");
+            }
         }
         var user = access.current(actor, Role.PATIENT);
-        if (!patients.existsByUser_Id(user.getId())) throw LaboratoryException.notLinked();
+        if (!patients.existsByUser_Id(user.getId()))
+            throw LaboratoryException.notLinked();
         var selectedFlag = flag;
         Specification<Visit> spec = (v, q, c) -> {
             var published = q.subquery(Integer.class);
@@ -59,7 +65,8 @@ public class VisitArchiveService {
             conditions.add(c.equal(sample.get("visit"), v));
             conditions.add(c.isTrue(r.get("current")));
             conditions.add(c.equal(r.get("status"), ResultStatus.PUBLISHED));
-            if (testId != null) conditions.add(c.equal(r.get("item").get("labTest").get("id"), testId));
+            if (testId != null)
+                conditions.add(c.equal(r.get("item").get("labTest").get("id"), testId));
             if (selectedFlag != null) {
                 var value = r.join("values");
                 conditions.add(c.equal(value.get("flag"), selectedFlag));
@@ -87,15 +94,16 @@ public class VisitArchiveService {
     public LaboratoryQuery.PageBody<VisitArchiveResponse.TestOption> tests(Authentication actor, LaboratoryQuery query) {
         var search = HistoryDates.search(query).toLowerCase(Locale.ROOT);
         var user = access.current(actor, Role.PATIENT);
-        if (!patients.existsByUser_Id(user.getId())) throw LaboratoryException.notLinked();
+        if (!patients.existsByUser_Id(user.getId()))
+            throw LaboratoryException.notLinked();
         // Keep a historical choice even if the catalog or parameter has been deactivated.
         var options = new LinkedHashMap<UUID, VisitArchiveResponse.TestOption>();
         results.archivedForPatient(user.getId()).stream().sorted(Comparator.comparing(TestResult::getMeasuredAt).reversed()
                 .thenComparing(r -> r.getId().toString())).forEach(r -> {
-                    var item = r.getItem();
-                    options.putIfAbsent(item.getLabTest().getId(), new VisitArchiveResponse.TestOption(item.getLabTest().getId(),
-                            item.getTestCodeSnapshot(), item.getTestNameSnapshot()));
-                });
+            var item = r.getItem();
+            options.putIfAbsent(item.getLabTest().getId(), new VisitArchiveResponse.TestOption(item.getLabTest().getId(),
+                    item.getTestCodeSnapshot(), item.getTestNameSnapshot()));
+        });
         var selected = options.values().stream().filter(o -> search.isEmpty()
                         || o.testCode().toLowerCase(Locale.ROOT).contains(search) || o.testName().toLowerCase(Locale.ROOT).contains(search))
                 .sorted(Comparator.comparing(VisitArchiveResponse.TestOption::testName)
@@ -112,12 +120,15 @@ public class VisitArchiveService {
     public VisitArchiveResponse.Detail get(Authentication actor, String id) {
         var key = LaboratoryInput.uuid(id, "id");
         var user = access.current(actor, Role.PATIENT);
-        if (!patients.existsByUser_Id(user.getId())) throw LaboratoryException.notLinked();
+        if (!patients.existsByUser_Id(user.getId()))
+            throw LaboratoryException.notLinked();
         var visit = visits.findById(key).orElseThrow(() -> LaboratoryException.missing("VISIT"));
         access.own(user, visit.getOrder(), "VISIT");
-        if (visit.getStatus() != Visit.Status.COMPLETED) throw LaboratoryException.missing("VISIT");
+        if (visit.getStatus() != Visit.Status.COMPLETED)
+            throw LaboratoryException.missing("VISIT");
         var published = results.currentForVisit(key);
-        if (published.isEmpty()) throw LaboratoryException.missing("VISIT");
+        if (published.isEmpty())
+            throw LaboratoryException.missing("VISIT");
         return new VisitArchiveResponse.Detail(row(visit, published), published.stream().map(r -> mapping.detail(r, true)).toList());
     }
 

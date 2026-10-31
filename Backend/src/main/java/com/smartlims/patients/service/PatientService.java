@@ -18,12 +18,14 @@ import com.smartlims.patients.repository.PatientRepository;
 import com.smartlims.patients.repository.PatientLinkTokenRepository;
 import com.smartlims.patients.specification.PatientSpecifications;
 import jakarta.validation.Valid;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -45,7 +47,7 @@ public class PatientService {
     private final VerificationTokens tokenValues;
 
     public PatientService(PatientRepository patients, UserAccountRepository users, PatientMapper mapper,
-            PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues) {
+                          PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues) {
         this.patients = patients;
         this.users = users;
         this.mapper = mapper;
@@ -86,7 +88,8 @@ public class PatientService {
     @Transactional
     public PatientResponse createMe(Authentication actor, @Valid CreatePatientRequest request) {
         UserAccount account = currentAccount(actor, true, "PATIENT");
-        if (patients.existsByUser_Id(account.getId())) throw PatientProfileException.conflict();
+        if (patients.existsByUser_Id(account.getId()))
+            throw PatientProfileException.conflict();
         validateBirthDate(request.dateOfBirth());
         String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
         Patient patient = new Patient(number, account, request.fullName(), request.dateOfBirth(),
@@ -99,7 +102,8 @@ public class PatientService {
     public PatientLinkTokenResponse issueLinkToken(Authentication actor, String id) {
         UserAccount issuer = currentAccount(actor, true, "ADMIN", "RECEPTIONIST");
         Patient patient = patients.findWithLockById(profileId(id)).orElseThrow(PatientNotFoundException::new);
-        if (patient.getUser() != null) throw PatientProfileException.conflict();
+        if (patient.getUser() != null)
+            throw PatientProfileException.conflict();
         Instant now = Instant.now();
         linkTokens.revokeOutstanding(patient.getId(), now);
         String rawToken = tokenValues.create();
@@ -111,14 +115,16 @@ public class PatientService {
     @Transactional
     public PatientResponse linkMe(Authentication actor, @Valid LinkPatientRequest request) {
         UserAccount account = currentAccount(actor, true, "PATIENT");
-        if (!request.token().matches("[A-Za-z0-9_-]{43}")) throw PatientProfileException.invalidToken();
+        if (!request.token().matches("[A-Za-z0-9_-]{43}"))
+            throw PatientProfileException.invalidToken();
         String hash = tokenValues.hash(request.token());
         UUID id = linkTokens.findPatientIdByTokenHash(hash).orElseThrow(PatientProfileException::invalidToken);
         // All claim/reissue paths lock the profile before token rows, preventing lock-order inversions.
         Patient patient = patients.findWithLockById(id).orElseThrow(PatientProfileException::invalidToken);
         PatientLinkToken token = linkTokens.findWithLockByTokenHash(hash).orElseThrow(PatientProfileException::invalidToken);
         Instant now = Instant.now();
-        if (!token.usableAt(now)) throw PatientProfileException.invalidToken();
+        if (!token.usableAt(now))
+            throw PatientProfileException.invalidToken();
         if (patient.getUser() != null || patients.existsByUser_Id(account.getId())) {
             throw PatientProfileException.conflict();
         }
@@ -133,8 +139,11 @@ public class PatientService {
         requireRole(actor, roles);
         UserAccount account = (lock ? users.findWithLockById(actorId(actor)) : users.findById(actorId(actor)))
                 .orElseThrow(PatientAuthenticationException::new);
-        if (!LoginEligibility.eligible(account)) throw new PatientAuthenticationException();
-        for (String role : roles) if (account.getRole() == Role.valueOf(role)) return account;
+        if (!LoginEligibility.eligible(account))
+            throw new PatientAuthenticationException();
+        for (String role : roles)
+            if (account.getRole() == Role.valueOf(role))
+                return account;
         throw new PatientForbiddenException();
     }
 
@@ -192,15 +201,19 @@ public class PatientService {
     }
 
     private void validateBirthDate(LocalDate date) {
-        if (date.isAfter(LocalDate.now(LAB_ZONE))) throw new PatientValidationException("dateOfBirth");
+        if (date.isAfter(LocalDate.now(LAB_ZONE)))
+            throw new PatientValidationException("dateOfBirth");
     }
 
     private UUID profileId(String value) {
         try {
             UUID id = UUID.fromString(value);
-            if (!id.toString().equalsIgnoreCase(value)) throw new PatientValidationException("id");
+            if (!id.toString().equalsIgnoreCase(value))
+                throw new PatientValidationException("id");
             return id;
-        } catch (IllegalArgumentException error) { throw new PatientValidationException("id"); }
+        } catch (IllegalArgumentException error) {
+            throw new PatientValidationException("id");
+        }
     }
 
     private boolean hasRole(Authentication actor, String role) {
@@ -211,9 +224,13 @@ public class PatientService {
         if (actor == null || !actor.isAuthenticated()) {
             throw new PatientAuthenticationException();
         }
-        for (String role : roles) if (hasRole(actor, role)) return;
+        for (String role : roles)
+            if (hasRole(actor, role))
+                return;
         throw new PatientForbiddenException();
     }
 
-    private UUID actorId(Authentication actor) { return UUID.fromString(actor.getName()); }
+    private UUID actorId(Authentication actor) {
+        return UUID.fromString(actor.getName());
+    }
 }

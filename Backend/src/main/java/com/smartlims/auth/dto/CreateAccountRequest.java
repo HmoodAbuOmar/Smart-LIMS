@@ -7,8 +7,10 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record CreateAccountRequest(@NotBlank @Size(min = 3, max = 80) String fullName,
-        @NotBlank @Email @Size(max = 120) String email, @NotBlank String userName,
-        @NotBlank @jakarta.validation.constraints.Pattern(regexp = "^[+0-9 ()-]{3,20}$") String phoneNumber,
-        @NotNull Role role) {
-    public CreateAccountRequest { email = email == null ? null : email.strip(); }
+                                   @NotBlank @Email @Size(max = 120) String email, @NotBlank String userName,
+                                   @NotBlank @jakarta.validation.constraints.Pattern(regexp = "^[+0-9 ()-]{3,20}$") String phoneNumber,
+                                   @NotNull Role role) {
+    public CreateAccountRequest {
+        email = email == null ? null : email.strip();
+    }
 }

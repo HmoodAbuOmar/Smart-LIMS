@@ -2,13 +2,16 @@ package com.smartlims.labtests.repository;
 
 import com.smartlims.labtests.entity.LabTest;
 import jakarta.persistence.LockModeType;
+
 import java.util.Optional;
 import java.util.UUID;
+
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface LabTestRepository extends JpaRepository<LabTest, UUID>, JpaSpecificationExecutor<LabTest> {
     boolean existsByCode(String code);
+
     boolean existsByCodeAndIdNot(String code, UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

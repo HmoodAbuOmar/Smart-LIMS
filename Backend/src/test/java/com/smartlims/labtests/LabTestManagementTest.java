@@ -9,12 +9,16 @@ import com.smartlims.auth.security.JwtKeyConfiguration;
 import com.smartlims.labtests.dto.LabTestRequest;
 import com.smartlims.labtests.exception.LabTestException;
 import com.smartlims.labtests.service.LabTestService;
+
 import java.math.BigDecimal;
 import java.time.Instant;
+
 import jakarta.servlet.http.Cookie;
 import org.springframework.dao.DataIntegrityViolationException;
+
 import java.util.*;
 import java.util.concurrent.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,13 +45,20 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             {"code":" cbc ","name":" Complete Blood Count ","price":25.50,
              "sampleType":" Blood ","description":" ","preparationInstructions":" None "}
             """;
-    @Autowired MockMvc mvc;
-    @Autowired UserAccountRepository users;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired JwtEncoder encoder;
-    @Autowired JsonMapper json;
-    @Autowired LabTestService service;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    UserAccountRepository users;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    JwtEncoder encoder;
+    @Autowired
+    JsonMapper json;
+    @Autowired
+    LabTestService service;
+    @MockitoBean
+    VerificationEmailSender email;
     private final Map<Role, String> tokens = new EnumMap<>(Role.class);
     private UUID adminId;
 
@@ -59,7 +70,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                     + "@example.invalid", null, "000001", role);
             user.acceptInvitation("test-only-unused-hash", Instant.now());
             user = users.saveAndFlush(user);
-            if (role == Role.ADMIN) adminId = user.getId();
+            if (role == Role.ADMIN)
+                adminId = user.getId();
             Instant now = Instant.now();
             var claims = JwtClaimsSet.builder().subject(user.getId().toString()).issuer(JwtKeyConfiguration.ISSUER)
                     .audience(List.of(JwtKeyConfiguration.AUDIENCE)).issuedAt(now).expiresAt(now.plusSeconds(600)).build();
@@ -74,7 +86,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
 
     private String create(String body) throws Exception {
         var result = mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN)
-                .contentType(MediaType.APPLICATION_JSON).content(body))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(header().exists("Location"))
                 .andExpect(jsonPath("$.categories").isArray()).andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("id").asString();
@@ -92,9 +104,10 @@ class LabTestManagementTest extends IsolatedPostgresTest {
     private String catalogTest(String code, String name, boolean active, String... categories) throws Exception {
         String id = create(json.writeValueAsString(Map.of("code", code, "name", name, "price", BigDecimal.TEN,
                 "sampleType", "SYNTHETIC", "categories", Arrays.asList(categories))));
-        if (!active) mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
-                .andExpect(status().isOk());
+        if (!active)
+            mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                    .andExpect(status().isOk());
         return id;
     }
 
@@ -115,8 +128,10 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             for (Role role : Role.values()) {
                 for (boolean cookie : List.of(false, true)) {
                     var request = get("/api/lab-tests/" + id);
-                    if (cookie) request.cookie(new Cookie("access_token", tokens.get(role)));
-                    else bearer(request, role);
+                    if (cookie)
+                        request.cookie(new Cookie("access_token", tokens.get(role)));
+                    else
+                        bearer(request, role);
                     var response = mvc.perform(request).andExpect(status().isOk())
                             .andExpect(jsonPath("$.id").value(id)).andExpect(jsonPath("$.code").value("DETAIL_" + i))
                             .andExpect(jsonPath("$.name").value("Synthetic detail " + i))
@@ -145,13 +160,17 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             for (Role role : Role.values()) {
                 for (boolean cookie : List.of(false, true)) {
                     var request = get("/api/lab-tests/" + id).param("active", "true").param("role", "ADMIN");
-                    if (cookie) request.cookie(new Cookie("access_token", tokens.get(role)));
-                    else bearer(request, role);
+                    if (cookie)
+                        request.cookie(new Cookie("access_token", tokens.get(role)));
+                    else
+                        bearer(request, role);
                     if (role == Role.PATIENT) {
                         for (String requestedId : List.of(id, UUID.randomUUID().toString())) {
                             var hiddenRequest = get("/api/lab-tests/" + requestedId).param("active", "true").param("role", "ADMIN");
-                            if (cookie) hiddenRequest.cookie(new Cookie("access_token", tokens.get(role)));
-                            else bearer(hiddenRequest, role);
+                            if (cookie)
+                                hiddenRequest.cookie(new Cookie("access_token", tokens.get(role)));
+                            else
+                                bearer(hiddenRequest, role);
                             var response = mvc.perform(hiddenRequest).andExpect(status().isNotFound())
                                     .andExpect(jsonPath("$.code").value("LAB_TEST_NOT_FOUND"))
                                     .andExpect(jsonPath("$.message").value("Laboratory test not found."))
@@ -161,8 +180,10 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                             Map<?, ?> error = json.readValue(response.getContentAsString(), Map.class);
                             assertEquals(Set.of("code", "message", "fieldErrors", "requestId"), error.keySet());
                             assertEquals(response.getHeader("X-Request-Id"), error.remove("requestId"));
-                            if (firstError == null) firstError = error;
-                            else assertEquals(firstError, error);
+                            if (firstError == null)
+                                firstError = error;
+                            else
+                                assertEquals(firstError, error);
                         }
                     } else {
                         mvc.perform(request).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id))
@@ -173,7 +194,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 }
             }
             mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}"))
                     .andExpect(status().isOk());
             mvc.perform(bearer(get("/api/lab-tests/" + id), Role.PATIENT))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
@@ -221,7 +242,11 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 .andExpect(jsonPath("$.content[*].id").value(org.hamcrest.Matchers.is(List.of(multi, blood, empty))))
                 .andExpect(jsonPath("$.content[2].categories").isArray()).andExpect(jsonPath("$.content[2].categories").isEmpty());
         for (var category : com.smartlims.labtests.entity.LabTestCategory.values()) {
-            int count = switch (category) { case BLOOD_TESTS -> 2; case THYROID -> 1; default -> 0; };
+            int count = switch (category) {
+                case BLOOD_TESTS -> 2;
+                case THYROID -> 1;
+                default -> 0;
+            };
             mvc.perform(bearer(get("/api/lab-tests").param("category", category.name()), Role.ADMIN))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(count));
         }
@@ -247,8 +272,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             Set<String> seen = new HashSet<>();
             for (int page = 0; page < 3; page++) {
                 var response = mvc.perform(bearer(get("/api/lab-tests").param("search", " mAtChInG ")
-                        .param("category", "BLOOD_TESTS").param("active", "true").param("size", "1")
-                        .param("page", Integer.toString(page)).param("sort", sort), Role.PATIENT))
+                                .param("category", "BLOOD_TESTS").param("active", "true").param("size", "1")
+                                .param("page", Integer.toString(page)).param("sort", sort), Role.PATIENT))
                         .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3))
                         .andExpect(jsonPath("$.totalPages").value(3)).andExpect(jsonPath("$.page").value(page))
                         .andExpect(jsonPath("$.content.length()").value(1))
@@ -258,11 +283,11 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             assertEquals(new HashSet<>(expected), seen);
         }
         mvc.perform(bearer(get("/api/lab-tests").param("search", "matching").param("category", "BLOOD_TESTS")
-                .param("sort", "code,desc"), Role.PATIENT)).andExpect(status().isOk())
+                        .param("sort", "code,desc"), Role.PATIENT)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].code").value(org.hamcrest.Matchers.is(List.of("M6", "M2", "M1"))));
         for (String page : List.of("3", "2147483647")) {
             mvc.perform(bearer(get("/api/lab-tests").param("search", "matching").param("category", "BLOOD_TESTS")
-                    .param("page", page).param("size", "2"), Role.PATIENT))
+                            .param("page", page).param("size", "2"), Role.PATIENT))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty())
                     .andExpect(jsonPath("$.totalElements").value(3)).andExpect(jsonPath("$.totalPages").value(2));
         }
@@ -282,10 +307,14 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 for (String active : List.of("omitted", "true", "false")) {
                     for (boolean category : List.of(false, true)) {
                         var request = get("/api/lab-tests");
-                        if (!active.equals("omitted")) request.param("active", active);
-                        if (category) request.param("category", "BLOOD_TESTS");
-                        if (cookie) request.cookie(new Cookie("access_token", tokens.get(role)));
-                        else bearer(request, role);
+                        if (!active.equals("omitted"))
+                            request.param("active", active);
+                        if (category)
+                            request.param("category", "BLOOD_TESTS");
+                        if (cookie)
+                            request.cookie(new Cookie("access_token", tokens.get(role)));
+                        else
+                            bearer(request, role);
                         if (role == Role.PATIENT && active.equals("false")) {
                             mvc.perform(request).andExpect(status().isForbidden())
                                     .andExpect(jsonPath("$.code").value("FORBIDDEN"))
@@ -323,7 +352,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         for (var field : invalid.entrySet()) {
             for (String value : field.getValue()) {
                 var request = get("/api/lab-tests").param(field.getKey(), value);
-                if (!field.getKey().equals("active")) request.param("active", "false");
+                if (!field.getKey().equals("active"))
+                    request.param("active", "false");
                 var response = mvc.perform(bearer(request, Role.PATIENT)).andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                         .andExpect(jsonPath("$.fieldErrors." + field.getKey()).value("Invalid value."))
@@ -334,7 +364,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         }
         for (var field : Map.of("category", "THYROID", "active", "false", "search", "", "page", "0", "size", "20", "sort", "name,asc").entrySet()) {
             var request = get("/api/lab-tests").param(field.getKey(), field.getValue(), field.getValue());
-            if (!field.getKey().equals("active")) request.param("active", "false");
+            if (!field.getKey().equals("active"))
+                request.param("active", "false");
             mvc.perform(bearer(request, Role.PATIENT)).andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                     .andExpect(jsonPath("$.fieldErrors." + field.getKey()).value("Invalid value."));
@@ -366,9 +397,10 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 List.of("BLOOD_TESTS", "THYROID"), all);
         for (int i = 0; i < inputs.size(); i++) {
             String body = BODY.replace(" cbc ", "CREATE_" + i);
-            if (inputs.get(i) != null) body = withCategories(body, inputs.get(i));
+            if (inputs.get(i) != null)
+                body = withCategories(body, inputs.get(i));
             var response = mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN)
-                    .contentType(MediaType.APPLICATION_JSON).content(body))
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isCreated()).andExpect(header().exists("Location"))
                     .andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected.get(i))))
                     .andExpect(jsonPath("$.category").doesNotExist()).andReturn().getResponse();
@@ -380,7 +412,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
                     .andExpect(jsonPath("$.content[0].categories").value(org.hamcrest.Matchers.is(expected.get(i))));
             mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected.get(i))));
             assertEquals(new TreeSet<>(expected.get(i)), new TreeSet<>(persistedCategories(id)));
         }
@@ -390,12 +422,12 @@ class LabTestManagementTest extends IsolatedPostgresTest {
     void replacesWholeSetRemovesMembershipsAndClearsForOmittedNullAndEmptyArrays() throws Exception {
         String id = create(withCategories(BODY, "[\"BLOOD_TESTS\",\"THYROID\"]"));
         mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isOk());
         for (String assignments : List.of("[\"KIDNEY\",\"LIVER\"]", "[\"KIDNEY\",\"LIVER\"]", "[\"KIDNEY\"]")) {
             List<String> expected = assignments.contains("LIVER") ? List.of("LIVER", "KIDNEY") : List.of("KIDNEY");
             mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                    .content(withCategories(BODY.replace("25.50", "30.00"), assignments)))
+                            .content(withCategories(BODY.replace("25.50", "30.00"), assignments)))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(expected)))
                     .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.price").value(30));
             assertEquals(new TreeSet<>(expected), new TreeSet<>(persistedCategories(id)));
@@ -404,7 +436,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
             mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
                     .content(withCategories(BODY, "[\"THYROID\"]"))).andExpect(status().isOk());
             mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                    .content(empty == null ? BODY : withCategories(BODY, empty)))
+                            .content(empty == null ? BODY : withCategories(BODY, empty)))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.categories").isEmpty())
                     .andExpect(jsonPath("$.active").value(false));
             assertTrue(persistedCategories(id).isEmpty());
@@ -432,7 +464,8 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                             .andExpect(header().exists("X-Request-Id")).andExpect(header().string("Cache-Control", "no-store"));
                     if (group.getKey().equals("VALIDATION_ERROR"))
                         result.andExpect(jsonPath("$.fieldErrors.categories").value("Invalid value."));
-                    else result.andExpect(jsonPath("$.fieldErrors").isEmpty());
+                    else
+                        result.andExpect(jsonPath("$.fieldErrors").isEmpty());
                 }
                 assertEquals(original, jdbc.queryForMap("SELECT * FROM lab_tests WHERE id = ?", UUID.fromString(id)));
                 assertEquals(List.of("BLOOD_TESTS", "THYROID"), persistedCategories(id));
@@ -441,7 +474,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         }
         String other = create(withCategories(BODY.replace(" cbc ", "OTHER"), "[\"LIVER\"]"));
         mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                .content(withCategories(BODY.replace(" cbc ", "OTHER"), "[\"KIDNEY\"]")))
+                        .content(withCategories(BODY.replace(" cbc ", "OTHER"), "[\"KIDNEY\"]")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAB_TEST_CODE_IN_USE"));
         assertEquals(original, jdbc.queryForMap("SELECT * FROM lab_tests WHERE id = ?", UUID.fromString(id)));
         assertEquals(List.of("BLOOD_TESTS", "THYROID"), persistedCategories(id));
@@ -461,10 +494,10 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                 .andExpect(jsonPath("$.fieldErrors.code").exists())
                 .andExpect(jsonPath("$.fields").doesNotExist());
         mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
         mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                .content(BODY.replace("25.50", "30.00"))).andExpect(status().isOk())
+                        .content(BODY.replace("25.50", "30.00"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.price").value(30));
         mvc.perform(bearer(get("/api/lab-tests").param("active", "true"), Role.RECEPTIONIST))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
@@ -494,24 +527,25 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         for (Role role : Role.values()) {
             mvc.perform(bearer(get("/api/lab-tests"), role)).andExpect(status().isOk());
             mvc.perform(bearer(get("/api/lab-tests/" + id), role)).andExpect(status().isOk());
-            if (role == Role.ADMIN) continue;
+            if (role == Role.ADMIN)
+                continue;
             mvc.perform(bearer(post("/api/lab-tests"), role).contentType(MediaType.APPLICATION_JSON).content(categoryBody))
                     .andExpect(status().isForbidden());
             mvc.perform(bearer(put("/api/lab-tests/" + id), role).contentType(MediaType.APPLICATION_JSON).content(categoryBody))
                     .andExpect(status().isForbidden());
             mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), role)
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                     .andExpect(status().isForbidden());
         }
         mvc.perform(bearer(get("/api/lab-tests/invalid"), Role.ADMIN)).andExpect(status().isBadRequest());
         mvc.perform(bearer(get("/api/lab-tests/" + UUID.randomUUID()), Role.ADMIN)).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("LAB_TEST_NOT_FOUND")).andExpect(header().exists("X-Request-Id"));
         mvc.perform(bearer(post("/api/lab-tests"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                .content(categoryBody.replace("25.50", "1.001"))).andExpect(status().isBadRequest())
+                        .content(categoryBody.replace("25.50", "1.001"))).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.price").value("Invalid value."))
                 .andExpect(jsonPath("$.fields").doesNotExist());
         mvc.perform(bearer(patch("/api/lab-tests/" + id + "/status"), Role.ADMIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"active\":\"false\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":\"false\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_JSON"));
     }
 
@@ -545,7 +579,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         String first = create(BODY);
         String second = create(BODY.replace(" cbc ", "OTHER"));
         mvc.perform(bearer(put("/api/lab-tests/" + second), Role.ADMIN)
-                .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAB_TEST_CODE_IN_USE"))
                 .andExpect(jsonPath("$.fieldErrors.code").exists());
         assertEquals("OTHER", jdbc.queryForObject("SELECT code FROM lab_tests WHERE id = ?", String.class, UUID.fromString(second)));
@@ -594,8 +628,9 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                         default -> patch("/api/lab-tests/" + id + "/status").content("{\"active\":false}");
                     };
                     request.cookie(access).contentType(MediaType.APPLICATION_JSON);
-                    if (!protection.equals("missing")) request.cookie(csrf).header("X-XSRF-TOKEN",
-                            protection.equals("valid") ? csrf.getValue() : "wrong-token");
+                    if (!protection.equals("missing"))
+                        request.cookie(csrf).header("X-XSRF-TOKEN",
+                                protection.equals("valid") ? csrf.getValue() : "wrong-token");
                     int expected = role == Role.ADMIN && protection.equals("valid")
                             ? (operation == 0 ? 201 : 200) : 403;
                     mvc.perform(request).andExpect(status().is(expected));
@@ -616,8 +651,12 @@ class LabTestManagementTest extends IsolatedPostgresTest {
         try (var pool = Executors.newFixedThreadPool(2)) {
             Callable<String> create = () -> {
                 gate.await();
-                try { service.create(actor, request); return "CREATED"; }
-                catch (LabTestException error) { return error.getCode(); }
+                try {
+                    service.create(actor, request);
+                    return "CREATED";
+                } catch (LabTestException error) {
+                    return error.getCode();
+                }
             };
             var first = pool.submit(create);
             var second = pool.submit(create);

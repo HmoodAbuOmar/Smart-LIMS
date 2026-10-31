@@ -7,12 +7,16 @@ import java.sql.*;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.CRC32;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Owns only newly created databases on the independently verified disposable cluster. */
+/**
+ * Owns only newly created databases on the independently verified disposable cluster.
+ */
 class MigrationLineageTest {
     private static final String LEGACY = "classpath:db/fixtures/historical-v1-v9";
     private static final String SPLIT = "classpath:db/migration";
@@ -28,11 +32,13 @@ class MigrationLineageTest {
             "V5__patient_link_tokens.sql", 504398204, "V6__lab_test_categories.sql", 449901481,
             "V7__orders.sql", -92617618, "V8__appointments.sql", -987232945,
             "V9__results_visits_samples.sql", 1485554142);
-    @TempDir Path temporary;
+    @TempDir
+    Path temporary;
     private final List<String> owned = new ArrayList<>();
     private String root;
 
-    @BeforeEach void requireGuardedRoot() {
+    @BeforeEach
+    void requireGuardedRoot() {
         root = System.getenv("SMARTLIMS_TEST_DATABASE_URL");
         if (root == null || !root.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/smartlims_auth_regression")) {
             throw new IllegalStateException("An independently verified disposable regression database is required");
@@ -48,9 +54,11 @@ class MigrationLineageTest {
         return root.substring(0, root.lastIndexOf('/') + 1) + name;
     }
 
-    @AfterEach void removeOnlyOwnedDatabases() throws SQLException {
+    @AfterEach
+    void removeOnlyOwnedDatabases() throws SQLException {
         for (String name : owned) {
-            if (!name.matches("smartlims_migration_[0-9a-f]{32}")) throw new IllegalStateException("Unexpected database");
+            if (!name.matches("smartlims_migration_[0-9a-f]{32}"))
+                throw new IllegalStateException("Unexpected database");
             try (var c = DriverManager.getConnection(root, "postgres", ""); var s = c.createStatement()) {
                 s.executeUpdate("DROP DATABASE " + name);
             }
@@ -60,21 +68,26 @@ class MigrationLineageTest {
     private Flyway migration(String url, String location, String target) {
         var config = Flyway.configure().dataSource(url, "postgres", "").locations(location).cleanDisabled(true);
         // This suite compares the immutable split baseline with legacy V9, before later features.
-        if (target == null && location.equals(SPLIT)) target = "24";
-        if (target != null) config.target(target);
+        if (target == null && location.equals(SPLIT))
+            target = "24";
+        if (target != null)
+            config.target(target);
         return config.load();
     }
 
     private List<String> rows(String url, String sql) throws SQLException {
         try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement(); var r = s.executeQuery(sql)) {
             List<String> result = new ArrayList<>();
-            while (r.next()) result.add(r.getString(1));
+            while (r.next())
+                result.add(r.getString(1));
             return result;
         }
     }
 
     private void execute(String url, String sql) throws SQLException {
-        try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement()) { s.execute(sql); }
+        try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement()) {
+            s.execute(sql);
+        }
     }
 
     private String resource(String path) throws Exception {
@@ -84,7 +97,8 @@ class MigrationLineageTest {
         }
     }
 
-    @Test void exactManifestOneTablePerFileAndOriginalFlywayChecksums() throws Exception {
+    @Test
+    void exactManifestOneTablePerFileAndOriginalFlywayChecksums() throws Exception {
         String url = database();
         var split = migration(url, SPLIT, null);
         var pending = split.info().pending();
@@ -111,9 +125,11 @@ class MigrationLineageTest {
     // named constraints, exclusion/partial indexes, sequence options, functions and triggers.
     private Path pgTool(String name) {
         String bin = System.getenv("SMARTLIMS_TEST_POSTGRES_BIN");
-        if (bin == null || bin.isBlank()) throw new IllegalStateException("Set SMARTLIMS_TEST_POSTGRES_BIN to the PostgreSQL client bin directory");
+        if (bin == null || bin.isBlank())
+            throw new IllegalStateException("Set SMARTLIMS_TEST_POSTGRES_BIN to the PostgreSQL client bin directory");
         Path exe = Path.of(bin, name + (System.getProperty("os.name").startsWith("Windows") ? ".exe" : ""));
-        if (!Files.isRegularFile(exe)) throw new IllegalStateException("PostgreSQL client tool missing: " + exe);
+        if (!Files.isRegularFile(exe))
+            throw new IllegalStateException("PostgreSQL client tool missing: " + exe);
         return exe;
     }
 
@@ -146,13 +162,15 @@ class MigrationLineageTest {
                 .toList();
     }
 
-    @Test void finalSchemaIsIdenticalAndEachLineageValidatesOnlyItsOwnHistory() throws Exception {
+    @Test
+    void finalSchemaIsIdenticalAndEachLineageValidatesOnlyItsOwnHistory() throws Exception {
         String legacy = database(), split = database();
         var old = migration(legacy, LEGACY, null);
         var fresh = migration(split, SPLIT, null);
         assertEquals(9, old.migrate().migrationsExecuted);
         assertEquals(24, fresh.migrate().migrationsExecuted);
-        old.validate(); fresh.validate();
+        old.validate();
+        fresh.validate();
         assertEquals(schema(legacy), schema(split));
         assertEquals(0, old.migrate().migrationsExecuted);
         assertEquals(0, fresh.migrate().migrationsExecuted);
@@ -162,21 +180,24 @@ class MigrationLineageTest {
         assertEquals(List.of("1"), rows(split, "SELECT id FROM appointment_coordination"));
     }
 
-    @Test void splitMilestonesPreservePriorHistoryAndRows() throws Exception {
+    @Test
+    void splitMilestonesPreservePriorHistoryAndRows() throws Exception {
         String url = database();
         int previous = 0;
         for (int milestone : List.of(5, 6, 7, 9, 14, 24)) {
             List<String> before = previous == 0 ? List.of() : rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
             assertEquals(milestone - previous, migration(url, SPLIT, Integer.toString(milestone)).migrate().migrationsExecuted);
             assertEquals(before, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=" + previous + " ORDER BY installed_rank"));
-            if (previous == 0) execute(url, "INSERT INTO users(id,full_name,email,role,origin) VALUES ('00000000-0000-0000-0000-000000000001','Synthetic retained','retained@example.invalid','ADMIN','ADMIN_INVITATION')");
+            if (previous == 0)
+                execute(url, "INSERT INTO users(id,full_name,email,role,origin) VALUES ('00000000-0000-0000-0000-000000000001','Synthetic retained','retained@example.invalid','ADMIN','ADMIN_INVITATION')");
             assertEquals(List.of("Synthetic retained"), rows(url, "SELECT full_name FROM users"));
             previous = milestone;
         }
         migration(url, SPLIT, null).validate();
     }
 
-    @Test void failedTableFileRollsBackAndCanResumeWithoutRepair() throws Exception {
+    @Test
+    void failedTableFileRollsBackAndCanResumeWithoutRepair() throws Exception {
         String url = database();
         assertEquals(21, migration(url, SPLIT, "21").migrate().migrationsExecuted);
         var before = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
@@ -196,8 +217,10 @@ class MigrationLineageTest {
 
     private Map<String, List<String>> data(String url) throws SQLException {
         Map<String, List<String>> snapshot = new LinkedHashMap<>();
-        for (String table : tables(url)) snapshot.put(table, rows(url, "SELECT to_jsonb(t)::text FROM " + table + " t ORDER BY 1"));
-        for (String sequence : SEQUENCES) snapshot.put(sequence, rows(url, "SELECT last_value::text||':'||is_called::text FROM " + sequence));
+        for (String table : tables(url))
+            snapshot.put(table, rows(url, "SELECT to_jsonb(t)::text FROM " + table + " t ORDER BY 1"));
+        for (String sequence : SEQUENCES)
+            snapshot.put(sequence, rows(url, "SELECT last_value::text||':'||is_called::text FROM " + sequence));
         return snapshot;
     }
 
@@ -224,10 +247,12 @@ class MigrationLineageTest {
                 WHERE con.contype='f' AND con.connamespace='public'::regnamespace
                 GROUP BY con.oid ORDER BY con.conname
                 """;
-        for (String check : rows(url, foreignKeyChecks)) assertEquals(List.of("0"), rows(url, check), check);
+        for (String check : rows(url, foreignKeyChecks))
+            assertEquals(List.of("0"), rows(url, check), check);
     }
 
-    @Test void syntheticDataCopyPreservesAllRowsSequencesAndPublishedCorrectionProtections() throws Exception {
+    @Test
+    void syntheticDataCopyPreservesAllRowsSequencesAndPublishedCorrectionProtections() throws Exception {
         String legacy = database(), split = database();
         migration(legacy, LEGACY, null).migrate();
         migration(split, SPLIT, null).migrate();
@@ -248,15 +273,18 @@ class MigrationLineageTest {
         assertEquals(oldHistory, rows(legacy, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank"));
         assertEquals(newHistory, rows(split, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank"));
         assertEquals(schema(legacy), schema(split));
-        migration(legacy, LEGACY, null).validate(); migration(split, SPLIT, null).validate();
-        assertProtections(legacy); assertProtections(split);
+        migration(legacy, LEGACY, null).validate();
+        migration(split, SPLIT, null).validate();
+        assertProtections(legacy);
+        assertProtections(split);
         assertEquals(List.of("2:1"), rows(split, "SELECT count(*)::text||':'||count(*) FILTER(WHERE is_current)::text FROM test_results WHERE status='PUBLISHED'"));
         for (String sequence : SEQUENCES) {
             assertEquals(rows(legacy, "SELECT nextval('" + sequence + "')"), rows(split, "SELECT nextval('" + sequence + "')"));
         }
     }
 
-    @Test void currentManifestAddsExactlyOneNotificationTableAndFreshSchemaValidates() throws Exception {
+    @Test
+    void currentManifestAddsExactlyOneNotificationTableAndFreshSchemaValidates() throws Exception {
         String url = database();
         var current = migration(url, SPLIT, "25");
         var pending = current.info().pending();
@@ -265,20 +293,27 @@ class MigrationLineageTest {
         String sql = resource("/db/migration/V25__patient_notifications.sql");
         assertEquals(1, Pattern.compile("(?im)^CREATE TABLE\\s+").matcher(sql).results().count());
         assertFalse(Pattern.compile("(?im)^INSERT\\s").matcher(sql).find(), "No historical backfill");
-        assertEquals(25, current.migrate().migrationsExecuted); current.validate();
+        assertEquals(25, current.migrate().migrationsExecuted);
+        current.validate();
         assertEquals(0, current.migrate().migrationsExecuted);
         assertEquals(23, tables(url).size());
         assertEquals(List.of("0"), rows(url, "SELECT count(*) FROM patient_notifications"));
     }
 
-    @Test void notificationUpgradePreservesAllV24DataDdlSequencesAndHistoryWithoutBackfill() throws Exception {
-        String url = database(); migration(url, SPLIT, "24").migrate();
+    @Test
+    void notificationUpgradePreservesAllV24DataDdlSequencesAndHistoryWithoutBackfill() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "24").migrate();
         execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
-        var before = data(url); var ddl = schema(url);
+        var before = data(url);
+        var ddl = schema(url);
         var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
-        var current = migration(url, SPLIT, "25"); assertEquals(1, current.migrate().migrationsExecuted);
-        current.validate(); assertEquals(0, current.migrate().migrationsExecuted);
-        var after = data(url); assertEquals(List.of(), after.remove("patient_notifications"));
+        var current = migration(url, SPLIT, "25");
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        assertEquals(0, current.migrate().migrationsExecuted);
+        var after = data(url);
+        assertEquals(List.of(), after.remove("patient_notifications"));
         assertEquals(before, after);
         assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=24 ORDER BY installed_rank"));
         var priorDdl = pg("pg_dump", url, "--schema-only", "--schema=public", "--no-owner", "--no-privileges",

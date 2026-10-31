@@ -1,14 +1,18 @@
 package com.smartlims.labtests.dto;
 
 import jakarta.validation.constraints.*;
+
 import java.math.BigDecimal;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import tools.jackson.databind.annotation.JsonDeserialize;
 
-/** Full catalog replacement. Availability is managed separately through the status endpoint. */
+/**
+ * Full catalog replacement. Availability is managed separately through the status endpoint.
+ */
 public record LabTestRequest(
         @JsonDeserialize(using = LabTestJson.Text.class) @NotBlank
         @Pattern(regexp = "[A-Z0-9][A-Z0-9_-]{0,29}") String code,

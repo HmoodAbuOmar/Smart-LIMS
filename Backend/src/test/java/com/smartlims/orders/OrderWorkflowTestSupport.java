@@ -15,10 +15,12 @@ import com.smartlims.orders.service.OrderService;
 import com.smartlims.patients.entity.Patient;
 import com.smartlims.patients.entity.PatientGender;
 import com.smartlims.patients.repository.PatientRepository;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -41,17 +43,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 abstract class OrderWorkflowTestSupport extends IsolatedPostgresTest {
-    @Autowired MockMvc mvc;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired UserAccountRepository users;
-    @Autowired PatientRepository patients;
-    @Autowired LabTestRepository tests;
-    @Autowired TestOrderRepository orders;
-    @Autowired OrderService creation;
-    @Autowired JsonMapper json;
-    @Autowired JwtEncoder encoder;
-    @Autowired PlatformTransactionManager transactionManager;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    UserAccountRepository users;
+    @Autowired
+    PatientRepository patients;
+    @Autowired
+    LabTestRepository tests;
+    @Autowired
+    TestOrderRepository orders;
+    @Autowired
+    OrderService creation;
+    @Autowired
+    JsonMapper json;
+    @Autowired
+    JwtEncoder encoder;
+    @Autowired
+    PlatformTransactionManager transactionManager;
+    @MockitoBean
+    VerificationEmailSender email;
     final Map<Role, UserAccount> actors = new EnumMap<>(Role.class);
     final Map<Role, String> tokens = new EnumMap<>(Role.class);
     Patient own;
@@ -88,7 +101,8 @@ abstract class OrderWorkflowTestSupport extends IsolatedPostgresTest {
     private Patient profile(UserAccount linked) {
         var patient = new Patient("PAT-" + patients.nextPatientNumber(), actors.get(Role.ADMIN),
                 "Synthetic workflow profile", LocalDate.of(2000, 1, 1), PatientGender.UNKNOWN, "000001", null);
-        if (linked != null) patient.linkAccount(linked);
+        if (linked != null)
+            patient.linkAccount(linked);
         return patients.saveAndFlush(patient);
     }
 
@@ -99,29 +113,40 @@ abstract class OrderWorkflowTestSupport extends IsolatedPostgresTest {
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
     }
 
-    Authentication actor(Role role) { return actor(actors.get(role).getId(), role); }
+    Authentication actor(Role role) {
+        return actor(actors.get(role).getId(), role);
+    }
+
     Authentication actor(UUID id, Role role) {
         return UsernamePasswordAuthenticationToken.authenticated(id.toString(), null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
     }
+
     MockHttpServletRequestBuilder bearer(MockHttpServletRequestBuilder request, Role role) {
         return request.header("Authorization", "Bearer " + tokens.get(role));
     }
+
     OrderDetailResponse create(Patient patient, LabTest... selection) {
         return creation.create(actor(Role.ADMIN), new CreateStaffOrderRequest(patient.getId().toString(),
                 Arrays.stream(selection).map(test -> test.getId().toString()).toList()), List.of(UUID.randomUUID().toString())).order();
     }
+
     void state(UUID id, String status) {
-        if (status.equals("CANCELLED")) jdbc.update("UPDATE test_orders SET status=?,cancelled_by=?,cancelled_at=created_at,cancellation_reason='Synthetic cancellation' WHERE id=?",
-                status, actors.get(Role.ADMIN).getId(), id);
-        else jdbc.update("UPDATE test_orders SET status=? WHERE id=?", status, id);
+        if (status.equals("CANCELLED"))
+            jdbc.update("UPDATE test_orders SET status=?,cancelled_by=?,cancelled_at=created_at,cancellation_reason='Synthetic cancellation' WHERE id=?",
+                    status, actors.get(Role.ADMIN).getId(), id);
+        else
+            jdbc.update("UPDATE test_orders SET status=? WHERE id=?", status, id);
     }
+
     void error(ResultActions result, int status, String code, String field) throws Exception {
         var response = result.andExpect(status().is(status)).andExpect(jsonPath("$.code").value(code))
                 .andExpect(header().string("Cache-Control", "no-store")).andReturn().getResponse();
         var body = json.readTree(response.getContentAsByteArray());
         assertEquals(response.getHeader("X-Request-Id"), body.get("requestId").asString());
         assertEquals(Set.of("code", "message", "fieldErrors", "requestId"), json.readValue(response.getContentAsByteArray(), Map.class).keySet());
-        if (field == null) assertEquals(0, body.get("fieldErrors").size());
-        else assertTrue(body.get("fieldErrors").has(field));
+        if (field == null)
+            assertEquals(0, body.get("fieldErrors").size());
+        else
+            assertTrue(body.get("fieldErrors").has(field));
     }
 }

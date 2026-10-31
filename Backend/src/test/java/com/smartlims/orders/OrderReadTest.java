@@ -6,8 +6,10 @@ import com.smartlims.orders.dto.*;
 import com.smartlims.orders.exception.OrderException;
 import com.smartlims.orders.service.OrderReadService;
 import jakarta.servlet.http.Cookie;
+
 import java.math.BigDecimal;
 import java.util.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -17,14 +19,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class OrderReadTest extends OrderWorkflowTestSupport {
-    @Autowired OrderReadService reads;
+    @Autowired
+    OrderReadService reads;
 
     private OrderPageResponse page(String... parameters) throws Exception {
         var request = bearer(get("/api/orders/me"), Role.PATIENT);
-        for (int i = 0; i < parameters.length; i += 2) request.param(parameters[i], parameters[i + 1]);
+        for (int i = 0; i < parameters.length; i += 2)
+            request.param(parameters[i], parameters[i + 1]);
         return json.readValue(mvc.perform(request).andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andReturn().getResponse().getContentAsByteArray(), OrderPageResponse.class);
     }
+
     private OrderDetailResponse detail(UUID id) throws Exception {
         return json.readValue(mvc.perform(bearer(get("/api/orders/me/" + id), Role.PATIENT)).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store")).andReturn().getResponse().getContentAsByteArray(), OrderDetailResponse.class);
@@ -75,7 +80,8 @@ class OrderReadTest extends OrderWorkflowTestSupport {
         }
         assertEquals(1, page("search", owned.getFirst().orderNumber().toLowerCase(Locale.ROOT)).totalElements());
         assertEquals(0, page("status", "COMPLETED", "search", owned.getFirst().orderNumber()).totalElements());
-        for (String literal : List.of("%", "_", "\\", "Synthetic", "Z_SYN")) assertEquals(0, page("search", literal).totalElements());
+        for (String literal : List.of("%", "_", "\\", "Synthetic", "Z_SYN"))
+            assertEquals(0, page("search", literal).totalElements());
     }
 
     @Test
@@ -199,8 +205,9 @@ class OrderReadTest extends OrderWorkflowTestSupport {
     @Test
     void pageAggregationPreservesTheMaximumExactTotalAcrossOneHundredItems() throws Exception {
         List<LabTest> maximum = new ArrayList<>();
-        for (int i = 0; i < 100; i++) maximum.add(tests.saveAndFlush(new LabTest("MAX_READ_" + i, "Synthetic maximum test " + i,
-                null, new BigDecimal("9999999999.99"), "SYNTHETIC", null)));
+        for (int i = 0; i < 100; i++)
+            maximum.add(tests.saveAndFlush(new LabTest("MAX_READ_" + i, "Synthetic maximum test " + i,
+                    null, new BigDecimal("9999999999.99"), "SYNTHETIC", null)));
         var order = create(own, maximum.toArray(LabTest[]::new));
         assertEquals(100, page().content().getFirst().testCount());
         assertEquals(new BigDecimal("999999999999.00"), page().content().getFirst().totalAmount());

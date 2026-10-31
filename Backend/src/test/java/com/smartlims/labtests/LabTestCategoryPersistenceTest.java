@@ -9,12 +9,14 @@ import com.smartlims.labtests.entity.LabTestCategory;
 import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.service.LabTestService;
 import jakarta.persistence.EntityManager;
+
 import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,10 +29,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Transactional
 class LabTestCategoryPersistenceTest extends IsolatedPostgresTest {
-    @Autowired LabTestRepository tests;
-    @Autowired EntityManager entities;
-    @Autowired LabTestService service;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    LabTestRepository tests;
+    @Autowired
+    EntityManager entities;
+    @Autowired
+    LabTestService service;
+    @MockitoBean
+    VerificationEmailSender email;
 
     private LabTest syntheticTest() {
         return new LabTest("CAT_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase(Locale.ROOT),

@@ -1,5 +1,190 @@
 # Database-backed test setup
 
+## Disposable PostgreSQL recovery and full-suite verification (2026-10-31)
+
+Status: DONE. This section is the current local setup; older Temp-based
+cluster paths and historical verification records below are retained as history.
+Scope: restore the independently isolated test infrastructure and run the full
+suite after the existing Java formatting changes. No business behavior, Java
+formatting, assertions, test selection, dependency or applied migration change.
+
+### Diagnosed failures and preserved instance
+
+The saved 52 Surefire XML reports summed to **404 tests, 0 failures, 27 errors,
+0 skips**. Six migration suites had errors. MigrationLineageTest included
+`Set SMARTLIMS_TEST_POSTGRES_BIN to the PostgreSQL client bin directory`; other
+errors and suppressed cleanup errors reported `checkpoint request failed`.
+
+The process environment had no SMARTLIMS_TEST_POSTGRES_BIN even though the
+Windows-user value existed. Its inherited DATA value pointed at an older,
+incomplete `smartlims-test-postgres-ea570e6002674f4aa37c53dd81d813df` directory.
+The saved-user DATA value instead identified the active broken cluster:
+
+```text
+C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-3001a4f182414219be120887abd9480b
+```
+
+Independently correlated PG_VERSION=16, postmaster.pid PID **29672**, pg_ctl
+status/postmaster.opts, the PostgreSQL 16 executable and exact `-D` command,
+and its sole listener **127.0.0.1:55432**. Explicit psql to only that disposable
+regression database confirmed PostgreSQL 16.15, user postgres, matching actual
+data_directory, address/port and listen_addresses. Its server.log repeatedly
+reported `could not open directory "pg_logical/snapshots": No such file or directory`.
+The directory was missing. The cause of its removal was not established.
+
+Rechecked identity immediately before stopping **only that cluster**, using
+`pg_ctl -D <verified-old-directory> -m immediate -t 15 -w stop`: immediate
+shutdown avoided reliance on the known failing shutdown checkpoint and retained
+the broken on-disk state for diagnosis. Confirmed the old process exited and
+55432 was free. Neither the original directory nor the older incomplete directory
+was deleted, repaired, moved or reused.
+
+Durable recovery/diagnostic root, outside Windows Temp and the repository:
+
+```text
+C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031
+```
+
+`diagnostics/` contains the old process/listener/PID evidence, a complete
+`broken-cluster-3001a4f182414219be120887abd9480b` copy, saved failed Surefire
+reports, source-preservation hash manifests, fresh identity evidence and the new
+full-suite log/run record. The original remains untouched after shutdown.
+SHA-256 comparison verified all **107,231 copied files** against the stopped
+original (1,068,762,121 bytes). The pre-shutdown PID file is preserved separately.
+
+### Fresh cluster and independently verified target
+
+Initialized a new PostgreSQL **16.15** cluster owned by the existing Windows user
+with UTF8, locale C and superuser postgres. Reused the approved disposable-test
+authentication: empty test password, trust for postgres on IPv4 loopback only;
+other network addresses/users are rejected in this cluster's pg_hba.conf. There
+are no credential changes to development or application configuration.
+
+| Setting | Current value |
+|---|---|
+| SMARTLIMS_TEST_POSTGRES_BIN | `C:/Program Files/PostgreSQL/16/bin` |
+| SMARTLIMS_TEST_POSTGRES_DATA | `C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster` |
+| SMARTLIMS_TEST_DATABASE_URL | `jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression` |
+| Cluster name | `smartlims-disposable-regression-20261031` |
+| Listener | `127.0.0.1:55432` only |
+| Server PID at provisioning and pre-suite verification | `480` (must be rediscovered after restart) |
+| Database / role | `smartlims_auth_regression` / `postgres` |
+
+pg_ctl, postmaster.pid, process executable/command and independent listener
+inspection all matched the new path/PID. SQL verified server_version 16.15,
+data_directory, server address/port, listen_addresses and cluster_name. `fsync`
+and `full_page_writes` remained **on**. Created only smartlims_auth_regression;
+it had zero public tables before tests. The fresh catalog contained only
+postgres, template0, template1 and the regression database. No development
+database or Windows PostgreSQL service was accessed or changed.
+
+Two explicit `CHECKPOINT` commands succeeded before the suite; server.log
+recorded successful completions at **15:18:18.471** and **15:18:18.666 +02:00**.
+No missing-directory workaround, reduced durability setting or migration repair
+was used. Identity/listener checks were repeated immediately before Maven.
+
+### Reproduce in later terminal sessions
+
+All three non-secret test variables above are saved in the Windows **User**
+environment. An existing terminal, IDE or agent still inherits its parent's old
+environment. Rehydrate the current PowerShell process explicitly before running
+Maven, including the tools directory needed by pg_dump/pg_restore tests:
+
+```powershell
+foreach ($name in @('SMARTLIMS_TEST_POSTGRES_BIN', 'SMARTLIMS_TEST_POSTGRES_DATA', 'SMARTLIMS_TEST_DATABASE_URL')) {
+    $savedValue = [Environment]::GetEnvironmentVariable($name, 'User')
+    if ([string]::IsNullOrWhiteSpace($savedValue)) { throw "Missing saved test setting: $name" }
+    [Environment]::SetEnvironmentVariable($name, $savedValue, 'Process')
+}
+$testPgBin = $env:SMARTLIMS_TEST_POSTGRES_BIN
+$testPgData = $env:SMARTLIMS_TEST_POSTGRES_DATA
+& "$testPgBin/pg_ctl.exe" --version
+& "$testPgBin/pg_dump.exe" --version
+& "$testPgBin/pg_ctl.exe" -D $testPgData status
+Get-Content -LiteralPath (Join-Path $testPgData 'postmaster.pid')
+Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq 55432 }
+```
+
+Use the PID from postmaster.pid to inspect its executable and exact data path:
+
+```powershell
+$testServerPid = [int](Get-Content -LiteralPath (Join-Path $testPgData 'postmaster.pid') -TotalCount 1)
+Get-CimInstance Win32_Process -Filter "ProcessId = $testServerPid" |
+    Select-Object ProcessId, ExecutablePath, CommandLine
+```
+
+Require all process/path/listener evidence to agree with the disposable cluster
+before connecting. If the server is stopped, independently confirm port 55432
+is free and that the saved path is this dedicated test cluster, then start it:
+
+```powershell
+$testPgLog = Join-Path (Split-Path -Parent $testPgData) 'server.log'
+& "$testPgBin/pg_ctl.exe" -D $testPgData -l $testPgLog -t 30 -w start
+if ($LASTEXITCODE -ne 0) { throw 'Test PostgreSQL did not start' }
+```
+
+Recheck process/listener evidence after startup, then verify SQL identity and a
+checkpoint explicitly. Do not connect using application defaults or redirect to
+another port/database when these checks fail:
+
+```powershell
+$env:PGCONNECT_TIMEOUT = '5'
+Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
+& "$testPgBin/psql.exe" -X -w -h 127.0.0.1 -p 55432 -U postgres -d smartlims_auth_regression -v ON_ERROR_STOP=1 -c "SELECT current_database(), current_user, inet_server_addr(), inet_server_port(), current_setting('data_directory'), current_setting('listen_addresses'), current_setting('server_version'), current_setting('cluster_name');"
+if ($LASTEXITCODE -ne 0) { throw 'Test identity check failed' }
+# Inspect the identity output and require the exact disposable settings above.
+& "$testPgBin/psql.exe" -X -w -h 127.0.0.1 -p 55432 -U postgres -d smartlims_auth_regression -v ON_ERROR_STOP=1 -c 'CHECKPOINT;'
+if ($LASTEXITCODE -ne 0) { throw 'Test checkpoint failed' }
+.\mvnw.cmd help:evaluate '-Dexpression=smartlims.test.database.url' -q '-DforceStdout'
+# Require jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression, then:
+.\mvnw.cmd test
+```
+
+The unchanged machine-local `.mvn/maven.config` supplies that exact URL and the
+unchanged POM maps it to Surefire's SMARTLIMS_TEST_DATABASE_URL. Maven
+`help:evaluate` confirmed the effective property in this recovery. The Java
+guard and test-only local profile/fake email setup are unchanged. The server is
+a manual user process, not an autostart service. Never restart either broken
+Temp cluster. A later rebuild must use another fresh dedicated directory and
+the same independent verification procedure, preserving failed files first.
+
+### Full-suite execution
+
+Started **2026-10-31 15:19:42.8389976 +02:00**, directly from Backend:
+`.\mvnw.cmd test`. All three test environment values were explicitly imported
+into that Maven process after fresh process/listener/SQL verification. No test
+selector, skip option, assertion change, source reformat or migration edit was
+used.
+
+| Invocation | Result | Finished (Asia/Jerusalem) | Duration |
+|---|---|---|---|
+| `.\mvnw.cmd test` | **BUILD SUCCESS, exit 0; 404 tests / 52 suites; 0 failures, 0 errors, 0 skips** | **2026-10-31 15:26:15.6520169 +02:00** | Maven **06:29 min**; measured wrapper **392.813 s** |
+
+Independently parsed all **52 fresh Surefire XML reports**: totals match Maven,
+suite names are unique and **zero reports predate this invocation**. All six
+previously erroring migration suites now pass, including pg_dump/pg_restore
+lineage/data-copy checks. This was the only test invocation during recovery;
+the prior failed run is preserved and reported above. No failing test was
+excluded or changed.
+
+Post-run pg_ctl/process/PID/listener and explicit SQL still identify PID 480,
+the same dedicated data directory and loopback-only regression target. SQL
+confirmed **25 successful migrations, latest V25**, zero remaining
+smartlims_migration_* databases and zero pg_hba parsing errors. A further
+explicit checkpoint succeeded, logged complete at **15:27:00.395 +02:00**.
+The fresh server log contained no missing pg_logical/snapshots or checkpoint
+request failure messages; expected constraint-violation messages from negative
+tests are separate from these infrastructure checks. The server remains running.
+
+SHA-256 baselines independently confirm all **286 Java/migration/configuration
+files** are unchanged, preserving every existing Java formatting edit, V1-V25,
+the isolation guard, POM, `.mvn/maven.config`, application YAML and test profile.
+The only repository file edited for this recovery is `docs/TESTING.md`; the
+fresh cluster, diagnostics and user environment settings are machine-local.
+No commits, pushes, development database connections or development service
+changes were performed. This result verifies the current isolated test run,
+not deployment readiness or development migration state.
+
 ## Patient Notifications verification (2026-10-31)
 
 Task NOTIF-38, NOTIF-R01-R06. Branch backend-hmood; entry working tree clean.
@@ -1185,16 +1370,12 @@ backup described in the [reconciliation runbook](PATIENT_LINKING_V5_RECONCILIATI
 ## Restarting the isolated PostgreSQL cluster
 
 The isolated server is a user process, not an automatically starting Windows
-service. After a reboot or manual shutdown, start this cluster before testing:
-
-```powershell
-$testPgData = [Environment]::GetEnvironmentVariable('SMARTLIMS_TEST_POSTGRES_DATA', 'User')
-& 'C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe' -D $testPgData -l (Join-Path $testPgData 'server.log') -w start
-```
-
-The cluster is disposable and its temporary directory can be removed by system
-cleanup. If that happens, provision a fresh isolated cluster and update the two
-user environment values; do not reuse a development database.
+service. Use the current [recovery and reproducibility procedure](#disposable-postgresql-recovery-and-full-suite-verification-2026-10-31)
+above after a reboot or manual shutdown. It imports all three saved user
+variables, verifies path/process/listener/SQL identity, handles a stopped server
+and checks checkpoints before tests. The current cluster is outside Windows
+Temp. Older Temp paths in dated verification records are diagnostic history;
+never restart those broken clusters or fall back to a development database.
 
 ## Process environments and IntelliJ
 
@@ -1205,8 +1386,11 @@ tab can therefore inherit the same old environment from IntelliJ. Without the
 local Maven configuration, Maven and the Java tests only see that inherited
 process environment.
 
-The local Maven file and Surefire mapping fix direct wrapper execution without
-restarting IntelliJ. For IntelliJ's Maven tool window, enable **Use settings from
+The local Maven file and Surefire mapping supply the URL without restarting
+IntelliJ, but do not populate SMARTLIMS_TEST_POSTGRES_BIN or refresh a stale
+SMARTLIMS_TEST_POSTGRES_DATA. Import all three saved user values as documented
+above; lineage tests need the client tools even when the URL is correct.
+For IntelliJ's Maven tool window, enable **Use settings from
 .mvn/maven.config** under **Build, Execution, Deployment > Build Tools > Maven**,
 select the Maven wrapper, and reload the Maven project. Alternatively, set the
 `smartlims.test.database.url` property explicitly in the Maven run configuration.

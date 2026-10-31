@@ -19,8 +19,10 @@ import com.smartlims.results.entity.*;
 import com.smartlims.results.repository.TestResultRepository;
 import com.smartlims.results.service.HealthTrendService;
 import com.smartlims.visits.repository.VisitRepository;
+
 import java.time.Instant;
 import java.util.*;
+
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
@@ -40,8 +42,8 @@ public class PatientDashboardService {
     private final com.smartlims.notifications.service.NotificationService notifications;
 
     public PatientDashboardService(LaboratoryAccess access, PatientRepository patients, OrderReadService orders,
-            AppointmentRepository appointments, TestResultRepository results, VisitRepository visits,
-            LabTestService catalog, HealthTrendService trends, com.smartlims.notifications.service.NotificationService notifications) {
+                                   AppointmentRepository appointments, TestResultRepository results, VisitRepository visits,
+                                   LabTestService catalog, HealthTrendService trends, com.smartlims.notifications.service.NotificationService notifications) {
         this.access = access;
         this.patients = patients;
         this.orders = orders;

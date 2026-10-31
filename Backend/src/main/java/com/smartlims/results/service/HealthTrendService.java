@@ -11,9 +11,11 @@ import com.smartlims.results.dto.ResultResponse;
 import com.smartlims.patients.dto.PatientDashboardResponse.TrendPreview;
 import com.smartlims.results.entity.ResultValue;
 import com.smartlims.results.repository.ResultValueRepository;
+
 import java.math.*;
 import java.time.*;
 import java.util.*;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
@@ -30,7 +32,7 @@ public class HealthTrendService {
             .thenComparing(m -> m.orderItemId().toString()).thenComparing(m -> m.valueId().toString());
 
     public HealthTrendService(LaboratoryAccess access, PatientRepository patients,
-            ResultValueRepository values, JsonMapper json) {
+                              ResultValueRepository values, JsonMapper json) {
         this.access = access;
         this.patients = patients;
         this.values = values;
@@ -39,8 +41,11 @@ public class HealthTrendService {
 
     // Include every compatibility dimension in the serialized key, preserving nulls.
     private record SeriesKey(UUID parameterId, String code, String name, String type,
-            String unit, String method, List<SpecimenKind> specimens) {}
-    private record Point(SeriesKey key, Measurement measurement) {}
+                             String unit, String method, List<SpecimenKind> specimens) {
+    }
+
+    private record Point(SeriesKey key, Measurement measurement) {
+    }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public TrendPreview preview(Authentication actor) {
@@ -48,7 +53,8 @@ public class HealthTrendService {
         var selected = groups.entrySet().stream().map(e -> series(e.getKey(), e.getValue()))
                 .sorted(Comparator.comparing(Series::latestMeasuredAt).reversed().thenComparing(Series::seriesId))
                 .findFirst();
-        if (selected.isEmpty()) return null;
+        if (selected.isEmpty())
+            return null;
         var series = selected.get();
         var points = groups.get(series.seriesId()).stream().map(Point::measurement).sorted(CHRONOLOGICAL).toList();
         return new TrendPreview(series, points.getLast(), points.subList(Math.max(0, points.size() - 6), points.size()));
@@ -68,10 +74,12 @@ public class HealthTrendService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public HealthTrendResponse trend(Authentication actor, LaboratoryQuery query) {
         String id = query.get("seriesId", "");
-        if (!id.matches("[0-9a-f]{64}")) throw LaboratoryException.invalid("seriesId");
+        if (!id.matches("[0-9a-f]{64}"))
+            throw LaboratoryException.invalid("seriesId");
         var dates = HistoryDates.trends(query, LocalDate.now(HistoryDates.ZONE));
         var all = groups(actor).get(id);
-        if (all == null) throw LaboratoryException.missing("TREND_SERIES");
+        if (all == null)
+            throw LaboratoryException.missing("TREND_SERIES");
         var chart = all.stream().map(Point::measurement).filter(m -> dates.contains(m.measuredAt()))
                 .sorted(CHRONOLOGICAL).toList();
         var table = chart.reversed();
@@ -91,14 +99,16 @@ public class HealthTrendService {
 
     private Map<String, List<Point>> groups(Authentication actor) {
         var user = access.current(actor, Role.PATIENT);
-        if (!patients.existsByUser_Id(user.getId())) throw LaboratoryException.notLinked();
+        if (!patients.existsByUser_Id(user.getId()))
+            throw LaboratoryException.notLinked();
         var groups = new HashMap<String, List<Point>>();
         // Publication snapshots are immutable; parse each result once even for multi-parameter panels.
         var specimens = new HashMap<UUID, List<ResultResponse.Specimen>>();
         for (var value : values.currentNumericForPatient(user.getId())) {
             var result = value.getResult();
             var retained = specimens.computeIfAbsent(result.getId(), ignored -> json.readValue(result.getSpecimenSnapshots(),
-                    new TypeReference<List<ResultResponse.Specimen>>() {}));
+                    new TypeReference<List<ResultResponse.Specimen>>() {
+                    }));
             var kinds = retained.stream().map(s -> new SpecimenKind(s.sampleType(), s.containerType())).distinct()
                     .sorted(Comparator.comparing(SpecimenKind::sampleType)
                             .thenComparing(SpecimenKind::containerType, Comparator.nullsFirst(Comparator.naturalOrder())))

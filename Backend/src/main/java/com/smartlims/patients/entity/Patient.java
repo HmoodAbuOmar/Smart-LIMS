@@ -77,7 +77,8 @@ public class Patient {
 
     // Only the verified creation/linking service calls this after locking and checking both sides.
     public void linkAccount(UserAccount account) {
-        if (user != null) throw new IllegalStateException("Patient profile is already linked.");
+        if (user != null)
+            throw new IllegalStateException("Patient profile is already linked.");
         this.user = java.util.Objects.requireNonNull(account);
     }
 }

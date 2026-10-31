@@ -8,29 +8,34 @@ import com.smartlims.patients.entity.Patient;
 import com.smartlims.results.dto.*;
 import com.smartlims.samples.dto.*;
 import com.smartlims.visits.dto.*;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 abstract class MedicalHistoryTestSupport extends LaboratoryTestSupport {
-    record Fixture(OrderDetailResponse order, VisitResponse visit, SampleResponse sample, ResultResponse result) {}
+    record Fixture(OrderDetailResponse order, VisitResponse visit, SampleResponse sample, ResultResponse result) {
+    }
 
     Fixture measurement(Patient patient, LabTest test, String at, String number, String flag, boolean complete) {
         return measurement(patient, test, at, number, flag, complete, "SYNTHETIC", null, null);
     }
 
     Fixture measurement(Patient patient, LabTest test, String at, String number, String flag, boolean complete,
-            String sampleType, String container, String comparator) {
-        if (jdbc.queryForObject("SELECT count(*) FROM test_parameters WHERE lab_test_id=?", Integer.class, test.getId()) == 0) define(test.getId());
+                        String sampleType, String container, String comparator) {
+        if (jdbc.queryForObject("SELECT count(*) FROM test_parameters WHERE lab_test_id=?", Integer.class, test.getId()) == 0)
+            define(test.getId());
         var order = create(patient, test);
         var visit = visitService.arrive(actor(Role.RECEPTIONIST), new VisitRequests.Arrival(order.id().toString(), null,
                 order.items().stream().map(i -> i.id().toString()).toList(), Instant.parse(at).minusSeconds(3600).toString()), keys()).visit();
         var sample = specimen(visit, order.items().getFirst().id(), at, sampleType, container);
         var result = draftService.create(actor(Role.LAB_TECHNICIAN), new ResultRequests.Create(order.items().getFirst().id().toString()), keys()).result();
         result = fill(result, List.of(sample.id()), at, number, flag, comparator);
-        if (complete) close(visit);
+        if (complete)
+            close(visit);
         return new Fixture(order, visit, sample, result);
     }
 
@@ -56,7 +61,9 @@ abstract class MedicalHistoryTestSupport extends LaboratoryTestSupport {
         visitService.complete(actor(Role.RECEPTIONIST), visit.id().toString(), new VisitRequests.Completion(visit.version(), LaboratoryInput.now().toString()));
     }
 
-    List<String> keys() { return List.of(UUID.randomUUID().toString()); }
+    List<String> keys() {
+        return List.of(UUID.randomUUID().toString());
+    }
 
     String seriesId() throws Exception {
         var response = mvc.perform(bearer(get("/api/results/me/trends/biomarkers"), Role.PATIENT))
@@ -66,7 +73,8 @@ abstract class MedicalHistoryTestSupport extends LaboratoryTestSupport {
 
     HealthTrendResponse trend(String id, String... query) throws Exception {
         var request = get("/api/results/me/trends").param("seriesId", id);
-        for (int i = 0; i < query.length; i += 2) request.param(query[i], query[i + 1]);
+        for (int i = 0; i < query.length; i += 2)
+            request.param(query[i], query[i + 1]);
         var response = mvc.perform(bearer(request, Role.PATIENT)).andExpect(status().isOk()).andReturn().getResponse();
         return json.readValue(response.getContentAsByteArray(), HealthTrendResponse.class);
     }

@@ -8,5 +8,7 @@ public class PatientValidationException extends RuntimeException {
         this.field = field;
     }
 
-    public String getField() { return field; }
+    public String getField() {
+        return field;
+    }
 }

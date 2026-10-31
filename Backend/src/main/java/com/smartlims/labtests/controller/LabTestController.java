@@ -3,7 +3,9 @@ package com.smartlims.labtests.controller;
 import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.service.LabTestService;
 import jakarta.validation.Valid;
+
 import java.net.URI;
+
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -15,7 +17,9 @@ import org.springframework.web.bind.annotation.*;
 public class LabTestController {
     private final LabTestService tests;
 
-    public LabTestController(LabTestService tests) { this.tests = tests; }
+    public LabTestController(LabTestService tests) {
+        this.tests = tests;
+    }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<LabTestResponse> create(@Valid @RequestBody LabTestRequest request, JwtAuthenticationToken actor) {
@@ -29,7 +33,9 @@ public class LabTestController {
     }
 
     @GetMapping("/{id}")
-    public LabTestResponse get(@PathVariable String id, JwtAuthenticationToken actor) { return tests.get(actor, id); }
+    public LabTestResponse get(@PathVariable String id, JwtAuthenticationToken actor) {
+        return tests.get(actor, id);
+    }
 
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public LabTestResponse update(@PathVariable String id, @Valid @RequestBody LabTestRequest request, JwtAuthenticationToken actor) {

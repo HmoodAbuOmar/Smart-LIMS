@@ -33,7 +33,7 @@ public class OrderController {
 
     @PostMapping(path = "/{id}/cancel", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderDetailResponse> cancel(@PathVariable String id, @Valid @RequestBody CancelOrderRequest request,
-            JwtAuthenticationToken actor) {
+                                                      JwtAuthenticationToken actor) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(cancellations.cancel(actor, id, request));
     }
 
@@ -49,19 +49,20 @@ public class OrderController {
 
     @PostMapping(path = "/me", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderDetailResponse> createMe(@Valid @RequestBody CreateSelfOrderRequest request,
-            @RequestHeader HttpHeaders headers, JwtAuthenticationToken actor) {
+                                                        @RequestHeader HttpHeaders headers, JwtAuthenticationToken actor) {
         return response(orders.createMe(actor, request, headers.get("Idempotency-Key")), true);
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderDetailResponse> create(@Valid @RequestBody CreateStaffOrderRequest request,
-            @RequestHeader HttpHeaders headers, JwtAuthenticationToken actor) {
+                                                      @RequestHeader HttpHeaders headers, JwtAuthenticationToken actor) {
         return response(orders.create(actor, request, headers.get("Idempotency-Key")), false);
     }
 
     private ResponseEntity<OrderDetailResponse> response(OrderCreationResult result, boolean self) {
         var response = ResponseEntity.status(result.created() ? 201 : 200).header("Cache-Control", "no-store");
-        if (self) response.header("Location", "/api/orders/me/" + result.order().id());
+        if (self)
+            response.header("Location", "/api/orders/me/" + result.order().id());
         return response.body(result.order());
     }
 }

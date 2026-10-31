@@ -38,7 +38,7 @@ public class ResultPublicationService {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public ResultPublicationService(LaboratoryAccess access, LaboratoryLocks locks, TestOrderRepository orders, TestResultRepository results, ResultDraftService drafts, LaboratoryEventRepository events, ResultEvidence evidence, ResultMapping mapping, OrderCompletion completion, EntityManager entities,
-            com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                    com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access = access;
         this.locks = locks;
         this.orders = orders;
@@ -56,11 +56,14 @@ public class ResultPublicationService {
     public ResultResponse approve(Authentication actor, String id, @NotNull @Valid ResultRequests.Revision body) {
         var user = access.reviewer(actor);
         var r = drafts.locked(id);
-        if (r.getVersion() != body.expectedVersion()) throw LaboratoryException.conflict("RESULT_CHANGED");
+        if (r.getVersion() != body.expectedVersion())
+            throw LaboratoryException.conflict("RESULT_CHANGED");
         if (r.getEnteredBy().getId().equals(user.getId()) || events.existsByResultIdAndActorIdAndKindIn(r.getId(), user.getId(), List.of("CREATE", "EDIT", "CORRECTION")))
             throw LaboratoryException.forbidden();
-        if (r.getStatus() == ResultStatus.APPROVED) return mapping.detail(r, false);
-        if (r.getStatus() != ResultStatus.DRAFT) throw LaboratoryException.conflict("RESULT_STATE_CONFLICT");
+        if (r.getStatus() == ResultStatus.APPROVED)
+            return mapping.detail(r, false);
+        if (r.getStatus() != ResultStatus.DRAFT)
+            throw LaboratoryException.conflict("RESULT_STATE_CONFLICT");
         complete(r);
         var specimens = evidence.describe(r.getItem(), r.getSpecimenIds(), true, r.getMeasuredAt());
         var now = LaboratoryInput.now();
@@ -75,9 +78,12 @@ public class ResultPublicationService {
     public ResultResponse publish(Authentication actor, String id, @NotNull @Valid ResultRequests.Revision body) {
         var user = access.reviewer(actor);
         var r = drafts.locked(id);
-        if (r.getVersion() != body.expectedVersion()) throw LaboratoryException.conflict("RESULT_CHANGED");
-        if (r.getStatus() == ResultStatus.PUBLISHED) return mapping.detail(r, false);
-        if (r.getStatus() != ResultStatus.APPROVED) throw LaboratoryException.conflict("RESULT_STATE_CONFLICT");
+        if (r.getVersion() != body.expectedVersion())
+            throw LaboratoryException.conflict("RESULT_CHANGED");
+        if (r.getStatus() == ResultStatus.PUBLISHED)
+            return mapping.detail(r, false);
+        if (r.getStatus() != ResultStatus.APPROVED)
+            throw LaboratoryException.conflict("RESULT_STATE_CONFLICT");
         complete(r);
         evidence.describe(r.getItem(), r.getSpecimenIds(), true, r.getMeasuredAt());
         var old = results.findByItem_IdAndCurrentTrue(r.getItem().getId());

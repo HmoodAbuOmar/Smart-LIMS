@@ -2,11 +2,14 @@ package com.smartlims.labtests.specification;
 
 import com.smartlims.labtests.entity.LabTest;
 import com.smartlims.labtests.entity.LabTestCategory;
+
 import java.util.Locale;
+
 import org.springframework.data.jpa.domain.Specification;
 
 public final class LabTestSpecifications {
-    private LabTestSpecifications() {}
+    private LabTestSpecifications() {
+    }
 
     public static Specification<LabTest> filter(String search, Boolean active, LabTestCategory category) {
         return (root, query, builder) -> {
@@ -20,7 +23,8 @@ public final class LabTestSpecifications {
                 membership = builder.exists(assignments);
             }
             var visible = builder.and(available, membership);
-            if (search == null || search.isEmpty()) return visible;
+            if (search == null || search.isEmpty())
+                return visible;
             String pattern = "%" + search.toLowerCase(Locale.ROOT).replace("\\", "\\\\")
                     .replace("%", "\\%").replace("_", "\\_") + "%";
             return builder.and(visible, builder.or(

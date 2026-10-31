@@ -12,11 +12,13 @@ import com.smartlims.patients.exception.PatientForbiddenException;
 import com.smartlims.patients.repository.PatientRepository;
 import com.smartlims.patients.service.PatientService;
 import jakarta.servlet.http.Cookie;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -51,14 +53,22 @@ class PatientManagementTest extends IsolatedPostgresTest {
             {"fullName":" Example Patient ","dateOfBirth":"2000-01-01","gender":"UNKNOWN",
              "phoneNumber":" 000001 ","address":" Example Address "}
             """;
-    @Autowired MockMvc mvc;
-    @Autowired UserAccountRepository users;
-    @MockitoSpyBean PatientRepository patients;
-    @Autowired PatientService service;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired JwtEncoder encoder;
-    @Autowired JsonMapper json;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    UserAccountRepository users;
+    @MockitoSpyBean
+    PatientRepository patients;
+    @Autowired
+    PatientService service;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    JwtEncoder encoder;
+    @Autowired
+    JsonMapper json;
+    @MockitoBean
+    VerificationEmailSender email;
     private final Map<Role, UserAccount> actors = new EnumMap<>(Role.class);
     private final Map<Role, String> tokens = new EnumMap<>(Role.class);
 
@@ -88,7 +98,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
 
     private JsonNode create(Role role, String body) throws Exception {
         MvcResult result = mvc.perform(bearer(post("/api/patients"), role)
-                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated())
+                        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated())
                 .andExpect(header().exists("Location")).andReturn();
         JsonNode patient = json.readTree(result.getResponse().getContentAsString());
         assertEquals("/api/patients/" + patient.get("id").asString(), result.getResponse().getHeader("Location"));
@@ -117,7 +127,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
         String replacement = BODY.replace("Example Patient", "Updated Patient").replace("000001", "000002")
                 .replace("\"address\":\" Example Address \"", "\"address\":\" \"");
         var updated = mvc.perform(bearer(put("/api/patients/" + id), Role.RECEPTIONIST)
-                .contentType(MediaType.APPLICATION_JSON).content(replacement)).andExpect(status().isOk())
+                        .contentType(MediaType.APPLICATION_JSON).content(replacement)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.address").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.patientNumber").value(first.get("patientNumber").asString()))
                 .andExpect(jsonPath("$.createdAt").value(first.get("createdAt").asString())).andReturn();
@@ -225,7 +235,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
         List<UUID> expected = jdbc.query("SELECT id FROM patients ORDER BY id ASC", (rs, row) -> rs.getObject(1, UUID.class));
         for (int page = 0; page < 3; page++) {
             mvc.perform(bearer(get("/api/patients").param("search", " ").param("page", String.valueOf(page))
-                    .param("size", "1"), Role.ADMIN)).andExpect(status().isOk())
+                            .param("size", "1"), Role.ADMIN)).andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].id").value(expected.get(page).toString()))
                     .andExpect(jsonPath("$.totalPages").value(3));
         }
@@ -265,7 +275,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
         }
         for (String field : List.of("id", "patientNumber", "userId", "createdBy", "createdAt", "updatedAt", "unexpected")) {
             mvc.perform(bearer(post("/api/patients"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
-                    .content(BODY.replace("}", ",\"" + field + "\":\"forbidden\"}")))
+                            .content(BODY.replace("}", ",\"" + field + "\":\"forbidden\"}")))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_JSON"));
         }
         for (String body : List.of("{", BODY.replace("UNKNOWN", "unknown"), BODY.replace("UNKNOWN", "OTHER"),
@@ -293,7 +303,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
         Cookie csrf = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
         assertNotNull(csrf);
         mvc.perform(post("/api/patients").cookie(new Cookie("access_token", tokens.get(Role.ADMIN)), csrf)
-                .header("X-XSRF-TOKEN", csrf.getValue()).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                        .header("X-XSRF-TOKEN", csrf.getValue()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated());
         doThrow(new org.springframework.dao.DataIntegrityViolationException("sensitive SQL constraint"))
                 .when(patients).saveAndFlush(any());
@@ -347,13 +357,15 @@ class PatientManagementTest extends IsolatedPostgresTest {
         CountDownLatch start = new CountDownLatch(1);
         try (ExecutorService executor = Executors.newFixedThreadPool(4)) {
             List<Future<String>> results = new ArrayList<>();
-            for (int i = 0; i < 12; i++) results.add(executor.submit(() -> {
-                assertTrue(start.await(10, TimeUnit.SECONDS));
-                return service.create(admin, request).patientNumber();
-            }));
+            for (int i = 0; i < 12; i++)
+                results.add(executor.submit(() -> {
+                    assertTrue(start.await(10, TimeUnit.SECONDS));
+                    return service.create(admin, request).patientNumber();
+                }));
             start.countDown();
             Set<String> numbers = new HashSet<>();
-            for (var result : results) assertTrue(numbers.add(result.get(30, TimeUnit.SECONDS)));
+            for (var result : results)
+                assertTrue(numbers.add(result.get(30, TimeUnit.SECONDS)));
             assertEquals(12, patients.count());
         }
         // Verify minimum-width padding also works after six digits, without resetting the sequence.

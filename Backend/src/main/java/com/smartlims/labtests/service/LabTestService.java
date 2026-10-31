@@ -9,10 +9,12 @@ import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.specification.LabTestSpecifications;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
@@ -36,7 +38,8 @@ public class LabTestService {
     @Transactional
     public LabTestResponse create(Authentication actor, @NotNull @Valid LabTestRequest request) {
         requireRole(actor, "ADMIN");
-        if (tests.existsByCode(request.code())) throw LabTestException.duplicate();
+        if (tests.existsByCode(request.code()))
+            throw LabTestException.duplicate();
         LabTest test = new LabTest(request.code(), request.name(), request.description(),
                 request.price().setScale(2, RoundingMode.UNNECESSARY), request.sampleType(), request.preparationInstructions());
         request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
@@ -79,7 +82,8 @@ public class LabTestService {
         requireRole(actor, "ADMIN");
         UUID testId = identifier(id);
         LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
-        if (tests.existsByCodeAndIdNot(request.code(), testId)) throw LabTestException.duplicate();
+        if (tests.existsByCodeAndIdNot(request.code(), testId))
+            throw LabTestException.duplicate();
         test.setCode(request.code());
         test.setName(request.name());
         test.setDescription(request.description());
@@ -102,8 +106,9 @@ public class LabTestService {
     }
 
     private LabTest save(LabTest test) {
-        try { return tests.saveAndFlush(test); }
-        catch (DataIntegrityViolationException error) {
+        try {
+            return tests.saveAndFlush(test);
+        } catch (DataIntegrityViolationException error) {
             // The unique constraint is authoritative even when concurrent requests pass the precheck.
             for (Throwable cause = error; cause != null; cause = cause.getCause()) {
                 if (cause instanceof ConstraintViolationException constraint
@@ -117,16 +122,20 @@ public class LabTestService {
     private UUID identifier(String value) {
         try {
             UUID id = UUID.fromString(value);
-            if (!id.toString().equalsIgnoreCase(value)) throw LabTestException.invalid("id");
+            if (!id.toString().equalsIgnoreCase(value))
+                throw LabTestException.invalid("id");
             return id;
-        } catch (IllegalArgumentException | NullPointerException error) { throw LabTestException.invalid("id"); }
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw LabTestException.invalid("id");
+        }
     }
 
     private void requireRole(Authentication actor, String... roles) {
         if (actor == null || !actor.isAuthenticated())
             throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
         for (String role : roles) {
-            if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role))) return;
+            if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role)))
+                return;
         }
         throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
     }

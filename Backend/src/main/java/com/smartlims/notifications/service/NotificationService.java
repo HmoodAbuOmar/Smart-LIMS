@@ -8,7 +8,9 @@ import com.smartlims.notifications.dto.NotificationResponse;
 import com.smartlims.notifications.entity.PatientNotification;
 import com.smartlims.notifications.repository.PatientNotificationRepository;
 import com.smartlims.patients.repository.PatientRepository;
+
 import java.util.*;
+
 import org.springframework.data.domain.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -21,7 +23,9 @@ public class NotificationService {
     private final PatientNotificationRepository notifications;
 
     public NotificationService(LaboratoryAccess access, PatientRepository patients, PatientNotificationRepository notifications) {
-        this.access = access; this.patients = patients; this.notifications = notifications;
+        this.access = access;
+        this.patients = patients;
+        this.notifications = notifications;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -39,7 +43,9 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public long unreadCount(Authentication actor) { return notifications.countVisible(linkedUser(actor), null, true); }
+    public long unreadCount(Authentication actor) {
+        return notifications.countVisible(linkedUser(actor), null, true);
+    }
 
     @Transactional
     public NotificationResponse markRead(Authentication actor, String id) {
@@ -57,12 +63,14 @@ public class NotificationService {
 
     private UUID linkedUser(Authentication actor) {
         var user = access.current(actor, Role.PATIENT);
-        if (!patients.existsByUser_Id(user.getId())) throw LaboratoryException.notLinked();
+        if (!patients.existsByUser_Id(user.getId()))
+            throw LaboratoryException.notLinked();
         return user.getId();
     }
 
     private NotificationResponse response(PatientNotification n) {
-        var a = n.getAppointment(); var r = n.getResult();
+        var a = n.getAppointment();
+        var r = n.getResult();
         String url = r != null ? "/api/results/me/" + r.getId()
                 : a != null ? "/api/appointments/me/" + a.getId() : "/api/orders/me/" + n.getOrder().getId();
         return new NotificationResponse(n.getId(), n.getCategory(), n.getEventType(), n.getTitle(), n.getMessage(),

@@ -9,12 +9,14 @@ import com.smartlims.orders.repository.TestOrderRepository;
 import com.smartlims.orders.specification.OrderSpecifications;
 import com.smartlims.patients.repository.PatientRepository;
 import jakarta.validation.constraints.NotNull;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,19 +51,21 @@ public class OrderReadService {
     @Transactional(readOnly = true)
     public OrderPageResponse listMe(Authentication actor, @NotNull OrderQueryRequest query) {
         var account = access.current(actor, Role.PATIENT);
-        if (!patients.existsByUser_Id(account.getId())) throw OrderException.notLinked();
+        if (!patients.existsByUser_Id(account.getId()))
+            throw OrderException.notLinked();
         var filter = OrderSpecifications.owned(account.getId(), query);
         String[] sort = query.sort().split(",");
         var pageable = PageRequest.of(query.page(), query.size(), Sort.by(Sort.Direction.fromString(sort[1]), sort[0]).and(Sort.by("id")));
         if (pageable.getOffset() > Integer.MAX_VALUE) {
             long total = orders.count(filter);
-            if (pageable.getOffset() < total) throw OrderException.invalid("page");
+            if (pageable.getOffset() < total)
+                throw OrderException.invalid("page");
             return page(new PageImpl<>(List.of(), pageable, total), Map.of());
         }
         var result = orders.findAll(filter, pageable);
         var totals = result.isEmpty() ? Map.<UUID, TestOrderRepository.ItemTotals>of()
                 : orders.findItemTotals(result.getContent().stream().map(order -> order.getId()).toList()).stream()
-                        .collect(Collectors.toMap(TestOrderRepository.ItemTotals::getOrderId, Function.identity()));
+                .collect(Collectors.toMap(TestOrderRepository.ItemTotals::getOrderId, Function.identity()));
         return page(result, totals);
     }
 

@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,8 @@ class LabTestCategoryMigrationTest {
 
     @AfterEach
     void dropOnlyOwnedDatabase() throws SQLException {
-        if (testUrl == null) return;
+        if (testUrl == null)
+            return;
         if (!databaseName.matches("smartlims_migration_[0-9a-f]{32}")) {
             throw new IllegalStateException("Refusing to drop an unexpected database.");
         }
@@ -56,7 +58,8 @@ class LabTestCategoryMigrationTest {
     private Flyway migrations(String target) {
         var config = Flyway.configure().dataSource(testUrl, "postgres", "")
                 .locations("classpath:db/migration");
-        if (target != null) config.target(target);
+        if (target != null)
+            config.target(target);
         return config.load();
     }
 
@@ -64,7 +67,8 @@ class LabTestCategoryMigrationTest {
         try (Connection connection = connection(); Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(sql)) {
             List<String> values = new ArrayList<>();
-            while (result.next()) values.add(result.getString(1));
+            while (result.next())
+                values.add(result.getString(1));
             return values;
         }
     }
@@ -95,7 +99,9 @@ class LabTestCategoryMigrationTest {
     }
 
     private void assign(UUID id, String category) throws SQLException {
-        try (Connection connection = connection()) { assign(connection, id, category); }
+        try (Connection connection = connection()) {
+            assign(connection, id, category);
+        }
     }
 
     private void rejects(String sqlState, UUID id, String category) {

@@ -12,7 +12,9 @@ public class AdministratorCoordination {
     private static final long LOCK_KEY = 0x534C494D5341444DL;
     private final EntityManager entityManager;
 
-    public AdministratorCoordination(EntityManager entityManager) { this.entityManager = entityManager; }
+    public AdministratorCoordination(EntityManager entityManager) {
+        this.entityManager = entityManager;
+    }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock() {

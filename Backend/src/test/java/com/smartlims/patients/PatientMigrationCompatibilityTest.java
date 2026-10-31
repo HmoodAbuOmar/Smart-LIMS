@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "SMARTLIMS_TEST_DATABASE_URL",
         matches = "jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/smartlims_auth_regression")
 class PatientMigrationCompatibilityTest {
-    @TempDir Path historicalMigrations;
+    @TempDir
+    Path historicalMigrations;
     private String rootUrl;
     private String databaseName;
     private String testUrl;
@@ -41,7 +43,8 @@ class PatientMigrationCompatibilityTest {
 
     @AfterEach
     void dropOnlyOwnedDisposableDatabase() throws SQLException {
-        if (testUrl == null) return;
+        if (testUrl == null)
+            return;
         if (!databaseName.matches("smartlims_migration_[0-9a-f]{32}")) {
             throw new IllegalStateException("Refusing to drop an unexpected database.");
         }
@@ -58,14 +61,16 @@ class PatientMigrationCompatibilityTest {
     private Flyway canonical(String target) {
         var config = Flyway.configure().dataSource(testUrl, "postgres", "")
                 .locations("classpath:db/migration");
-        if (target != null) config.target(target);
+        if (target != null)
+            config.target(target);
         return config.load();
     }
 
     private Flyway historical(String target, boolean outOfOrder) {
         var config = Flyway.configure().dataSource(testUrl, "postgres", "")
                 .locations("classpath:db/fixtures/historical-v1-v9").outOfOrder(outOfOrder);
-        if (target != null) config.target(target);
+        if (target != null)
+            config.target(target);
         return config.load();
     }
 
@@ -100,7 +105,10 @@ class PatientMigrationCompatibilityTest {
     private boolean tableExists(String table) throws SQLException {
         try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("SELECT to_regclass(?) IS NOT NULL")) {
             statement.setString(1, "public." + table);
-            try (ResultSet rows = statement.executeQuery()) { rows.next(); return rows.getBoolean(1); }
+            try (ResultSet rows = statement.executeQuery()) {
+                rows.next();
+                return rows.getBoolean(1);
+            }
         }
     }
 
@@ -108,12 +116,14 @@ class PatientMigrationCompatibilityTest {
         // All table names are fixed constants from these tests.
         try (Connection connection = connection(); Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("SELECT count(*) FROM " + table)) {
-            rows.next(); return rows.getInt(1);
+            rows.next();
+            return rows.getInt(1);
         }
     }
 
     private void runReviewedReconciliation(String expectedDatabase) throws IOException, SQLException {
-        if (!expectedDatabase.matches("[a-z0-9_]+")) throw new IllegalArgumentException();
+        if (!expectedDatabase.matches("[a-z0-9_]+"))
+            throw new IllegalArgumentException();
         String sql;
         try (var source = getClass().getResourceAsStream("/db/fixtures/reconcile-patient-linking-v4-to-v5.sql")) {
             assertNotNull(source, "Reconciliation SQL fixture");
@@ -139,7 +149,8 @@ class PatientMigrationCompatibilityTest {
             Map<String, String> scripts = new LinkedHashMap<>();
             while (rows.next()) {
                 scripts.put(rows.getString(1), rows.getString(2));
-                if ("5".equals(rows.getString(1))) assertEquals(504398204, rows.getInt(3));
+                if ("5".equals(rows.getString(1)))
+                    assertEquals(504398204, rows.getInt(3));
             }
             assertEquals(List.of("1", "2", "3", "4", "5", "6", "7", "8", "9"), new ArrayList<>(scripts.keySet()));
             assertEquals("V4__lab_tests.sql", scripts.get("4"));
@@ -154,7 +165,8 @@ class PatientMigrationCompatibilityTest {
              ResultSet rows = statement.executeQuery("SELECT version, script FROM flyway_schema_history "
                      + "WHERE success AND version IS NOT NULL ORDER BY version::integer")) {
             Map<String, String> scripts = new LinkedHashMap<>();
-            while (rows.next()) scripts.put(rows.getString(1), rows.getString(2));
+            while (rows.next())
+                scripts.put(rows.getString(1), rows.getString(2));
             assertEquals(java.util.stream.IntStream.rangeClosed(1, 25).mapToObj(Integer::toString).toList(),
                     new ArrayList<>(scripts.keySet()));
             assertEquals("V4__patients.sql", scripts.get("4"));
@@ -176,7 +188,8 @@ class PatientMigrationCompatibilityTest {
             try (ResultSet rows = statement.executeQuery()) {
                 assertTrue(rows.next());
                 List<Object> metadata = new ArrayList<>();
-                for (int i = 1; i <= 8; i++) metadata.add(rows.getObject(i));
+                for (int i = 1; i <= 8; i++)
+                    metadata.add(rows.getObject(i));
                 assertFalse(rows.next());
                 return metadata;
             }

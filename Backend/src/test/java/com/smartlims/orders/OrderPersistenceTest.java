@@ -13,10 +13,12 @@ import com.smartlims.patients.entity.Patient;
 import com.smartlims.patients.entity.PatientGender;
 import com.smartlims.patients.repository.PatientRepository;
 import jakarta.persistence.EntityManager;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -28,12 +30,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Transactional
 class OrderPersistenceTest extends IsolatedPostgresTest {
-    @Autowired TestOrderRepository orders;
-    @Autowired UserAccountRepository users;
-    @Autowired PatientRepository patients;
-    @Autowired LabTestRepository tests;
-    @Autowired EntityManager entities;
-    @MockitoBean VerificationEmailSender email;
+    @Autowired
+    TestOrderRepository orders;
+    @Autowired
+    UserAccountRepository users;
+    @Autowired
+    PatientRepository patients;
+    @Autowired
+    LabTestRepository tests;
+    @Autowired
+    EntityManager entities;
+    @MockitoBean
+    VerificationEmailSender email;
 
     private UserAccount actor() {
         return users.save(UserAccount.registerPatient("Synthetic order actor",
@@ -155,7 +163,8 @@ class OrderPersistenceTest extends IsolatedPostgresTest {
     @Test
     void storesOneHundredMaximumPricesWithoutNarrowingTheAggregate() {
         TestOrder order = order(actor());
-        for (int i = 0; i < 100; i++) order.addItem(test(new BigDecimal("9999999999.99")));
+        for (int i = 0; i < 100; i++)
+            order.addItem(test(new BigDecimal("9999999999.99")));
         orders.saveAndFlush(order);
         TestOrder loaded = reload(order.getId());
         assertEquals(100, loaded.getItems().size());
@@ -163,7 +172,7 @@ class OrderPersistenceTest extends IsolatedPostgresTest {
         assertEquals(expected, loaded.getItems().stream().map(item -> item.getPriceAtOrder())
                 .reduce(new BigDecimal("0.00"), BigDecimal::add));
         assertEquals(expected, entities.createQuery(
-                "select sum(i.priceAtOrder) from OrderItem i where i.order.id = :id", BigDecimal.class)
+                        "select sum(i.priceAtOrder) from OrderItem i where i.order.id = :id", BigDecimal.class)
                 .setParameter("id", order.getId()).getSingleResult());
     }
 

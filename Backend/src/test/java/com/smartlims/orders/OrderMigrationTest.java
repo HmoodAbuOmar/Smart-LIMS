@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +46,8 @@ class OrderMigrationTest {
 
     @AfterEach
     void dropOnlyOwnedDatabase() throws SQLException {
-        if (testUrl == null) return;
+        if (testUrl == null)
+            return;
         if (!databaseName.matches("smartlims_migration_[0-9a-f]{32}")) {
             throw new IllegalStateException("Refusing to drop an unexpected database.");
         }
@@ -61,26 +63,31 @@ class OrderMigrationTest {
 
     private Flyway migrations(String target) {
         var config = Flyway.configure().dataSource(testUrl, "postgres", "").locations("classpath:db/migration");
-        if (target != null) config.target(target);
+        if (target != null)
+            config.target(target);
         return config.load();
     }
 
     private void execute(Connection connection, String sql, Object... args) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (int i = 0; i < args.length; i++) statement.setObject(i + 1, args[i]);
+            for (int i = 0; i < args.length; i++)
+                statement.setObject(i + 1, args[i]);
             statement.executeUpdate();
         }
     }
 
     private void execute(String sql, Object... args) throws SQLException {
-        try (Connection connection = connection()) { execute(connection, sql, args); }
+        try (Connection connection = connection()) {
+            execute(connection, sql, args);
+        }
     }
 
     private List<String> rows(String sql) throws SQLException {
         try (Connection connection = connection(); Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(sql)) {
             List<String> values = new ArrayList<>();
-            while (result.next()) values.add(result.getString(1));
+            while (result.next())
+                values.add(result.getString(1));
             return values;
         }
     }
@@ -113,7 +120,9 @@ class OrderMigrationTest {
     }
 
     private UUID insertOrder(String number, UUID actor, UUID key) throws SQLException {
-        try (Connection connection = connection()) { return insertOrder(connection, number, actor, key); }
+        try (Connection connection = connection()) {
+            return insertOrder(connection, number, actor, key);
+        }
     }
 
     private void insertItem(Connection connection, UUID orderId, UUID testId) throws SQLException {
@@ -204,7 +213,8 @@ class OrderMigrationTest {
         for (String invalid : List.of("NEW", "pending", "UNKNOWN", "")) {
             rejects("23514", "UPDATE test_orders SET status=? WHERE id=?", invalid, id);
         }
-        for (String valid : List.of("IN_PROGRESS", "COMPLETED", "PENDING")) execute("UPDATE test_orders SET status=? WHERE id=?", valid, id);
+        for (String valid : List.of("IN_PROGRESS", "COMPLETED", "PENDING"))
+            execute("UPDATE test_orders SET status=? WHERE id=?", valid, id);
         rejects("23514", "UPDATE test_orders SET currency='USD' WHERE id=?", id);
         assertEquals(List.of("PENDING|ILS"), rows("SELECT status || '|' || currency FROM test_orders WHERE id='" + id + "'"));
     }
@@ -236,7 +246,9 @@ class OrderMigrationTest {
     void enforcesItemSnapshotsPricesUniqueMembershipAndRetainedReferences() throws SQLException {
         ready();
         UUID order = insertOrder("ORD-000001", creator, UUID.randomUUID());
-        try (Connection connection = connection()) { insertItem(connection, order, test); }
+        try (Connection connection = connection()) {
+            insertItem(connection, order, test);
+        }
         for (String column : List.of("order_id", "lab_test_id", "test_code_snapshot", "test_name_snapshot", "price_at_order", "created_at")) {
             rejects("23502", "UPDATE order_items SET " + column + "=NULL WHERE order_id=?", order);
         }
@@ -255,7 +267,9 @@ class OrderMigrationTest {
         execute("UPDATE order_items SET price_at_order=0 WHERE order_id=?", order);
         execute("UPDATE order_items SET price_at_order=9999999999.99 WHERE order_id=?", order);
         SQLException duplicate = assertThrows(SQLException.class, () -> {
-            try (Connection connection = connection()) { insertItem(connection, order, test); }
+            try (Connection connection = connection()) {
+                insertItem(connection, order, test);
+            }
         });
         assertEquals("23505", duplicate.getSQLState());
         rejects("23503", "UPDATE order_items SET order_id=? WHERE order_id=?", UUID.randomUUID(), order);
@@ -289,7 +303,9 @@ class OrderMigrationTest {
         assertEquals(List.of("0"), rows("SELECT count(*) FROM test_orders"));
         assertEquals(List.of("0"), rows("SELECT count(*) FROM order_items"));
         UUID retried = insertOrder("ORD-000002", creator, key);
-        try (Connection connection = connection()) { insertItem(connection, retried, test); }
+        try (Connection connection = connection()) {
+            insertItem(connection, retried, test);
+        }
         assertEquals(List.of("1"), rows("SELECT count(*) FROM test_orders"));
     }
 
@@ -308,13 +324,17 @@ class OrderMigrationTest {
                     started.countDown();
                     insertOrder(second, "ORD-000002", creator, key);
                     return "unexpected success";
-                } catch (SQLException error) { return error.getSQLState(); }
+                } catch (SQLException error) {
+                    return error.getSQLState();
+                }
             });
             try {
                 assertTrue(started.await(5, TimeUnit.SECONDS));
                 first.commit();
                 assertEquals("23505", duplicate.get(15, TimeUnit.SECONDS));
-            } finally { first.rollback(); }
+            } finally {
+                first.rollback();
+            }
             assertEquals(List.of(winner.toString()), rows("SELECT id::text FROM test_orders"));
             assertEquals(List.of("1"), rows("SELECT count(*) FROM order_items"));
         }

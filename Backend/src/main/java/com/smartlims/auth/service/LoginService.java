@@ -6,11 +6,13 @@ import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.auth.security.JwtKeyConfiguration;
 import com.smartlims.auth.security.LoginEligibility;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,12 +33,13 @@ public class LoginService {
     private final Duration lifetime;
 
     public LoginService(UserAccountRepository users, PasswordEncoder passwords, JwtEncoder encoder,
-            TransactionTemplate transactions, @Value("${smartlims.auth.jwt.duration-minutes:60}") long durationMinutes) {
+                        TransactionTemplate transactions, @Value("${smartlims.auth.jwt.duration-minutes:60}") long durationMinutes) {
         this.users = users;
         this.passwords = passwords;
         this.encoder = encoder;
         this.transactions = transactions;
-        if (durationMinutes < 1 || durationMinutes > 1440) throw new IllegalArgumentException("Invalid JWT duration");
+        if (durationMinutes < 1 || durationMinutes > 1440)
+            throw new IllegalArgumentException("Invalid JWT duration");
         this.lifetime = Duration.ofMinutes(durationMinutes);
     }
 
@@ -61,14 +64,18 @@ public class LoginService {
     private LoginResult authenticate(String identity, String password) {
         UserAccount candidate = users.findByEmail(identity)
                 .or(() -> users.findByUserNameIgnoreCase(identity)).orElse(null);
-        if (candidate == null) return new LoginResult(null, invalid());
+        if (candidate == null)
+            return new LoginResult(null, invalid());
         UserAccount user = users.findWithLockById(candidate.getId()).orElse(null);
-        if (user == null) return new LoginResult(null, invalid());
+        if (user == null)
+            return new LoginResult(null, invalid());
         Instant now = Instant.now();
-        if (!user.isEnabled()) return new LoginResult(null, new AuthRequestException(HttpStatus.FORBIDDEN,
-                "ACCOUNT_BLOCKED", "Your account is blocked.", null));
-        if (user.locked(now)) return new LoginResult(null, new AuthRequestException(HttpStatus.FORBIDDEN,
-                "ACCOUNT_LOCKED", "Your account is locked.", null));
+        if (!user.isEnabled())
+            return new LoginResult(null, new AuthRequestException(HttpStatus.FORBIDDEN,
+                    "ACCOUNT_BLOCKED", "Your account is blocked.", null));
+        if (user.locked(now))
+            return new LoginResult(null, new AuthRequestException(HttpStatus.FORBIDDEN,
+                    "ACCOUNT_LOCKED", "Your account is locked.", null));
         if (user.getPasswordHash() == null || password == null || password.length() > 1024
                 || !passwords.matches(password, user.getPasswordHash())) {
             user.failedLogin(now);
@@ -76,8 +83,9 @@ public class LoginService {
                     ? new AuthRequestException(HttpStatus.FORBIDDEN, "ACCOUNT_LOCKED", "Your account is locked.", null)
                     : invalid());
         }
-        if (!LoginEligibility.eligible(user)) return new LoginResult(null, new AuthRequestException(
-                HttpStatus.BAD_REQUEST, "EMAIL_NOT_CONFIRMED", "Please confirm your email.", null));
+        if (!LoginEligibility.eligible(user))
+            return new LoginResult(null, new AuthRequestException(
+                    HttpStatus.BAD_REQUEST, "EMAIL_NOT_CONFIRMED", "Please confirm your email.", null));
         user.successfulLogin();
         return new LoginResult(user, null);
     }
@@ -87,6 +95,9 @@ public class LoginService {
                 "Invalid email/username or password.", null);
     }
 
-    private record LoginResult(UserAccount user, AuthRequestException error) {}
-    public record IssuedLogin(String accessToken, Instant expiresAt, AccountResponse account) {}
+    private record LoginResult(UserAccount user, AuthRequestException error) {
+    }
+
+    public record IssuedLogin(String accessToken, Instant expiresAt, AccountResponse account) {
+    }
 }

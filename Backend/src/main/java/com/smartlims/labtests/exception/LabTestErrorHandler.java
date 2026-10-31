@@ -3,9 +3,11 @@ package com.smartlims.labtests.exception;
 import com.smartlims.auth.controller.AuthErrorHandler.ApiError;
 import com.smartlims.labtests.controller.LabTestController;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -31,6 +33,7 @@ public class LabTestErrorHandler {
         });
         return respond(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please correct the request fields.", fields, response);
     }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> validation(MethodArgumentNotValidException error, HttpServletResponse response) {
         Map<String, String> fields = new LinkedHashMap<>();
@@ -55,7 +58,7 @@ public class LabTestErrorHandler {
     }
 
     private ResponseEntity<ApiError> respond(HttpStatus status, String code, String message,
-            Map<String, String> fields, HttpServletResponse response) {
+                                             Map<String, String> fields, HttpServletResponse response) {
         String requestId = UUID.randomUUID().toString();
         response.setHeader("X-Request-Id", requestId);
         return ResponseEntity.status(status).header("Cache-Control", "no-store")

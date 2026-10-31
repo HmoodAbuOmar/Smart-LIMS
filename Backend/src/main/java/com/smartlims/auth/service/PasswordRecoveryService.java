@@ -5,8 +5,10 @@ import com.smartlims.auth.email.VerificationEmailSender;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.auth.security.LoginEligibility;
+
 import java.security.SecureRandom;
 import java.time.Instant;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,8 +26,8 @@ public class PasswordRecoveryService {
     private final SecureRandom random = new SecureRandom();
 
     public PasswordRecoveryService(UserAccountRepository users, PasswordEncoder passwords,
-            PasswordPolicy policy, EmailIdentity identities, VerificationEmailSender email,
-            TransactionTemplate transactions) {
+                                   PasswordPolicy policy, EmailIdentity identities, VerificationEmailSender email,
+                                   TransactionTemplate transactions) {
         this.users = users;
         this.passwords = passwords;
         this.policy = policy;
@@ -37,7 +39,8 @@ public class PasswordRecoveryService {
     @Transactional
     public void forgot(String suppliedEmail) {
         UserAccount user = lockedByEmail(suppliedEmail);
-        if (!LoginEligibility.eligible(user)) throw unavailable();
+        if (!LoginEligibility.eligible(user))
+            throw unavailable();
         String code = Integer.toString(1000 + random.nextInt(9000));
         user.setResetCode(passwords.encode(code), Instant.now().plusSeconds(900));
         email.sendPasswordReset(user.getEmail(), code);
@@ -47,7 +50,8 @@ public class PasswordRecoveryService {
         policy.validate(request.newPassword(), "newPassword");
         // Return failures from the transaction so incorrect-attempt updates commit before throwing.
         AuthRequestException failure = transactions.execute(status -> resetLocked(request));
-        if (failure != null) throw failure;
+        if (failure != null)
+            throw failure;
     }
 
     private AuthRequestException resetLocked(ResetPasswordRequest request) {

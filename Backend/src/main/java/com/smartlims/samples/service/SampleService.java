@@ -95,9 +95,12 @@ public class SampleService {
     public SampleResponse receive(Authentication actor, String id, @NotNull @Valid SampleRequests.Revision body) {
         var user = access.clinical(actor);
         var s = locked(id);
-        if (s.getStatus() == Sample.Status.RECEIVED) return map(s);
-        if (s.getVersion() != body.expectedVersion()) throw LaboratoryException.conflict("SAMPLE_CHANGED");
-        if (s.getStatus() != Sample.Status.REGISTERED) throw LaboratoryException.conflict("SAMPLE_STATE_CONFLICT");
+        if (s.getStatus() == Sample.Status.RECEIVED)
+            return map(s);
+        if (s.getVersion() != body.expectedVersion())
+            throw LaboratoryException.conflict("SAMPLE_CHANGED");
+        if (s.getStatus() != Sample.Status.REGISTERED)
+            throw LaboratoryException.conflict("SAMPLE_STATE_CONFLICT");
         var now = LaboratoryInput.now();
         if (s.getCollectedAt() != null && s.getCollectedAt().isAfter(now))
             throw LaboratoryException.conflict("SAMPLE_STATE_CONFLICT");
@@ -129,9 +132,12 @@ public class SampleService {
         var user = access.clinical(actor);
         var reason = LaboratoryInput.text(body.reason(), "reason", 1000, true);
         var s = locked(id);
-        if (s.getStatus() == Sample.Status.REJECTED) return map(s);
-        if (s.getVersion() != body.expectedVersion()) throw LaboratoryException.conflict("SAMPLE_CHANGED");
-        if (results.protectsSample(s.getId())) throw LaboratoryException.conflict("SAMPLE_IN_USE");
+        if (s.getStatus() == Sample.Status.REJECTED)
+            return map(s);
+        if (s.getVersion() != body.expectedVersion())
+            throw LaboratoryException.conflict("SAMPLE_CHANGED");
+        if (results.protectsSample(s.getId()))
+            throw LaboratoryException.conflict("SAMPLE_IN_USE");
         var now = LaboratoryInput.now();
         s.reject(user, now, reason);
         events.save(new LaboratoryEvent("sample", s.getId(), "REJECT", user, now, reason));
@@ -150,7 +156,8 @@ public class SampleService {
     public LaboratoryQuery.PageBody<SampleResponse> list(Authentication actor, LaboratoryQuery query) {
         access.clinical(actor);
         var id = LaboratoryInput.uuid(query.get("orderId", null), "orderId");
-        if (!orders.existsById(id)) throw LaboratoryException.missing("ORDER");
+        if (!orders.existsById(id))
+            throw LaboratoryException.missing("ORDER");
         Specification<Sample> spec = (r, q, c) -> c.equal(r.get("visit").get("order").get("id"), id);
         var page = query.find(samples, spec, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id")));
         return LaboratoryQuery.page(page, page.getContent().stream().map(this::map).toList());

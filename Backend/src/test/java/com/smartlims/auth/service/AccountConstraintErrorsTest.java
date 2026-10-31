@@ -1,15 +1,17 @@
 package com.smartlims.auth.service;
 
 import java.sql.SQLException;
+
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class AccountConstraintErrorsTest {
     @Test
     void databaseUsernameAndEmailConflictsAreDistinguished() {
-        for (String constraint : new String[] {"users_user_name_ci_unique", "users_email_key"}) {
+        for (String constraint : new String[]{"users_user_name_ci_unique", "users_email_key"}) {
             var violation = new ConstraintViolationException("synthetic unique violation",
                     new SQLException("synthetic", "23505"), constraint);
             var translated = AccountConstraintErrors.translate(new DataIntegrityViolationException("synthetic", violation));
