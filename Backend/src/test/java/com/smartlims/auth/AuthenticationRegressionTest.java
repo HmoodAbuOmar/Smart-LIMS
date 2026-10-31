@@ -60,7 +60,7 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     @BeforeEach
     void resetIsolatedDatabase() {
         // The superclass requires the dedicated database URL; never use application datasource defaults.
-        jdbc.execute("TRUNCATE TABLE laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(email);
         reset(users);
         doAnswer(call -> { resetCode.set(call.getArgument(1)); return null; })

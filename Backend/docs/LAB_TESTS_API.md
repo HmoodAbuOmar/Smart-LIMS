@@ -1,7 +1,7 @@
 # Lab Tests API
 
 Migration-version references in historical sections describe the original V1-V9
-implementation. The current application uses canonical V1-V24 from
+implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
 fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
 

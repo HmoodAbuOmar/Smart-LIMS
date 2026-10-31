@@ -26,13 +26,16 @@ public class OrderCancellationService {
     private final OrderMapper mapper;
     private final EntityManager entities;
     private final AppointmentOrderCancellation appointments;
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
-    public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities, AppointmentOrderCancellation appointments) {
+    public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities, AppointmentOrderCancellation appointments,
+            com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access = access;
         this.orders = orders;
         this.mapper = mapper;
         this.entities = entities;
         this.appointments = appointments;
+        this.notifications = notifications;
     }
 
     @Transactional
@@ -56,6 +59,7 @@ public class OrderCancellationService {
         appointments.cancelForOrder(order);
         orders.flush();
         entities.refresh(order);
+        notifications.order(order);
         return mapper.toDetail(order);
     }
 }

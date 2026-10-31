@@ -65,7 +65,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
     @BeforeEach
     void fixtures() {
         // IsolatedPostgresTest refuses any URL outside the dedicated regression database.
-        jdbc.execute("TRUNCATE TABLE laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(patients);
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Synthetic Test Account", role.name().toLowerCase(Locale.ROOT)
@@ -321,7 +321,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 () -> jdbc.update("DELETE FROM users WHERE id = ?", actors.get(Role.ADMIN).getId()));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE patients SET created_by = ? WHERE id = ?", UUID.randomUUID(), second));
-        assertEquals(java.util.stream.IntStream.rangeClosed(1, 24).mapToObj(Integer::toString).toList(), jdbc.queryForList(
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, 25).mapToObj(Integer::toString).toList(), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals("V5__lab_tests.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '5'", String.class));

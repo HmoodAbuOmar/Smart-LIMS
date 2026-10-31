@@ -53,7 +53,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, lab_test_categories, lab_tests, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, lab_test_categories, lab_tests, patient_link_tokens, patients, email_action_tokens, users");
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Catalog Test Account", role.name().toLowerCase(Locale.ROOT)
                     + "@example.invalid", null, "000001", role);

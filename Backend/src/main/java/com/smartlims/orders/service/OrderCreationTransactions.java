@@ -29,15 +29,18 @@ public class OrderCreationTransactions {
     private final TestOrderRepository orders;
     private final OrderMapper mapper;
     private final EntityManager entities;
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public OrderCreationTransactions(UserAccountRepository users, PatientRepository patients,
-            LabTestRepository tests, TestOrderRepository orders, OrderMapper mapper, EntityManager entities) {
+            LabTestRepository tests, TestOrderRepository orders, OrderMapper mapper, EntityManager entities,
+            com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.users = users;
         this.patients = patients;
         this.tests = tests;
         this.orders = orders;
         this.mapper = mapper;
         this.entities = entities;
+        this.notifications = notifications;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -56,6 +59,7 @@ public class OrderCreationTransactions {
         orders.saveAndFlush(order);
         // Return database timestamp precision on both the initial response and subsequent replays.
         entities.refresh(order);
+        notifications.order(order);
         return new OrderCreationResult(mapper.toDetail(order), true);
     }
 

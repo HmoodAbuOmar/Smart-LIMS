@@ -1,7 +1,13 @@
 # Orders API Contract
 
+NOTIF-38 (2026-10-31): actual order creation/cancellation/processing/completion
+transitions now insert patient in-app notifications in the same transaction.
+Retries/no-ops do not duplicate them; notification persistence failure rolls back
+the source change. See [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md). Existing
+order paths, DTOs, authorization, status rules and creation retry semantics remain.
+
 Migration-version references in historical sections describe the original V1-V9
-implementation. The current application uses canonical V1-V24 from
+implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
 fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
 

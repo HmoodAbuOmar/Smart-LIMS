@@ -1,5 +1,107 @@
 # Database-backed test setup
 
+## Patient Notifications verification (2026-10-31)
+
+Task NOTIF-38, NOTIF-R01-R06. Branch backend-hmood; entry working tree clean.
+Scope: patient in-app list/filter/count/read operations, durable real workflow
+events, V25 and Dashboard unread integration. No frontend, email/SMS/push delivery,
+Postman, development/shared database access, dependency change, commit or push.
+Contract/screenshot action mapping: [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md).
+
+### Independently verified target
+
+Before database execution and again before the full suite, independently checked
+pg_ctl status, postmaster.pid, Windows PostgreSQL executable/`-D` command and the
+sole listener **127.0.0.1:55432**, all identifying PostgreSQL 16.15 PID **29672**.
+Explicit psql confirmed database **smartlims_auth_regression**, user **postgres**,
+server address/port, listen_addresses=127.0.0.1, and actual data_directory:
+`C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-3001a4f182414219be120887abd9480b`.
+This matches the recorded approved disposable instance and Windows-user
+SMARTLIMS_TEST_POSTGRES_DATA, independently of its JDBC URL. No restore was needed.
+
+Unchanged .mvn/maven.config/Surefire mapping supplies the guarded loopback URL;
+IsolatedPostgresTest remains unchanged, including its no-fallback guard and test
+credentials. Existing local test profile and fake email delivery remain. Schema
+tests create/drop only their own guarded smartlims_migration_<32 hex> databases
+on this instance. The development server and its Flyway history were not accessed.
+Before the full suite psql found exactly 25 successful migrations, latest V25.
+
+### Commands and actual execution
+
+Directly from Backend (non-secret test-tool environment values):
+
+```powershell
+$env:SMARTLIMS_TEST_POSTGRES_DATA = 'C:/Users/hmood/AppData/Local/Temp/smartlims-test-postgres-3001a4f182414219be120887abd9480b'
+$env:SMARTLIMS_TEST_POSTGRES_BIN = 'C:/Program Files/PostgreSQL/16/bin'
+.\mvnw.cmd '-DskipTests' compile
+.\mvnw.cmd '-Dtest=PatientNotificationTest,PatientDashboardTest' test
+.\mvnw.cmd '-Dtest=MigrationLineageTest,PatientMigrationCompatibilityTest,OrderMigrationTest,AppointmentMigrationTest,LabTestCategoryMigrationTest,ResultMigrationTest' test
+.\mvnw.cmd '-Dtest=PatientNotificationTest' test
+.\mvnw.cmd test
+```
+
+| Invocation | Actual result | Finished (Asia/Jerusalem) | Maven duration |
+|---|---|---|---|
+| Compile | BUILD SUCCESS, exit 0 | 2026-10-31 00:29:24 +02:00 | 22.176 s |
+| Initial notification + Dashboard focus | 28 tests / 2 suites, 0 failures/errors/skips; BUILD SUCCESS | 00:32:46 +02:00 | 01:04 min |
+| Migration/compatibility focus | 27 tests / 6 suites, 0 failures/errors/skips; BUILD SUCCESS | 00:35:20 +02:00 | 01:53 min |
+| Final notification focus (two additional rollback cases) | 17 tests / 1 suite, 0 failures/errors/skips; BUILD SUCCESS | 00:37:18 +02:00 | 54.228 s |
+| Final direct full wrapper suite | **404 tests / 52 suites, 0 failures/errors/skips; BUILD SUCCESS, exit 0** | **00:42:47 +02:00** | **05:06 min** |
+
+No failed test invocation is omitted. Final full invocation began
+**2026-10-31 00:37:38 +02:00** after fresh independent identity verification.
+All **52 Surefire XML reports** independently sum to **404 tests**, failures=0,
+errors=0, skipped=0; **zero stale reports** predating the final invocation. All
+385 previous cases, 17 new notification cases and two new migration cases passed
+together. Final source/tests are exactly those in this full run; only final
+documentation/status evidence was updated afterward.
+
+Post-run explicit psql confirmed the same approved data_directory/loopback target,
+**25 successful migrations, latest V25**, zero remaining smartlims_migration_*
+databases and zero remaining synthetic test triggers. Final diff whitespace and
+new-file conflict scans pass. Protected-file diff is empty for applied V1-V24,
+POM, Maven mapping, isolation guard, main application configuration and report
+renderer. No development datasource/runtime/history or Git tracking state changed.
+NOTIF-38 is DONE. Deployment and applying V25 to development remain outside this
+verification; no real patient data was used.
+
+### Acceptance and regression evidence
+
+| Requirement | Evidence |
+|---|---|
+| NOTIF-R01 | Anonymous/staff rejection for all routes; stored-role/disabled-account checks; foreign/unknown UUID concealment; linked identity only; secure staff-assisted profile claim exposes only actual target-profile events; cookie GET and write-CSRF checks. |
+| NOTIF-R02 | All/category/unread AND filters, real owned totals, strict query/JSON validation, equal-time UUID ties across pages, distant pages and empty/System states; no automatic mark on GET. |
+| NOTIF-R03 | One/all-read repeats preserve original readAt, createdAt and targets; concurrent mark-one/mark-all, foreign unread rows untouched; newly created rows remain unread after prior mark-all. |
+| NOTIF-R04 | Actual order create/cancel/start/complete; appointment book/move/cancel/cascade/check-in/complete/no-show; only published results/corrections; original and superseded published navigation. Creation/booking/transition retries and no-op moves do not duplicate; concurrent create retries produce one event. Source rollback, publication rollback, booking rollback and injected notification-insert failure leave no partial workflow/notification. Defensive read/count/update predicates hide unpublished or mismatched targets even in deliberately corrupt synthetic fixtures. |
+| NOTIF-R05 | Dashboard available=true with actual shared unread count before/after read operations. V25 fresh/validate/no-op and V24 upgrade: every prior table row, all sequence states, complete preexisting pg_dump DDL and original history identical; inbox initially empty. Unique event key, FK, event/target shape, read-time constraints and original publication protections pass. |
+| NOTIF-R06 | Focused results above plus final direct full suite below. Applied V1-V24, POM, main configuration, Maven mapping, isolation guard and report renderer unchanged; contract/data-model/diff checks. |
+
+MigrationLineageTest's existing legacy V9 equivalence/import cases now explicitly
+target the immutable canonical **V24 baseline**; all old equality/checksum and
+protection assertions remain. Two additional cases test the **latest V25** fresh
+manifest and all-table/no-backfill upgrade separately. Other current-schema tests
+expect V25 counts/scripts. Existing ten explicit fixture truncation lists include
+patient_notifications because its FKs require it; no CASCADE fallback or weakened
+assertion was introduced. The old Dashboard unavailable assertion is updated to
+the now-authorized available=true/real-zero response.
+
+Changed-file inventory: new notifications controller/service/publisher/DTO/entity/
+repository and V25; hooks in OrderCreationTransactions, OrderCancellationService,
+AppointmentBookingService, AppointmentActionService, AppointmentOrderCancellation,
+OrderCompletion, VisitService and ResultPublicationService; Dashboard service,
+exact security matchers and shared error advice; PatientNotificationTest,
+PatientDashboardTest, migration tests and explicit test fixture cleanup lists;
+notification/Dashboard/source API contracts, DATABASE_DESIGN, lineage note, this
+evidence and the excluded implementation plan. No source definition/lifecycle,
+publication permission, authentication strategy or external delivery was added.
+
+Remaining scope limits: SYSTEM is filter-only with no producer (no invented
+welcome/history); no client creation/deletion/reset, realtime transport, email,
+SMS or push. No frontend/deployed-client or production migration execution claim.
+Retention is existing-row preservation; notifications are not an external-delivery
+outbox or queue. Notification persistence deliberately participates in source
+success: persistence failure rolls back the source, as explicitly tested.
+
 ## Patient Dashboard verification (2026-10-30)
 
 Task DASH-37, DASH-R01-R06. Branch backend-hmood; Backend only. New contract and

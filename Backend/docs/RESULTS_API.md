@@ -1,9 +1,15 @@
 # Results API Contract — Stage 4
 
 Migration-version references in historical sections describe the original V1-V9
-implementation. The current application uses canonical V1-V24 from
+implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
 fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
+
+NOTIF-38 (2026-10-31): only actual successful publication emits in-app patient
+notifications, atomically with the source transaction. Corrected versions notify
+only on publication. Draft/edit/approve/correction creation never notify; failed
+publication leaves no event. See [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md).
+Existing publication authority and exact-version patient access remain unchanged.
 
 Stage 5 additive patient reads: `GET /api/results/me/trends/biomarkers` and
 `GET /api/results/me/trends`. See [MEDICAL_HISTORY_API.md](MEDICAL_HISTORY_API.md)

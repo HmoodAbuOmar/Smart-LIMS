@@ -59,6 +59,8 @@ class MigrationLineageTest {
 
     private Flyway migration(String url, String location, String target) {
         var config = Flyway.configure().dataSource(url, "postgres", "").locations(location).cleanDisabled(true);
+        // This suite compares the immutable split baseline with legacy V9, before later features.
+        if (target == null && location.equals(SPLIT)) target = "24";
         if (target != null) config.target(target);
         return config.load();
     }
@@ -252,5 +254,46 @@ class MigrationLineageTest {
         for (String sequence : SEQUENCES) {
             assertEquals(rows(legacy, "SELECT nextval('" + sequence + "')"), rows(split, "SELECT nextval('" + sequence + "')"));
         }
+    }
+
+    @Test void currentManifestAddsExactlyOneNotificationTableAndFreshSchemaValidates() throws Exception {
+        String url = database();
+        var current = migration(url, SPLIT, "25");
+        var pending = current.info().pending();
+        assertEquals(25, pending.length);
+        assertEquals("V25__patient_notifications.sql", pending[24].getScript());
+        String sql = resource("/db/migration/V25__patient_notifications.sql");
+        assertEquals(1, Pattern.compile("(?im)^CREATE TABLE\\s+").matcher(sql).results().count());
+        assertFalse(Pattern.compile("(?im)^INSERT\\s").matcher(sql).find(), "No historical backfill");
+        assertEquals(25, current.migrate().migrationsExecuted); current.validate();
+        assertEquals(0, current.migrate().migrationsExecuted);
+        assertEquals(23, tables(url).size());
+        assertEquals(List.of("0"), rows(url, "SELECT count(*) FROM patient_notifications"));
+    }
+
+    @Test void notificationUpgradePreservesAllV24DataDdlSequencesAndHistoryWithoutBackfill() throws Exception {
+        String url = database(); migration(url, SPLIT, "24").migrate();
+        execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
+        var before = data(url); var ddl = schema(url);
+        var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "25"); assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate(); assertEquals(0, current.migrate().migrationsExecuted);
+        var after = data(url); assertEquals(List.of(), after.remove("patient_notifications"));
+        assertEquals(before, after);
+        assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=24 ORDER BY installed_rank"));
+        var priorDdl = pg("pg_dump", url, "--schema-only", "--schema=public", "--no-owner", "--no-privileges",
+                "--exclude-table=public.flyway_schema_history", "--exclude-table=public.patient_notifications").lines()
+                .filter(line -> !line.isBlank() && !line.startsWith("--") && !line.startsWith("\\restrict ") && !line.startsWith("\\unrestrict ")).toList();
+        assertEquals(ddl, priorDdl, "All preexisting DDL unchanged");
+        assertProtections(url);
+        String insert = "INSERT INTO patient_notifications(patient_id,order_id,category,event_type,event_key,title,message) "
+                + "SELECT patient_id,id,'ORDERS','ORDER_CREATED','synthetic-migration-event','Synthetic title','Synthetic message' FROM test_orders ORDER BY id LIMIT 1";
+        execute(url, insert);
+        assertEquals("23505", assertThrows(SQLException.class, () -> execute(url, insert)).getSQLState());
+        assertEquals("23514", assertThrows(SQLException.class, () -> execute(url, "UPDATE patient_notifications SET read_at=created_at-interval '1 second'")).getSQLState());
+        assertEquals("23514", assertThrows(SQLException.class, () -> execute(url, "UPDATE patient_notifications SET event_type='RESULT_PUBLISHED'")).getSQLState());
+        assertEquals("23503", assertThrows(SQLException.class, () -> execute(url, "UPDATE patient_notifications SET patient_id='ffffffff-ffff-ffff-ffff-ffffffffffff'")).getSQLState());
+        execute(url, "UPDATE patient_notifications SET read_at=created_at");
+        assertEquals(List.of("1"), rows(url, "SELECT count(*) FROM patient_notifications WHERE read_at=created_at"));
     }
 }

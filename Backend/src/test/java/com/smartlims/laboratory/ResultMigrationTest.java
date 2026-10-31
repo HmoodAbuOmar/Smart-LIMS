@@ -35,7 +35,7 @@ class ResultMigrationTest {
   }
   List<String> tables=List.of("users","patients","lab_tests","lab_test_categories","test_orders","order_items","appointment_types","appointment_slots");Map<String,List<String>> before=new LinkedHashMap<>();for(String table:tables)before.put(table,rows("SELECT to_jsonb(t)::text FROM "+table+" t ORDER BY 1"));
   var appointment=rows("SELECT to_jsonb(a)::text FROM appointments a");var history=rows("SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
-   var f=migration(null);assertEquals(4,f.migrate().migrationsExecuted);f.validate();
+   var f=migration(null);assertEquals(5,f.migrate().migrationsExecuted);f.validate();
   for(var entry:before.entrySet())assertEquals(entry.getValue(),rows("SELECT to_jsonb(t)::text FROM "+entry.getKey()+" t ORDER BY 1"));
   // V20 already includes V16's visit-state columns; preserve the complete row.
   assertEquals(appointment,rows("SELECT to_jsonb(a)::text FROM appointments a"));

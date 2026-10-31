@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.*;
 public class AppointmentOrderCancellation {
     private final AppointmentRepository appointments;
     private final AppointmentSlotRepository slots;
-    public AppointmentOrderCancellation(AppointmentRepository appointments,AppointmentSlotRepository slots) { this.appointments=appointments; this.slots=slots; }
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
+    public AppointmentOrderCancellation(AppointmentRepository appointments,AppointmentSlotRepository slots,
+            com.smartlims.notifications.service.NotificationPublisher notifications) { this.appointments=appointments; this.slots=slots; this.notifications=notifications; }
     /** Caller already holds the order row lock; never opens a separate transaction. */
     @Transactional(propagation=Propagation.MANDATORY)
     public void cancelForOrder(TestOrder order) {
@@ -21,6 +23,7 @@ public class AppointmentOrderCancellation {
             slots.findForUpdate(appointment.getSlot().getId()).orElseThrow();
             // Required order consistency cascade is independent of direct-action cutoff.
             appointment.cancel(order.getCancelledBy(),order.getCancelledAt(),order.getCancellationReason());
+            notifications.appointment(appointment,false);
         });
         appointments.flush();
     }

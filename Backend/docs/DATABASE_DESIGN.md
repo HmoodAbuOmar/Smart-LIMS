@@ -1,5 +1,26 @@
 # Smart-LIMS Database Design
 
+## Patient notifications design (NOTIF-38, 2026-10-31)
+
+Additive V25 creates patient_notifications only; V1-V24 are immutable. Rows have
+UUID, patient/order FKs, optional appointment/published-result FKs, category/event,
+unique event_key, fixed retained title/message, creation/read instants. Category/
+event/navigation shape checks and patient chronological/unread indexes accompany
+the table. No historical INSERT SELECT/backfill or system/welcome producer.
+See [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md) for the complete event/API matrix.
+
+Source workflows call a MANDATORY transactional emitter after a real successful
+change; source state and notification commit or roll back together. Native INSERT
+ON CONFLICT(event_key) DO NOTHING preserves the first notification/read state.
+Existing source locks serialize transitions and reschedule versions identify
+distinct moves. Result draft/approval/correction creation never emit. Published
+version identity is retained after supersession. Read predicates enforce linked
+patient ownership, target ownership and PUBLISHED result state; conditional read
+updates preserve first readAt under concurrent retries. Global read-all uses one
+statement snapshot, leaving subsequently committed notifications unread. Dashboard
+shares its existing repeatable-read snapshot with the same unread predicate.
+No new account locks, external transport, clinical interpretation or lifecycle.
+
 Local cutover and canonical-resource cleanup (2026-10-30): **smart_lims_db uses
 V1-V24**, selected by the single main `application.yaml` at
 `classpath:db/migration`; no profile is required for normal startup. The owner
@@ -215,7 +236,7 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 14 | `test_results` | Implemented V9 | Independent approval/publication and corrections per item. |
 | 15 | `result_specimens` | Implemented V9 | Retained exact specimens per result version. |
 | 16 | `result_values` | Implemented V9 | Values and historical manual-reference/definition snapshots. |
-| 17 | `notifications` | Planned; T-NTF-02/03 | User notifications and delivery/retry state. |
+| 17 | `patient_notifications` | V25; NOTIF-38 | Patient-profile in-app workflow events and read state; external delivery deferred. |
 | 18 | `audit_logs` | Planned; T-AUD-02/03 | Append-only records of important business actions. |
 | 19 | `symptom_assessments` | Deferred AI; T-AI-01 | Patient symptom-analysis sessions for the later test-suggestion feature. |
 | 20 | `suggested_tests` | Deferred AI; T-AI-01 | Laboratory tests suggested by a symptom assessment. |
@@ -721,37 +742,35 @@ rows remain NULL/NOT_EVALUATED. SQL and DTO/service checks enforce types, finite
 precision, comparator/value consistency and minimum<=maximum when both supplied.
 No clinical interpretation. Published values and snapshots are immutable.
 
-### 4.17. `notifications`
+### 4.17. `patient_notifications`
 
-User notifications and delivery/retry state.
-
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Implemented by additive V25 for NOTIF-38. The owner's 2026-10-31 in-app-only scope
+supersedes the old proposed account/email delivery queue. External channels and
+system announcements remain deferred; no queue, worker or retry-delivery state.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
 | `id` | `UUID` | No | PK | Record identifier |
-| `user_id` | `UUID` | No | FK users.id | Linked account or event actor/recipient |
+| `patient_id` | `UUID` | No | FK patients.id | Actual recipient profile; authenticated linked ownership required |
+| `order_id` | `UUID` | No | FK test_orders.id | Actual source order |
+| `appointment_id` | `UUID` | Yes | FK appointments.id | Actual appointment event target |
 | `result_id` | `UUID` | Yes | FK test_results.id | Result version |
-| `type` | `VARCHAR(30)` | No | - | Payment/refund or notification type |
-| `message` | `TEXT` | No | - | General notification message |
-| `channel` | `VARCHAR(10)` | No | CHECK | IN_APP or EMAIL |
-| `delivery_status` | `VARCHAR(10)` | No | DEFAULT PENDING | Delivery workflow state |
-| `deduplication_key` | `VARCHAR(160)` | No | UNIQUE | Unique notification event key |
-| `attempt_count` | `INTEGER` | No | DEFAULT 0 | Delivery attempt count |
-| `next_attempt_at` | `TIMESTAMPTZ` | Yes | - | Next scheduled retry |
-| `last_error` | `TEXT` | Yes | - | Sanitized delivery error |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
-| `sent_at` | `TIMESTAMPTZ` | Yes | - | Delivery time |
+| `category` | `VARCHAR(20)` | No | CHECK | ORDERS, APPOINTMENTS, RESULTS; SYSTEM filter has no producer/rows |
+| `event_type` | `VARCHAR(40)` | No | CHECK | Approved category/target-shape event matrix in NOTIFICATIONS_API.md |
+| `event_key` | `VARCHAR(180)` | No | UNIQUE | Type + source UUID, with revision for each real slot move |
+| `title` | `VARCHAR(150)` | No | Nonblank CHECK | Fixed server display title |
+| `message` | `VARCHAR(1000)` | No | Nonblank CHECK | General server template, no unpublished/clinical/internal detail |
+| `created_at` | `TIMESTAMPTZ` | No | DEFAULT clock_timestamp() | Actual notification insertion time |
 | `read_at` | `TIMESTAMPTZ` | Yes | - | In-app read time |
 
 **Rules and relationships**
 
-- channel values: IN_APP, EMAIL. delivery_status values: PENDING, SENT, FAILED. attempt_count starts at 0.
-- Create notification rows transactionally with result publication; deliver email after commit and retry failures.
-- deduplication_key prevents duplicate notification rows. Claim/update pending rows atomically so workers do not process the same row concurrently.
-- This table is the initial delivery queue; no additional outbox table is required. SMTP can still duplicate delivery after a crash between sending and saving status; this is not an exactly-once guarantee.
-- Only the recipient may read or mark their in-app notifications. Unlinked patients receive manual phone communication in the initial scope.
-- Keep email messages general, such as result-ready notifications, without sensitive result details. last_error must be sanitized.
+- Source and notification share a transaction; any rollback removes both changes.
+- Only real transitions generate rows; replay/no-op/duplicate insert leaves original read state unchanged.
+- Read predicates verify patient link, source ownership and exact result PUBLISHED state, including superseded publications.
+- Read time must be >= creation time. Conditional one/all updates retain the first readAt under concurrent retries.
+- No backfill or fabricated welcome/system event; legitimate new staff events for unlinked profiles become readable only after authorized linking.
+- Patient/time and partial unread indexes support bounded lists/counts; FK indexes support source references.
 
 ### 4.18. `audit_logs`
 
@@ -857,7 +876,7 @@ Links involving planned/deferred tables below are proposed relationships, not ex
 | test_results | result_values | Multiple parameter measurements |
 | test_parameters | result_values | Parameter referenced by many measurements |
 | result/visit/sample/appointment | laboratory_events | Append-only lifecycle events; exactly one target per row |
-| users | notifications | Multiple notifications per recipient |
+| patients | patient_notifications | Multiple in-app events per profile; linked account controls access |
 | users | audit_logs | Multiple events; system actor may be NULL |
 | patients | symptom_assessments | Multiple assessment sessions |
 | symptom_assessments | suggested_tests | Multiple suggestions |
@@ -888,7 +907,7 @@ Additional recommended indexes:
 - Partial UNIQUE indexes on test_results(order_item_id) for current publication and working DRAFT/APPROVED.
 - result_specimens(result_id,sample_id) PK and reverse sample index; visit_items reverse item index.
 - `result_values(result_id, parameter_id)` UNIQUE and `result_values(parameter_id)`.
-- `notifications(user_id, read_at)` and `notifications(delivery_status, next_attempt_at)`.
+- `patient_notifications(patient_id, created_at DESC, id)` and the same partial index WHERE read_at IS NULL; unique event_key and order/appointment/result FK indexes.
 - Audit indexes listed in the audit table section.
 - `suggested_tests(assessment_id, lab_test_id)` UNIQUE and `suggested_tests(lab_test_id)`.
 

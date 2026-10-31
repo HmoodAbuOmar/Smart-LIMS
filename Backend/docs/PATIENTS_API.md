@@ -1,7 +1,7 @@
 # Smart-LIMS Patients API Contract
 
 Migration-version references in historical sections describe the original V1-V9
-implementation. The current application uses canonical V1-V24 from
+implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
 fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
 
@@ -906,5 +906,7 @@ here were not executed as a live HTTP campaign.
 
 `GET /api/patients/me/dashboard` is the patient-only aggregate for the three
 Dashboard references. See [DASHBOARD_API.md](DASHBOARD_API.md) for fields, counts,
-ordering/limits/empty states, profile-linking/security, destination action mapping
-and explicit notification unavailability. Existing profile endpoints are unchanged.
+ordering/limits/empty states, profile-linking/security and destination action mapping.
+Notifications now use the persisted unread total from [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md).
+Existing profile endpoints are unchanged; authorized linking controls access to
+real subsequent workflow notifications assigned to that profile.

@@ -46,8 +46,10 @@ public class VisitService {
     private final PatientRepository patients;
     private final OrderCompletion completion;
     private final EntityManager entities;
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
-    public VisitService(LaboratoryAccess access, LaboratoryLocks locks, TestOrderRepository orders, OrderItemRepository items, VisitRepository visits, AppointmentRepository appointments, AppointmentSlotRepository slots, LaboratoryEventRepository events, TestResultRepository results, SampleRepository samples, PatientRepository patients, OrderCompletion completion, EntityManager entities) {
+    public VisitService(LaboratoryAccess access, LaboratoryLocks locks, TestOrderRepository orders, OrderItemRepository items, VisitRepository visits, AppointmentRepository appointments, AppointmentSlotRepository slots, LaboratoryEventRepository events, TestResultRepository results, SampleRepository samples, PatientRepository patients, OrderCompletion completion, EntityManager entities,
+            com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access = access;
         this.locks = locks;
         this.orders = orders;
@@ -61,6 +63,7 @@ public class VisitService {
         this.patients = patients;
         this.completion = completion;
         this.entities = entities;
+        this.notifications = notifications;
     }
 
     public record Created(VisitResponse visit, boolean created) {
@@ -97,8 +100,11 @@ public class VisitService {
             slots.findForUpdate(appointment.getSlot().getId()).orElseThrow();
             appointment.checkIn(user, at);
             events.save(new LaboratoryEvent("appointment", appointmentId, "CHECK_IN", user, at, null));
+            notifications.appointment(appointment, false);
         }
+        boolean started = order.getStatus() == OrderStatus.PENDING;
         order.setStatus(OrderStatus.IN_PROGRESS);
+        if (started) notifications.order(order);
         var visit = visits.saveAndFlush(new Visit("VIS-%08d".formatted(visits.nextNumber()), order, appointment, at, user, key, hash, selected));
         events.saveAndFlush(new LaboratoryEvent("visit", visit.getId(), "ARRIVAL", user, at, null));
         entities.refresh(visit);
@@ -124,6 +130,7 @@ public class VisitService {
                 throw LaboratoryException.conflict("APPOINTMENT_STATE_CONFLICT");
             appointment.completeVisit(user, at);
             events.save(new LaboratoryEvent("appointment", appointment.getId(), "VISIT_COMPLETE", user, at, null));
+            notifications.appointment(appointment, false);
         }
         visit.complete(user, at);
         events.save(new LaboratoryEvent("visit", key, "COMPLETE", user, at, null));
@@ -151,6 +158,7 @@ public class VisitService {
         events.save(new LaboratoryEvent("appointment", key, "NO_SHOW", user, now, null));
         appointments.flush();
         entities.refresh(a);
+        notifications.appointment(a, false);
         return AppointmentMapping.detail(a, now);
     }
 

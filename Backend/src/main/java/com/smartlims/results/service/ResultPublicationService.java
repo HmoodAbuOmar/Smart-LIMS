@@ -35,8 +35,10 @@ public class ResultPublicationService {
     private final ResultMapping mapping;
     private final OrderCompletion completion;
     private final EntityManager entities;
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
-    public ResultPublicationService(LaboratoryAccess access, LaboratoryLocks locks, TestOrderRepository orders, TestResultRepository results, ResultDraftService drafts, LaboratoryEventRepository events, ResultEvidence evidence, ResultMapping mapping, OrderCompletion completion, EntityManager entities) {
+    public ResultPublicationService(LaboratoryAccess access, LaboratoryLocks locks, TestOrderRepository orders, TestResultRepository results, ResultDraftService drafts, LaboratoryEventRepository events, ResultEvidence evidence, ResultMapping mapping, OrderCompletion completion, EntityManager entities,
+            com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access = access;
         this.locks = locks;
         this.orders = orders;
@@ -47,6 +49,7 @@ public class ResultPublicationService {
         this.mapping = mapping;
         this.completion = completion;
         this.entities = entities;
+        this.notifications = notifications;
     }
 
     @Transactional
@@ -89,6 +92,7 @@ public class ResultPublicationService {
         completion.reconsider(r.getItem().getOrder());
         orders.flush();
         entities.refresh(r);
+        notifications.publication(r);
         return mapping.detail(r, false);
     }
 

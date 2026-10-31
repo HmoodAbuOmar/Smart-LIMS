@@ -26,8 +26,11 @@ public class AppointmentBookingService {
     private final AppointmentRepository appointments;
     private final AppointmentAvailability availability;
     private final EntityManager entities;
-    public AppointmentBookingService(AppointmentAccess access,TestOrderRepository orders,AppointmentTypeRepository types,AppointmentSlotRepository slots,AppointmentRepository appointments,AppointmentAvailability availability,EntityManager entities) {
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
+    public AppointmentBookingService(AppointmentAccess access,TestOrderRepository orders,AppointmentTypeRepository types,AppointmentSlotRepository slots,AppointmentRepository appointments,AppointmentAvailability availability,EntityManager entities,
+            com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access=access; this.orders=orders; this.types=types; this.slots=slots; this.appointments=appointments; this.availability=availability; this.entities=entities;
+        this.notifications=notifications;
     }
     @Transactional
     public AppointmentResponses.Booking book(Authentication actor,@NotNull @Valid AppointmentRequests.Book body,List<String> keys) {
@@ -48,6 +51,7 @@ public class AppointmentBookingService {
         var now=Instant.now();
         if(!slot.isActive()||!slot.getStartsAt().isAfter(now)||appointments.countActiveBySlot(slotId)>=slot.getCapacity()||appointments.patientConflict(order.getPatient().getId(),slotId,null))throw AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE");
         var appointment=appointments.saveAndFlush(new Appointment(order,slot,type,account,key));entities.refresh(appointment);
+        notifications.appointment(appointment,false);
         return new AppointmentResponses.Booking(AppointmentMapping.detail(appointment,now),true);
     }
     @Transactional(readOnly=true)

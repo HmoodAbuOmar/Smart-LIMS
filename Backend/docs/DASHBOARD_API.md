@@ -7,6 +7,10 @@ Task DASH-37; requirements DASH-R01-R06. References: the three local
 patient-dashboard screenshots, PATIENTS_API.md, LAB_TESTS_API.md, ORDERS_API.md,
 APPOINTMENTS_API.md, RESULTS_API.md, VISITS_API.md and MEDICAL_HISTORY_API.md.
 
+NOTIF-38 (2026-10-31) replaces the original deferred notification state with
+persisted in-app unread counts. See [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md).
+The historical DASH-37 test evidence above retains its original scope/date.
+
 ## Read contract
 
 `GET /api/patients/me/dashboard`, PATIENT only. No query parameters or patient
@@ -31,7 +35,7 @@ Response fields:
 | totalOrders | All owned orders, including CANCELLED; independent of preview limit. |
 | upcomingAppointmentCount | Owned CONFIRMED appointments with startsAt strictly after asOf; same definition as UPCOMING list. |
 | currentPublishedResultCount | Owned current PUBLISHED versions, one per order item; includes retained publications on cancelled orders. Excludes working, approved and superseded versions. |
-| notifications | `{available:false,unreadCount:null}`. Unavailable is never zero; notification actions remain deferred. |
+| notifications | `{available:true,unreadCount:N}`; actual owned visible unread total, independent of list filters/pages. |
 | recentOrders | Up to 3 `{order,visits}` rows. `order` is the existing OrderSummaryResponse, createdAt descending then UUID ascending. `visits` contains actual `{id,visitNumber,visitUrl}` references, arrivedAt descending then UUID ascending. All actual visits are navigable, independently of order completion/publication. |
 | nextAppointment | Existing appointment Detail DTO for earliest upcoming startsAt then UUID ascending; null if absent. Includes id/orderId/slotId/typeId, retained type name, timezone/date/time/offset/status/action fields. |
 | latestResults | Up to 3 `{resultId,orderItemId,orderId,orderNumber,labTestId,testCode,testName,publishedAt,publicationDate,resultUrl,reportUrl}`. Current PUBLISHED only, publishedAt descending then result UUID ascending; ordered-test snapshots supply names/codes. Publication order is intentionally independent of result-list order. |
@@ -47,7 +51,7 @@ uses all retained history, and its seriesId opens the full trend with period=ALL
 
 Empty linked profile: zero counts, empty recentOrders/latestResults, null
 nextAppointment/healthTrendPreview; catalogSuggestions still reflect the active
-catalog (possibly empty). Notifications remain unavailable in every state.
+catalog (possibly empty). Empty inbox has notifications.available=true and unreadCount=0.
 Errors use the existing envelope, request ID and no-store policy.
 
 Example request with the existing eligible patient bearer token or access cookie:
@@ -68,7 +72,7 @@ Illustrative empty response with an empty active catalog (synthetic identity):
   "totalOrders": 0,
   "upcomingAppointmentCount": 0,
   "currentPublishedResultCount": 0,
-  "notifications": {"available": false, "unreadCount": null},
+  "notifications": {"available": true, "unreadCount": 0},
   "recentOrders": [],
   "nextAppointment": null,
   "latestResults": [],
@@ -90,7 +94,7 @@ unchanged. Lists below retain their documented paging/filter/validation rules.
 | Total orders / View all; My Orders sidebar and quick action | Dashboard totalOrders; `GET /api/orders/me`. |
 | Upcoming appointments / View all; My Appointments | Dashboard upcomingAppointmentCount; `GET /api/appointments/me?tab=UPCOMING` (PAST for other records). |
 | Available results / View all; My Results sidebar and quick action | Dashboard currentPublishedResultCount; `GET /api/results/me?tab=AVAILABLE` (ALL/PENDING supported). |
-| Unread / View all; bell; Notifications sidebar | Explicitly unavailable; notification service/list/unread tracking deferred. Do not show a fabricated 0. |
+| Unread / View all; bell; Notifications sidebar | `GET /api/notifications/me`, `/me/unread-count`; one/all-read actions in NOTIFICATIONS_API.md. Dashboard uses the same persisted unread predicate. |
 | Search laboratory tests; Tests Catalog; Browse tests | `GET /api/lab-tests?search=...`; patient active visibility; category/paging/sort supported. |
 | Popular tests cards / View all | Dashboard catalogSuggestions; `GET /api/lab-tests/{id}` and catalog list. Label as catalog suggestions; popularity is unavailable. |
 | Review selected tests / create order | Catalog details supply current price/preparation; `POST /api/orders/me` with `{testIds:[...]}` and UUID Idempotency-Key, backend-calculated snapshots/totals; 201 new/200 replay. No cart persistence or payment inferred. |
@@ -104,7 +108,7 @@ unchanged. Lists below retain their documented paging/filter/validation rules.
 | My Profile / account menu | `GET`/`PUT /api/patients/me/profile`; read-only email and existing completion/linking rules. Logout uses `POST /api/auth/logout` with existing cookie CSRF policy. |
 | Back / Home / Dashboard breadcrumbs; language toggle | Client navigation/localization; no backend mutation/API required. |
 
-Remaining intentional gaps: notifications/unread state, measured popularity,
+Remaining intentional gaps: external notification delivery, system announcements, measured popularity,
 payments and AI recommendations remain outside this slice. No PDF redesign.
 Verification evidence and limits are recorded in TESTING.md, not inferred from
 source inspection or screenshot sample values.

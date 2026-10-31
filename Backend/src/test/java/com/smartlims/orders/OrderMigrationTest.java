@@ -129,9 +129,9 @@ class OrderMigrationTest {
     @Test
     void freshDatabaseAppliesValidatesAndReappliesWithoutChanges() throws SQLException {
         Flyway flyway = migrations(null);
-        assertEquals(24, flyway.migrate().migrationsExecuted);
+        assertEquals(25, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertEquals(java.util.stream.IntStream.rangeClosed(1, 24).mapToObj(Integer::toString).toList(), rows(
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, 25).mapToObj(Integer::toString).toList(), rows(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank"));
         assertEquals(List.of("V8__test_orders.sql"), rows("SELECT script FROM flyway_schema_history WHERE version='8'"));
         assertEquals(List.of("0"), rows("SELECT count(*) FROM test_orders"));
@@ -164,7 +164,7 @@ class OrderMigrationTest {
         String history = "SELECT row_to_json(h)::text FROM flyway_schema_history h WHERE version::integer <= 7 ORDER BY installed_rank";
         List<String> oldHistory = rows(history);
         Flyway flyway = migrations(null);
-        assertEquals(17, flyway.migrate().migrationsExecuted);
+        assertEquals(18, flyway.migrate().migrationsExecuted);
         flyway.validate();
         for (var entry : before.entrySet()) {
             assertEquals(entry.getValue(), rows("SELECT row_to_json(t)::text FROM " + entry.getKey() + " t ORDER BY 1"));

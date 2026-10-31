@@ -1,5 +1,13 @@
 # Migration lineage history and reviewed-cutover procedure
 
+NOTIF-38 (2026-10-31) adds V25__patient_notifications.sql after the immutable
+V1-V24 split baseline. Current resource set is V1-V25 (23 application tables).
+The lineage-equivalence/copy tests and historical procedure below explicitly
+compare legacy V9 to canonical V24; they do not treat the later feature as part
+of that equivalent baseline. Separate V24-to-V25 checks preserve all existing
+DDL/rows/sequences/history and establish an empty inbox without backfill.
+This task does not apply V25 to development or change the recorded cutover state.
+
 Updated 2026-10-30. MIG-SPLIT-02 implements the owner-selected Option B from
 IMPLEMENTATION_PLAN.md. This is file organization only; API contracts, production
 Java, database object definitions and dependency versions are unchanged.

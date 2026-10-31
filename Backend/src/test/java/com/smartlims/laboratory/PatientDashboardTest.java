@@ -24,7 +24,7 @@ class PatientDashboardTest extends MedicalHistoryTestSupport {
         return json.readValue(response.getContentAsByteArray(), PatientDashboardResponse.class);
     }
 
-    @Test void emptyLinkedDashboardUsesProfileNameAndExplicitlyUnavailableNotifications() throws Exception {
+    @Test void emptyLinkedDashboardUsesProfileNameAndRealZeroUnreadNotifications() throws Exception {
         var result = read();
         assertEquals(own.getId(), result.patientId()); assertEquals(own.getFullName(), result.displayName());
         assertNotEquals(actors.get(Role.PATIENT).getFullName(), result.displayName());
@@ -32,8 +32,8 @@ class PatientDashboardTest extends MedicalHistoryTestSupport {
         assertEquals(0, result.totalOrders()); assertEquals(0, result.upcomingAppointmentCount());
         assertEquals(0, result.currentPublishedResultCount()); assertTrue(result.recentOrders().isEmpty());
         assertTrue(result.latestResults().isEmpty()); assertNull(result.nextAppointment()); assertNull(result.healthTrendPreview());
-        mvc.perform(bearer(get(URL), Role.PATIENT)).andExpect(jsonPath("$.notifications.available").value(false))
-                .andExpect(jsonPath("$.notifications.unreadCount").value(org.hamcrest.Matchers.nullValue()));
+        mvc.perform(bearer(get(URL), Role.PATIENT)).andExpect(jsonPath("$.notifications.available").value(true))
+                .andExpect(jsonPath("$.notifications.unreadCount").value(0));
     }
 
     @Test void rolesStoredEligibilityProfileLinkAndCookieAuthenticationAreEnforced() throws Exception {

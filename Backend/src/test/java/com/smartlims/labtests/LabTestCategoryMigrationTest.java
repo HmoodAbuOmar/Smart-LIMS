@@ -106,7 +106,7 @@ class LabTestCategoryMigrationTest {
     @Test
     void freshDatabaseAppliesAndValidatesCategorySchemaWithBothIndexes() throws SQLException {
         Flyway flyway = migrations(null);
-        assertEquals(24, flyway.migrate().migrationsExecuted);
+        assertEquals(25, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertEquals(List.of("0"), rows("SELECT count(*) FROM lab_test_categories"));
         assertEquals(List.of("V7__lab_test_categories.sql"), rows(
@@ -131,7 +131,7 @@ class LabTestCategoryMigrationTest {
         List<String> beforeHistory = rows(historySql);
 
         Flyway flyway = migrations(null);
-        assertEquals(18, flyway.migrate().migrationsExecuted);
+        assertEquals(19, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertEquals(beforeCatalog, rows(catalogSql));
         assertEquals(beforeHistory, rows(historySql));

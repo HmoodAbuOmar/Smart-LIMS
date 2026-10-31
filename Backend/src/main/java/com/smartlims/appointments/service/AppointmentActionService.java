@@ -27,8 +27,11 @@ public class AppointmentActionService {
     private final AppointmentRescheduleRepository history;
     private final AppointmentAvailability availability;
     private final EntityManager entities;
-    public AppointmentActionService(AppointmentAccess access,TestOrderRepository orders,AppointmentRepository appointments,AppointmentSlotRepository slots,AppointmentRescheduleRepository history,AppointmentAvailability availability,EntityManager entities) {
+    private final com.smartlims.notifications.service.NotificationPublisher notifications;
+    public AppointmentActionService(AppointmentAccess access,TestOrderRepository orders,AppointmentRepository appointments,AppointmentSlotRepository slots,AppointmentRescheduleRepository history,AppointmentAvailability availability,EntityManager entities,
+            com.smartlims.notifications.service.NotificationPublisher notifications) {
         this.access=access; this.orders=orders; this.appointments=appointments; this.slots=slots; this.history=history; this.availability=availability; this.entities=entities;
+        this.notifications=notifications;
     }
     @Transactional(readOnly=true)
     public AppointmentResponses.Page<AppointmentResponses.Slot> alternatives(Authentication actor,String id,AppointmentQuery query) {
@@ -54,6 +57,7 @@ public class AppointmentActionService {
         var target=slots.findById(targetId).orElseThrow(()->AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE"));
         if(!target.isActive()||!target.getStartsAt().isAfter(now)||appointments.countActiveBySlot(targetId)>=target.getCapacity()||appointments.patientConflict(a.getOrder().getPatient().getId(),targetId,key))throw AppointmentException.conflict("APPOINTMENT_SLOT_UNAVAILABLE");
         history.save(new AppointmentReschedule(a,target,account,now));a.move(target);appointments.flush();entities.refresh(a);
+        notifications.appointment(a,true);
         return AppointmentMapping.detail(a,now);
     }
     @Transactional
@@ -66,7 +70,7 @@ public class AppointmentActionService {
         slots.findForUpdate(a.getSlot().getId()).orElseThrow(()->AppointmentException.missing("APPOINTMENT_SLOT"));
         var now=Instant.now().truncatedTo(ChronoUnit.MICROS);
         if(!a.getSlot().getStartsAt().isAfter(now))throw AppointmentException.conflict("APPOINTMENT_NOT_CHANGEABLE");
-        a.cancel(account,now,body.reason());appointments.flush();entities.refresh(a);return AppointmentMapping.detail(a,now);
+        a.cancel(account,now,body.reason());appointments.flush();entities.refresh(a);notifications.appointment(a,false);return AppointmentMapping.detail(a,now);
     }
     private Appointment locked(UserAccount actor,UUID id) {
         // Discover only immutable order ID; never hold appointment/coordination before order.

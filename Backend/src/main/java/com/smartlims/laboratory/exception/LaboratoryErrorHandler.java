@@ -6,6 +6,7 @@ import com.smartlims.visits.controller.VisitController;
 import com.smartlims.samples.controller.SampleController;
 import com.smartlims.results.controller.ResultController;
 import com.smartlims.patients.controller.PatientDashboardController;
+import com.smartlims.notifications.controller.NotificationController;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
 import java.util.*;
@@ -16,7 +17,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
-@Order(-1) @RestControllerAdvice(assignableTypes={TestParameterController.class,VisitController.class,SampleController.class,ResultController.class,PatientDashboardController.class})
+@Order(-1) @RestControllerAdvice(assignableTypes={TestParameterController.class,VisitController.class,SampleController.class,ResultController.class,PatientDashboardController.class,NotificationController.class})
 public class LaboratoryErrorHandler {
  @ExceptionHandler(LaboratoryException.class) ResponseEntity<ApiError> request(LaboratoryException e,HttpServletResponse r){return respond(e.getStatus(),e.getCode(),e.getMessage(),e.getField()==null?Map.of():Map.of(e.getField(),e.getMessage()),r);}
  @ExceptionHandler(MethodArgumentNotValidException.class) ResponseEntity<ApiError> validation(MethodArgumentNotValidException e,HttpServletResponse r){Map<String,String> f=new LinkedHashMap<>();e.getBindingResult().getFieldErrors().forEach(v->f.putIfAbsent(v.getField(),"Invalid value."));return respond(HttpStatus.BAD_REQUEST,"VALIDATION_ERROR","Please correct the request fields.",f,r);}

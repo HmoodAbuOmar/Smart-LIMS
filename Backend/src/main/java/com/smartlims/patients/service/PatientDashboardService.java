@@ -37,10 +37,11 @@ public class PatientDashboardService {
     private final VisitRepository visits;
     private final LabTestService catalog;
     private final HealthTrendService trends;
+    private final com.smartlims.notifications.service.NotificationService notifications;
 
     public PatientDashboardService(LaboratoryAccess access, PatientRepository patients, OrderReadService orders,
             AppointmentRepository appointments, TestResultRepository results, VisitRepository visits,
-            LabTestService catalog, HealthTrendService trends) {
+            LabTestService catalog, HealthTrendService trends, com.smartlims.notifications.service.NotificationService notifications) {
         this.access = access;
         this.patients = patients;
         this.orders = orders;
@@ -49,6 +50,7 @@ public class PatientDashboardService {
         this.visits = visits;
         this.catalog = catalog;
         this.trends = trends;
+        this.notifications = notifications;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -72,7 +74,7 @@ public class PatientDashboardService {
                         .map(v -> new VisitLink(v.getId(), v.getVisitNumber(), "/api/visits/me/" + v.getId())).toList())).toList();
         return new PatientDashboardResponse(patient.getId(), patient.getFullName(), now, HistoryDates.ZONE.getId(),
                 recent.totalElements(), next.getTotalElements(), latest.getTotalElements(),
-                new Notifications(false, null), rows,
+                new Notifications(true, notifications.unreadCount(actor)), rows,
                 next.isEmpty() ? null : AppointmentMapping.detail(next.getContent().getFirst(), now),
                 latest.getContent().stream().map(this::publication).toList(),
                 catalog.list(actor, new LabTestQueryRequest(null, true, 0, 4, "name,asc", null)).content(),
