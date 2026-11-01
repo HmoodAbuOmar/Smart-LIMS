@@ -36,3 +36,25 @@ export const demoAppointments = Array.from({ length: 6 }, (_, index) => ({
   date: offsetDate(Math.floor(index / 2)), time: index % 2 ? '11:30' : '09:00',
   status: index === 3 ? 'pending' : 'confirmed',
 }))
+
+// A01-only historical event fixtures. Confirmations are collection events, not
+// appointment bookings; refunds are explicit amounts, never inferred from orders.
+export const demoSampleEvents = [
+  { id: 'DEMO-S-001', orderId: 'DEMO-O-1401', date: offsetDate(0), status: 'rejected' },
+  { id: 'DEMO-S-002', orderId: 'DEMO-O-1203', date: offsetDate(-2), status: 'rejected' },
+  { id: 'DEMO-S-003', orderId: 'DEMO-O-0602', date: offsetDate(-8), status: 'rejected' },
+  { id: 'DEMO-S-004', orderId: 'DEMO-O-1404', date: offsetDate(0), status: 'accepted' },
+]
+export const demoCollectionEvents = [
+  { id: 'DEMO-C-001', orderId: 'DEMO-O-1404', date: offsetDate(0), status: 'confirmed' },
+  { id: 'DEMO-C-002', orderId: 'DEMO-O-1302', date: offsetDate(-1), status: 'confirmed' },
+  { id: 'DEMO-C-003', orderId: 'DEMO-O-1204', date: offsetDate(-2), status: 'confirmed' },
+  { id: 'DEMO-C-004', orderId: 'DEMO-O-0603', date: offsetDate(-8), status: 'confirmed' },
+  { id: 'DEMO-C-005', orderId: 'DEMO-O-1401', date: offsetDate(0), status: 'pending' },
+]
+export const demoRefundEvents = [
+  { id: 'DEMO-F-001', orderId: 'DEMO-O-1404', date: offsetDate(0), status: 'completed', amount: 25, currency: 'ILS' },
+  { id: 'DEMO-F-002', orderId: 'DEMO-O-1204', date: offsetDate(-1), status: 'completed', amount: 45, currency: 'ILS' },
+  { id: 'DEMO-F-003', orderId: 'DEMO-O-0602', date: offsetDate(-8), status: 'completed', amount: 35, currency: 'ILS' },
+  { id: 'DEMO-F-004', orderId: 'DEMO-O-1402', date: offsetDate(0), status: 'pending', amount: 70, currency: 'ILS' },
+]

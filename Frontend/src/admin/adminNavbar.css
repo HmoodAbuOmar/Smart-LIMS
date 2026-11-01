@@ -1,56 +1,56 @@
 /* Navbar styles stay within the isolated Admin layout and reuse its approved palette. */
 .admin-layout .admin-header {
+  --medical-deep: var(--admin-deep);
+  --medical-mint: var(--admin-mint);
+  --medical-off-white: #f7faf9;
   grid-column: 2;
   grid-row: 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  min-block-size: 88px;
-  padding: 18px 28px;
+  gap: 12px;
+  min-block-size: 72px;
+  padding: 12px 24px;
   border-block-end: 1px solid var(--admin-border);
   background: var(--admin-white);
+  font-family: var(--admin-font);
+  line-height: 1.6;
 }
+.admin-layout[lang='ar'] .admin-header { line-height: 1.8; }
 .admin-layout .admin-header-heading { min-inline-size: 0; }
-.admin-layout .admin-header-heading h1 { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.4; }
-.admin-layout .admin-header-heading > span { display: block; margin-block-start: 3px; font-size: 12px; color: #426b67; }
+.admin-layout .admin-header-heading h1 { margin: 0; font-size: 25px; font-weight: 700; letter-spacing: -.02em; line-height: 1.4; }
+.admin-layout .admin-header-heading > span { display: block; margin-block-start: 2px; font-size: 11px; color: #426b67; }
 .admin-layout .admin-navbar-search {
   display: flex;
   align-items: center;
   gap: 9px;
   flex: 1 1 180px;
-  max-inline-size: 320px;
+  max-inline-size: 650px;
   min-inline-size: 150px;
-  min-block-size: 42px;
   margin-inline-start: auto;
-  padding: 9px 12px;
+  padding: 0 10px;
   border: 1px solid var(--admin-border);
-  border-radius: 8px;
-  background: #f7faf9;
-  color: #426b67;
+  border-radius: 9px;
+  background: #eaf5f2;
+  color: var(--admin-deep);
 }
 .admin-layout .admin-navbar-search svg { flex-shrink: 0; }
-.admin-layout .admin-navbar-search input { inline-size: 100%; min-inline-size: 0; padding: 0; border: 0; background: transparent; font: inherit; font-size: 12px; color: #426b67; opacity: 1; cursor: not-allowed; }
+.admin-layout .admin-navbar-search input { inline-size: 100%; min-inline-size: 0; padding: 7px 0; border: 0; background: transparent; font: inherit; font-size: 12px; color: #426b67; opacity: 1; cursor: not-allowed; }
 .admin-layout .admin-navbar-search input::placeholder { color: #426b67; opacity: 1; }
-.admin-layout .admin-navbar-actions { display: flex; align-items: center; gap: 12px; margin-inline-start: auto; }
-.admin-layout .admin-language-toggle,
-.admin-layout .admin-menu-toggle,
-.admin-layout .admin-notifications { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-block-size: 42px; border: 1px solid var(--admin-border); border-radius: 7px; background: var(--admin-white); color: var(--admin-deep); padding: 8px 12px; transition: background-color 150ms ease; }
-.admin-layout .admin-language-toggle { flex-shrink: 0; }
-.admin-layout .admin-language-toggle:hover,
+.admin-layout .admin-navbar-actions { display: flex; align-items: center; gap: 18px; margin-inline-start: auto; }
+.admin-layout .admin-menu-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-block-size: 38px; border: 1px solid var(--admin-border); border-radius: 7px; background: var(--admin-white); color: var(--admin-deep); padding: 7px 10px; transition: background-color 150ms ease; }
 .admin-layout .admin-menu-toggle:hover { background: #edf6f3; }
 .admin-layout .admin-menu-toggle { display: none; }
 .admin-layout .admin-notifications-wrapper { display: inline-flex; }
-.admin-layout .admin-notifications { position: relative; inline-size: 42px; padding: 8px; }
-.admin-layout .admin-notification-indicator { position: absolute; inset-block-start: 8px; inset-inline-end: 9px; inline-size: 6px; block-size: 6px; background: var(--admin-mint); border: 1px solid var(--admin-green); border-radius: 50%; }
-.admin-layout .admin-navbar-profile { display: flex; align-items: center; gap: 9px; padding-inline-start: 14px; border-inline-start: 1px solid var(--admin-border); }
-.admin-layout .admin-profile-avatar { display: grid; place-items: center; flex-shrink: 0; inline-size: 40px; block-size: 40px; background: var(--admin-mint); color: var(--admin-deep); border: 1px solid var(--admin-border); border-radius: 50%; }
+/* Portal.css .portal-bell: same icon, padding, transparent surface, and borderless box. */
+.admin-layout .admin-notifications { position: relative; display: grid; place-items: center; margin-inline-start: auto; padding: 6px; border: 0; border-radius: 0; background: transparent; color: var(--medical-deep); -webkit-tap-highlight-color: transparent; }
+.admin-layout .admin-notifications:disabled { opacity: .5; cursor: not-allowed; }
+.admin-layout .admin-notifications:focus-visible { outline: 2px solid #23a99a; outline-offset: 3px; }
+.admin-layout .admin-navbar-profile { display: flex; align-items: center; gap: 9px; }
+.admin-layout .admin-profile-avatar { display: grid; place-items: center; flex-shrink: 0; inline-size: 32px; block-size: 32px; background: var(--admin-mint); color: var(--admin-deep); border-radius: 50%; }
 .admin-layout .admin-profile-copy { display: grid; gap: 1px; }
 .admin-layout .admin-profile-copy strong { font-size: 12px; font-weight: 600; }
 .admin-layout .admin-profile-copy > span { font-size: 11px; color: #426b67; }
-@media (max-width: 1250px) and (min-width: 901px) {
-  .admin-layout .admin-navbar-search { order: 3; flex-basis: 100%; max-inline-size: none; margin-inline-start: 0; }
-}
 @media (max-width: 900px) {
   .admin-layout .admin-header { grid-column: 1; grid-row: 1; padding: 16px 20px; gap: 12px; }
   .admin-layout .admin-menu-toggle { display: inline-flex; flex-shrink: 0; }
@@ -65,10 +65,9 @@
   .admin-layout .admin-header { padding: 14px 12px; gap: 10px; }
   .admin-layout .admin-header-heading h1 { font-size: 16px; }
   .admin-layout .admin-navbar-actions { gap: 7px; }
-  .admin-layout .admin-language-toggle { padding: 8px; font-size: 12px; gap: 5px; }
-  .admin-layout .admin-navbar-profile { padding-inline-start: 8px; gap: 6px; }
+  .admin-layout .admin-navbar-profile { gap: 6px; }
   .admin-layout .admin-profile-avatar { inline-size: 32px; block-size: 32px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-layout .admin-language-toggle, .admin-layout .admin-menu-toggle, .admin-layout .admin-notifications { transition: none; }
+  .admin-layout .admin-menu-toggle { transition: none; }
 }

@@ -58,10 +58,10 @@ export default function AdminLayout() {
       if (event.key === 'Escape' && mobileOpen) closeMenu()
     }}>
       <a className="admin-skip-link" href="#admin-main">{copy.skip}</a>
-      <AdminNavbar copy={copy} activeId={activeId} language={language} mobileOpen={mobileOpen} menuButtonRef={menuButton}
-        onToggleMenu={() => setMobileOpen(open => !open)}
+      <AdminNavbar copy={copy} activeId={activeId} mobileOpen={mobileOpen} menuButtonRef={menuButton}
+        onToggleMenu={() => setMobileOpen(open => !open)} />
+      <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} language={language}
         onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />
-      <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} />
       <main id="admin-main" className="admin-main" aria-label={copy.content} tabIndex={-1}>
         {activeId === 'overview' && <AdminOverview language={language} />}
       </main>

@@ -1,0 +1,11 @@
+.admin-overview .admin-filter-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; min-block-size: 34px; max-inline-size: 100%; padding: 6px 10px; border: 1px solid #c5e1da; border-radius: 7px; background: #fff; color: #083f3d; font: inherit; font-size: 11px; cursor: pointer; }
+.admin-overview .admin-filter-trigger:hover, .admin-overview .admin-filter-trigger[aria-expanded='true'] { background: #edf6f3; border-color: #91bfb2; }
+.admin-filter-trigger svg { flex-shrink: 0; transition: transform 150ms ease; }
+.admin-filter-trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+.admin-filter-trigger:focus-visible { outline: 2px solid #12645f; outline-offset: 3px; }
+.admin-filter-menu { position: fixed; z-index: 1000; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding: 5px; border: 1px solid #d4e5df; border-radius: 10px; background: #fff; color: #083f3d; box-shadow: 0 8px 28px #083f3d24; font-family: var(--font-ui); font-size: 11px; text-align: start; }
+.admin-filter-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-block-size: 36px; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; cursor: pointer; outline: none; }
+.admin-filter-option:hover, .admin-filter-option:focus { background: #e7f3ef; }
+.admin-filter-option:focus-visible { box-shadow: inset 0 0 0 1px #91bfb2; }
+.admin-filter-option[aria-selected='true'] { color: #12645f; font-weight: 600; }
+.admin-filter-option svg { flex-shrink: 0; }

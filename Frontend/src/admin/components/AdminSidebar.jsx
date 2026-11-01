@@ -1,6 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createInstance } from 'i18next'
+import { I18nextProvider } from 'react-i18next'
 import { ChevronDown, LogOut } from 'lucide-react'
 import BrandLogo from '../../components/BrandLogo.jsx'
+import LanguageSwitcher from '../../components/LanguageSwitcher.jsx'
 import { adminNavigation } from '../adminNavigation.js'
 
 function AdminNavGroup({ item, copy, activeId, onNavigate }) {
@@ -27,7 +30,7 @@ function AdminNavGroup({ item, copy, activeId, onNavigate }) {
       <button ref={toggle} id={`admin-group-${id}`} type="button"
         className={'admin-nav-item admin-nav-group-toggle' + (childActive ? ' has-active-child' : '')}
         aria-expanded={expanded} aria-controls={`admin-submenu-${id}`} onClick={() => setExpanded(!expanded)}>
-        <Icon size={19} strokeWidth={1.7} aria-hidden="true" />
+        <Icon size={18} aria-hidden="true" />
         <span>{copy.items[id]}</span>
         <ChevronDown className="admin-nav-chevron" size={16} aria-hidden="true" />
       </button>
@@ -36,7 +39,7 @@ function AdminNavGroup({ item, copy, activeId, onNavigate }) {
           <li key={childId}>
             <button type="button" className={'admin-nav-item admin-nav-child' + (activeId === childId ? ' is-active' : '')}
               aria-current={activeId === childId ? 'true' : undefined} onClick={() => onNavigate(childId)}>
-              <ChildIcon size={17} strokeWidth={1.7} aria-hidden="true" />
+              <ChildIcon size={18} aria-hidden="true" />
               <span>{copy.items[childId]}</span>
             </button>
           </li>
@@ -46,7 +49,23 @@ function AdminNavGroup({ item, copy, activeId, onNavigate }) {
   )
 }
 
-export default function AdminSidebar({ copy, activeId, onNavigate, mobileOpen }) {
+export default function AdminSidebar({ copy, activeId, onNavigate, mobileOpen, language, onToggleLanguage }) {
+  // Reuse the Portal control while preserving the independent Admin preference.
+  const languageControl = useMemo(() => {
+    const instance = createInstance()
+    void instance.init({
+      lng: language, fallbackLng: 'en', defaultNS: 'common', initAsync: false,
+      resources: { en: { common: { language: 'Language' } }, ar: { common: { language: 'اللغة' } } },
+    })
+    return instance
+  }, [language])
+
+  useEffect(() => {
+    const updateLanguage = next => { if (next !== language) onToggleLanguage() }
+    languageControl.on('languageChanged', updateLanguage)
+    return () => languageControl.off('languageChanged', updateLanguage)
+  }, [languageControl, language, onToggleLanguage])
+
   return (
     <aside id="admin-navigation" className="admin-sidebar" data-open={mobileOpen} aria-label={copy.navigation}>
       <div className="admin-brand">
@@ -59,7 +78,7 @@ export default function AdminSidebar({ copy, activeId, onNavigate, mobileOpen })
           return (
           <button key={id} type="button" className={'admin-nav-item' + (activeId === id ? ' is-active' : '')}
             aria-current={activeId === id ? 'true' : undefined} onClick={() => onNavigate(id)}>
-            <Icon size={19} strokeWidth={1.7} aria-hidden="true" />
+            <Icon size={18} aria-hidden="true" />
             <span>{copy.items[id]}</span>
           </button>
           )
@@ -69,6 +88,7 @@ export default function AdminSidebar({ copy, activeId, onNavigate, mobileOpen })
         <button type="button" className="admin-nav-item admin-logout" disabled>
           <LogOut size={19} strokeWidth={1.7} aria-hidden="true" /><span>{copy.logout}</span>
         </button>
+        <div className="admin-language-control"><I18nextProvider i18n={languageControl}><LanguageSwitcher /></I18nextProvider></div>
       </div>
     </aside>
   )

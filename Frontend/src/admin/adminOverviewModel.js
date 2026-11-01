@@ -1,7 +1,8 @@
-import { demoAppointments, demoOrders, demoTests, offsetDate } from './adminDemoData.js'
+import { demoAppointments, demoCollectionEvents, demoDate, demoOrders, demoRefundEvents, demoSampleEvents, demoTests, offsetDate } from './adminDemoData.js'
 
 export const orderStatuses = ['received', 'processing', 'review', 'completed']
 export const testFor = id => demoTests.find(test => test.id === id)
+export const displayOrderId = id => id.replace(/^DEMO-O-/, 'ORD-')
 
 export function periodOrders(days) {
   return demoOrders.filter(order => order.date >= offsetDate(1 - days))
@@ -28,16 +29,33 @@ export function dailyOrders(orders, days) {
   })
 }
 
+export function summarizeOperations(orders, days, events = {
+  samples: demoSampleEvents, collections: demoCollectionEvents, refunds: demoRefundEvents,
+}) {
+  const start = offsetDate(1 - days)
+  const inPeriod = record => record.date >= start && record.date <= demoDate
+  const completedRefunds = events.refunds.filter(event => inPeriod(event) && event.status === 'completed' && event.currency === 'ILS')
+  return {
+    newOrders: orders.filter(order => order.status === 'received').length,
+    inProgress: orders.filter(order => order.status === 'processing' || order.status === 'review').length,
+    completed: orders.filter(order => order.status === 'completed').length,
+    rejectedSamples: events.samples.filter(event => inPeriod(event) && event.status === 'rejected').length,
+    confirmedCollections: events.collections.filter(event => inPeriod(event) && event.status === 'confirmed').length,
+    refunds: completedRefunds.reduce((sum, event) => sum + event.amount, 0),
+    refundCount: completedRefunds.length,
+  }
+}
+
 export function filterOrders(orders, query, status, local) {
-  const needle = query.trim().toLocaleLowerCase()
+  const needle = query.trim().replace(/^ORD-/i, 'DEMO-O-').toLocaleLowerCase()
   return orders.filter(order => (status === 'all' || order.status === status) &&
     [order.id, ...order.patient, ...testFor(order.testId).name, local(order.patient)].join(' ').toLocaleLowerCase().includes(needle))
 }
 
-// Export only explicit demo fields. Prefix formula-like cells defensively.
+// Export explicit order fields. Prefix formula-like cells defensively.
 export function ordersCsv(orders, copy, local, date) {
   const rows = [[copy.order, copy.patient, copy.test, copy.date, copy.status, copy.payment, `${copy.amount} (ILS)`],
-    ...orders.map(order => [order.id, local(order.patient), local(testFor(order.testId).name), date(order.date), copy.statuses[order.status], copy.statuses[order.payment], String(order.amount)])]
+    ...orders.map(order => [displayOrderId(order.id), local(order.patient), local(testFor(order.testId).name), date(order.date), copy.statuses[order.status], copy.statuses[order.payment], String(order.amount)])]
   return '\ufeff' + rows.map(row => row.map(value => {
     const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
     return `"${safe.replaceAll('"', '""')}"`
