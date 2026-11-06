@@ -2,6 +2,9 @@ package com.smartlims.labtests;
 
 import com.smartlims.IsolatedPostgresTest;
 import com.smartlims.auth.email.VerificationEmailSender;
+import com.smartlims.auth.entity.Role;
+import com.smartlims.auth.entity.UserAccount;
+import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.labtests.dto.LabTestRequest;
 import com.smartlims.labtests.dto.LabTestStatusRequest;
 import com.smartlims.labtests.entity.LabTest;
@@ -11,6 +14,7 @@ import com.smartlims.labtests.service.LabTestService;
 import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +39,8 @@ class LabTestCategoryPersistenceTest extends IsolatedPostgresTest {
     EntityManager entities;
     @Autowired
     LabTestService service;
+    @Autowired
+    UserAccountRepository users;
     @MockitoBean
     VerificationEmailSender email;
 
@@ -90,7 +96,11 @@ class LabTestCategoryPersistenceTest extends IsolatedPostgresTest {
         LabTest test = syntheticTest();
         test.getCategories().addAll(Set.of(BLOOD_TESTS, THYROID));
         tests.saveAndFlush(test);
-        var admin = UsernamePasswordAuthenticationToken.authenticated("synthetic-admin", null,
+        var account = UserAccount.invite("Synthetic Category Administrator", UUID.randomUUID() + "@example.invalid",
+                "category-admin", "000001", Role.ADMIN);
+        account.acceptInvitation("unused-test-hash", Instant.now());
+        account = users.saveAndFlush(account);
+        var admin = UsernamePasswordAuthenticationToken.authenticated(account.getId().toString(), null,
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
         var request = new LabTestRequest(test.getCode(), "Replaced synthetic catalog test", null,
                 new BigDecimal("2.00"), "ILS", "SYNTHETIC", null, List.of("KIDNEY", "LIVER"));

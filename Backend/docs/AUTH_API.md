@@ -1,5 +1,13 @@
 # Smart-LIMS registration contract
 
+Security remediation F1: administrative `/api/users` operations retain their
+existing HTTP contract and also require a currently eligible persisted ADMIN
+at the service boundary. Anonymous, missing or ineligible callers receive
+401 `UNAUTHORIZED`; callers without administrative authority or a current stored
+ADMIN role receive 403 `FORBIDDEN`. Authorization precedes target access and
+database/token/email changes. The non-web first-administrator command and public
+token-authorized invitation acceptance retain their existing behavior.
+
 Traceability: R-AUTH-01/02, R-NFR-01; T-AUTH-01 (existing slice), T-AUTH-02 (remaining contract work) in the [backend SDLC index](../IMPLEMENTATION_PLAN.md). This document currently specifies registration, not the full authentication/users API. Detailed existing behavior remains in the local [authentication requirements](../AUTH_REQUIREMENTS.md); complete the shareable login/recovery/invitation/users contracts before extending those features. No new behavior is introduced here.
 
 `POST /api/auth/register` accepts `Content-Type: application/json` with these required fields:

@@ -1,5 +1,109 @@
 # Database-backed test setup
 
+## Security remediation F1/F2 verification (2026-11-06)
+
+Status: DONE. Both F1 and F2 accepted after the final passing complete suite
+and source/diff review. Scope is F1 administrative
+service authorization and F2 persisted-account checks in catalog/basic patient
+CRUD. F3-F6, routes/DTOs, migrations, dependencies, test isolation/mapping and
+local sensitive configuration are unchanged. No development/main database was
+connected to or modified; no Postman operations, commit or push.
+
+Safety: imported only the three documented non-secret test environment settings
+from Windows User scope. The documented recovery-20261031 cluster was stopped;
+confirmed PG_VERSION=16, exact postmaster.opts data path, loopback-only 55432
+configuration, cluster_name and test-only pg_hba rules before starting only that
+cluster. The existing directory was preserved. After startup, postmaster.pid,
+pg_ctl and process executable/command agreed on PID 36140 and
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`.
+The server log independently recorded that PID listening only on 127.0.0.1:55432.
+Windows Get-NetTCPConnection/netstat did not enumerate that listener; a direct
+.NET TCP socket corroborated the reachable loopback endpoint instead. Explicit
+psql to only smartlims_auth_regression verified database, server address/port,
+data_directory, listen_addresses, cluster_name and PostgreSQL 16.15. fsync and
+full_page_writes were on; explicit CHECKPOINT succeeded. Maven help:evaluate
+confirmed the unchanged effective test URL:
+`jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression`.
+Process/PID-file/socket/SQL identity and checkpoint were checked again before
+the full invocation, with exact expected-value guards. The existing Surefire
+environment mapping and IsolatedPostgresTest guard were preserved; fake email
+and synthetic fixtures were used throughout.
+
+Executed directly from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=AuthenticationRegressionTest,RegistrationTest,LabTestServiceTest,PersistedServiceAuthorizationTest,LabTestManagementTest,PatientManagementTest,PatientProfileLinkingTest,ProvisioningContextTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=AuthenticationRegressionTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+.\mvnw.cmd '-Dtest=LabTestCategoryPersistenceTest' test
+.\mvnw.cmd test
+```
+
+| Invocation | Result | Finished (Asia/Jerusalem) | Maven duration |
+|---|---|---|---|
+| Initial focused run | BUILD SUCCESS, exit 0; 157 tests / 8 suites, 0 failures/errors/skips | 2026-11-06 20:16:23 +02:00 | 02:23 min |
+| Additional F1 assertions | BUILD SUCCESS, exit 0; 38 tests / 1 suite, 0 failures/errors/skips | 2026-11-06 20:18:45 +02:00 | 01:03 min |
+| Initial complete suite | BUILD FAILURE, exit 1; 438 tests / 53 suites, 0 failures, 1 error, 0 skips | 2026-11-06 20:25:14 +02:00 | 05:30 min |
+| Corrected category fixture focus | BUILD SUCCESS, exit 0; 3 tests / 1 suite, 0 failures/errors/skips | 2026-11-06 20:26:32 +02:00 | 51.593 s |
+| Final complete suite | BUILD SUCCESS, exit 0; 438 tests / 53 suites, 0 failures/errors/skips | 2026-11-06 20:32:40 +02:00 | 05:38 min |
+
+The second run followed additional assertions for missing administrative
+authority, exact concurrent revocation/self-protection outcomes, same-role
+no-op email behavior and external-writer username uniqueness collisions.
+Expected synthetic constraint warnings in those two collision cases are part
+of passing tests, not failed cases. Counts overlap between invocations.
+
+The first complete suite (started 20:19:40 +02:00) completed all 438 tests;
+independent XML totals confirmed 53 fresh reports, 437 passing and one error.
+The sole error was the existing category-persistence fixture supplying the
+non-UUID principal `synthetic-admin` without a persisted account. The new F2
+check correctly rejected it. Updated only that fixture to persist an eligible
+synthetic ADMIN and use its UUID; all category/status assertions are unchanged.
+No authorization guard or production behavior was relaxed. Focused verification
+of the corrected fixture precedes the final complete invocation.
+
+Final full invocation started 20:26:58 +02:00 after renewed process/socket/SQL
+identity and checkpoint checks. Independently parsed every Surefire XML report:
+53 unique suites, all reports newer than this invocation, exactly 438 tests and
+zero failures/errors/skips. Post-run process/PID/SQL still identified the same
+disposable cluster and regression database. It retained 25 successful migrations
+through V25, with zero remaining smartlims_migration_* databases or synthetic
+triggers. A post-run checkpoint succeeded. Only this dedicated cluster was then
+stopped normally to restore its initial stopped state; no development service
+or database was accessed or changed. All F1/F2 acceptance criteria are satisfied.
+
+Acceptance coverage:
+
+- F1: all administrative service methods reject null/unauthenticated/anonymous,
+  malformed/missing, non-admin/forged/demoted, blocked, unverified, passwordless,
+  unaccepted and missing-authority callers. Full users/token row snapshots and
+  email mock assertions prove denial has no persisted/token/email side effects;
+  missing target lookup does not bypass authorization. An eligible ADMIN uses
+  all ten HTTP operations. Self-protection, same-role no-op, last-admin counts,
+  concurrent removal/provisioning, public invitation acceptance and JWT current
+  account behavior retain regression coverage.
+- F2: every catalog/basic patient method rejects invalid/ineligible accounts;
+  forged/stale privileged authorities do not grant writes. Stored PATIENT role
+  limits catalog lists/detail and patient-owned reads even with stale ADMIN
+  authorities; stored staff roles retain their allowed reads. Existing catalog,
+  patient management/linking and registration regressions cover HTTP matrices,
+  concealment, CRUD behavior and independent account/profile demographics.
+- Administrative writes now share the existing coordination lock so caller
+  eligibility is checked after waiting. Existing concurrent username tests
+  retain one success/one specific conflict; new independent committed external
+  writer cases retain real database constraint-translation/rollback coverage.
+  Concurrent administrator removal now rejects the revoked caller with 401/403
+  before target handling; exact self-protection LAST_ADMIN assertions remain.
+
+Changed files: AccountController, AccountManagementService, LabTestService,
+PatientService; AuthenticationRegressionTest, RegistrationTest,
+LabTestServiceTest, LabTestCategoryPersistenceTest and new
+PersistedServiceAuthorizationTest; AUTH_API.md,
+LAB_TESTS_API.md, PATIENTS_API.md, PERMISSIONS_REPORT.md, this verification
+record and the excluded local IMPLEMENTATION_PLAN.md. No generated output was
+edited manually. Runtime deployment/browser integration and real SMTP remain
+outside this local automated verification.
+
 ## Disposable PostgreSQL recovery and full-suite verification (2026-10-31)
 
 Status: DONE. This section is the current local setup; older Temp-based

@@ -1,5 +1,12 @@
 # Lab Tests API
 
+Security remediation F2: every catalog service operation also requires a
+currently eligible persisted account and an allowed stored role. Missing or
+ineligible identities return 401 `UNAUTHORIZED`; disallowed roles return 403
+`FORBIDDEN`. Verified stored roles select patient active-only visibility,
+including when supplied authentication authorities are stale. Routes and DTOs
+are unchanged.
+
 Migration-version references in historical sections describe the original V1-V9
 implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test

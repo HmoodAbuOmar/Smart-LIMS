@@ -1,5 +1,27 @@
 # Backend permissions audit
 
+## F1/F2 remediation follow-up (2026-11-06)
+
+Status: F1 DONE; F2 DONE after successful verification on 2026-11-06. The audit below remains
+the historical 2026-10-31 snapshot. F1 now has explicit Authentication-based
+persisted ADMIN/eligibility checks at every administrative service entry point;
+administrative writes coordinate before checking the caller and target. The
+first-admin private invitation helper and public token-authorized setPassword
+path preserve their existing authority models. F2 now reloads persisted
+roles/eligibility for catalog and basic patient CRUD; verified stored roles
+select active-only visibility and patient ownership. No HTTP route/DTO or schema
+change. F3-F6 remain unchanged and outside this remediation.
+
+Focused verification: 157/157 across eight suites, then 38/38 account regression
+tests after added assertions, with no failures/errors/skips. These overlapping
+runs include direct-service denial/side-effect matrices and authorized HTTP
+regressions on independently verified disposable PostgreSQL only. Full-suite
+results: final direct `.\mvnw.cmd test` passed 438 tests / 53 fresh suites,
+zero failures/errors/skips, exit 0 at 20:32:40 +02:00. The earlier full run had
+one stale category-fixture error, corrected without weakening authorization or
+assertions; that fixture passed 3/3 before the final full run.
+Safety and complete execution evidence: [TESTING.md](TESTING.md#security-remediation-f1f2-verification-2026-11-06).
+
 Audit date: 2026-10-31. Scope: the current working copy on `backend-hmood`, including existing modified files and untracked notifications implementation. This is a source audit, not an audit of a deployed server or its configuration. Existing work was preserved.
 
 There are **91 distinct implemented application endpoints across 13 controllers**. Nine are public authentication actions; 82 require authentication. Public does not mean exempt from CSRF or from proof such as a password, invitation token or reset code. [ENDPOINT_PERMISSIONS.md](ENDPOINT_PERMISSIONS.md) lists every explicit HTTP method/full-path mapping exactly once, with controller and service line references, feature counts and prerequisites.

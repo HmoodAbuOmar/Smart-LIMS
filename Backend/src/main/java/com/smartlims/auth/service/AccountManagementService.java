@@ -10,6 +10,7 @@ import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.EmailActionTokenRepository;
 import com.smartlims.auth.repository.UserAccountRepository;
+import com.smartlims.auth.security.LoginEligibility;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +19,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Sort;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,8 +53,13 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public AccountResponse create(CreateAccountRequest request) {
+    public AccountResponse create(Authentication actor, CreateAccountRequest request) {
         administrators.lock();
+        currentAdministrator(actor);
+        return createInvitation(request);
+    }
+
+    private AccountResponse createInvitation(CreateAccountRequest request) {
         String canonical = identities.canonicalize(request.email());
         String name = userNames.normalize(request.userName());
         if (users.existsByEmail(canonical)) {
@@ -79,13 +87,15 @@ public class AccountManagementService {
             throw new AuthRequestException(HttpStatus.CONFLICT, "ADMIN_ALREADY_EXISTS",
                     "An administrator already exists; provisioning refused.", null);
         }
-        AccountResponse created = create(new CreateAccountRequest(request.fullName(), request.email(),
+        AccountResponse created = createInvitation(new CreateAccountRequest(request.fullName(), request.email(),
                 request.userName(), request.phoneNumber(), Role.ADMIN));
         locked(created.id()).markFirstAdministratorInvitation();
     }
 
     @Transactional
-    public void sendSetPassword(UUID id) {
+    public void sendSetPassword(Authentication actor, UUID id) {
+        administrators.lock();
+        currentAdministrator(actor);
         UserAccount user = locked(id);
         if (!user.isEnabled())
             throw new AuthRequestException(HttpStatus.FORBIDDEN,
@@ -117,17 +127,21 @@ public class AccountManagementService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountResponse> all() {
+    public List<AccountResponse> all(Authentication actor) {
+        currentAdministrator(actor);
         return users.findAll(Sort.by("userName")).stream().map(AccountResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
-    public AccountResponse get(UUID id) {
+    public AccountResponse get(Authentication actor, UUID id) {
+        currentAdministrator(actor);
         return AccountResponse.from(users.findById(id).orElseThrow(this::missing));
     }
 
     @Transactional
-    public AccountResponse update(UUID id, UpdateAccountRequest request) {
+    public AccountResponse update(Authentication actor, UUID id, UpdateAccountRequest request) {
+        administrators.lock();
+        currentAdministrator(actor);
         UserAccount user = locked(id);
         String canonical = identities.canonicalize(request.email());
         if (!canonical.equals(identities.canonicalize(user.getEmail()))) {
@@ -149,10 +163,11 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public AccountResponse setBlocked(UUID actor, UUID id, boolean blocked) {
+    public AccountResponse setBlocked(Authentication actor, UUID id, boolean blocked) {
         administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
-        if (blocked && actor.equals(id))
+        if (blocked && administrator.getId().equals(id))
             throw protectedAdmin();
         guardLastAdmin(user, blocked || user.getRole() != Role.ADMIN);
         user.setEnabled(!blocked);
@@ -160,10 +175,11 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public AccountResponse changeRole(UUID actor, UUID id, Role role) {
+    public AccountResponse changeRole(Authentication actor, UUID id, Role role) {
         administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
-        if (actor.equals(id) && user.getRole() != role)
+        if (administrator.getId().equals(id) && user.getRole() != role)
             throw protectedAdmin();
         if (user.getRole() == role)
             return AccountResponse.from(user);
@@ -174,13 +190,41 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public void delete(UUID actor, UUID id) {
+    public void delete(Authentication actor, UUID id) {
         administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
-        if (actor.equals(id))
+        if (administrator.getId().equals(id))
             throw protectedAdmin();
         guardLastAdmin(user, true);
         users.delete(user);
+    }
+
+    private UserAccount currentAdministrator(Authentication actor) {
+        if (actor == null || !actor.isAuthenticated() || actor instanceof AnonymousAuthenticationToken)
+            throw unauthorized();
+        if (actor.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN")))
+            throw forbidden();
+        UUID id;
+        try {
+            id = UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw unauthorized();
+        }
+        UserAccount account = users.findById(id).orElseThrow(this::unauthorized);
+        if (!LoginEligibility.eligible(account))
+            throw unauthorized();
+        if (account.getRole() != Role.ADMIN)
+            throw forbidden();
+        return account;
+    }
+
+    private AuthRequestException unauthorized() {
+        return new AuthRequestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
+    }
+
+    private AuthRequestException forbidden() {
+        return new AuthRequestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
     }
 
     private void guardLastAdmin(UserAccount user, boolean removing) {

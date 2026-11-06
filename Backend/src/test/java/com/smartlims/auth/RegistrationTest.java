@@ -18,7 +18,9 @@ import com.smartlims.auth.service.VerificationTokens;
 import jakarta.servlet.http.Cookie;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -33,6 +35,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -264,7 +268,12 @@ class RegistrationTest extends IsolatedPostgresTest {
         UserAccount afterProfile = users.findById(registered.id()).orElseThrow();
         assertEquals("Account Name", afterProfile.getFullName());
         assertNull(afterProfile.getPhoneNumber());
-        accounts.update(registered.id(), new UpdateAccountRequest("Updated Account Name", "registered@example.invalid",
+        var admin = UserAccount.invite("Synthetic Administrator", "admin@example.invalid", "admin", "000001", Role.ADMIN);
+        admin.acceptInvitation("unused-test-hash", Instant.now());
+        admin = users.saveAndFlush(admin);
+        var administrator = new UsernamePasswordAuthenticationToken(admin.getId().toString(), null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        accounts.update(administrator, registered.id(), new UpdateAccountRequest("Updated Account Name", "registered@example.invalid",
                 "registered", "000002"));
         mvc.perform(get("/api/patients/me").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Profile Name"))

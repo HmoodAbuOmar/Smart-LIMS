@@ -22,55 +22,57 @@ public class AccountController {
     }
 
     @GetMapping
-    public List<AccountResponse> all() {
-        return accounts.all();
+    public List<AccountResponse> all(JwtAuthenticationToken authentication) {
+        return accounts.all(authentication);
     }
 
     @GetMapping("/{id}")
-    public AccountResponse get(@PathVariable UUID id) {
-        return accounts.get(id);
+    public AccountResponse get(@PathVariable UUID id, JwtAuthenticationToken authentication) {
+        return accounts.get(authentication, id);
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<AccountResponse> create(@Valid @RequestBody CreateAccountRequest request) {
-        return ResponseEntity.ok(accounts.create(request));
+    public ResponseEntity<AccountResponse> create(@Valid @RequestBody CreateAccountRequest request,
+                                                 JwtAuthenticationToken authentication) {
+        return ResponseEntity.ok(accounts.create(authentication, request));
     }
 
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public AccountResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateAccountRequest request) {
-        return accounts.update(id, request);
+    public AccountResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateAccountRequest request,
+                                  JwtAuthenticationToken authentication) {
+        return accounts.update(authentication, id, request);
     }
 
     @PutMapping(path = "/{id}/role", consumes = MediaType.APPLICATION_JSON_VALUE)
     public AccountResponse role(@PathVariable UUID id, @Valid @RequestBody ChangeRoleRequest request,
                                 JwtAuthenticationToken authentication) {
-        return accounts.changeRole(UUID.fromString(authentication.getName()), id, request.role());
+        return accounts.changeRole(authentication, id, request.role());
     }
 
     @PostMapping("/{id}/set-password-email")
-    public AuthController.SuccessResponse setPasswordEmail(@PathVariable UUID id) {
-        accounts.sendSetPassword(id);
+    public AuthController.SuccessResponse setPasswordEmail(@PathVariable UUID id, JwtAuthenticationToken authentication) {
+        accounts.sendSetPassword(authentication, id);
         return new AuthController.SuccessResponse(true);
     }
 
     @PatchMapping("/{id}/block")
     public AccountResponse block(@PathVariable UUID id, JwtAuthenticationToken authentication) {
-        return accounts.setBlocked(UUID.fromString(authentication.getName()), id, true);
+        return accounts.setBlocked(authentication, id, true);
     }
 
     @PatchMapping("/{id}/unblock")
     public AccountResponse unblock(@PathVariable UUID id, JwtAuthenticationToken authentication) {
-        return accounts.setBlocked(UUID.fromString(authentication.getName()), id, false);
+        return accounts.setBlocked(authentication, id, false);
     }
 
     @GetMapping("/{id}/isblocked")
-    public boolean isBlocked(@PathVariable UUID id) {
-        return accounts.get(id).blocked();
+    public boolean isBlocked(@PathVariable UUID id, JwtAuthenticationToken authentication) {
+        return accounts.get(authentication, id).blocked();
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id, JwtAuthenticationToken authentication) {
-        accounts.delete(UUID.fromString(authentication.getName()), id);
+        accounts.delete(authentication, id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -79,6 +79,12 @@ All endpoints require authentication. No anonymous access is allowed.
 
 Check both role and ownership on the backend. UI visibility is not authorization.
 
+Security remediation F2: basic CRUD also reloads the caller's stored account and
+requires current login eligibility and an allowed stored role, rather than
+trusting supplied authorities alone. Missing/ineligible identities return 401
+`UNAUTHORIZED`; disallowed roles return 403 `FORBIDDEN`. Ownership branching uses
+the verified stored role and account ID, including with stale supplied authorities.
+
 For a PATIENT requesting a valid UUID that is nonexistent or not their linked profile, return 404. This avoids distinguishing another patient's existing profile from a nonexistent one. Ownership is checked using authenticated account ID and `patients.user_id`, never a request-supplied account ID.
 
 No DELETE endpoint is defined.

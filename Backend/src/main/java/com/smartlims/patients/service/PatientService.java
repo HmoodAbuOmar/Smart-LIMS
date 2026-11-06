@@ -30,6 +30,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -149,17 +150,17 @@ public class PatientService {
 
     @Transactional
     public PatientResponse create(Authentication actor, @Valid CreatePatientRequest request) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST");
+        UserAccount account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
         validateBirthDate(request.dateOfBirth());
         String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
-        Patient patient = new Patient(number, users.getReferenceById(actorId(actor)), request.fullName(),
+        Patient patient = new Patient(number, account, request.fullName(),
                 request.dateOfBirth(), request.gender(), request.phoneNumber(), request.address());
         return mapper.toResponse(patients.saveAndFlush(patient));
     }
 
     @Transactional(readOnly = true)
     public PatientPageResponse list(Authentication actor, @Valid PatientQueryRequest query) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
+        currentAccount(actor, false, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
         String[] sort = query.sort().split(",");
         Sort ordering = Sort.by(Sort.Direction.fromString(sort[1]), sort[0]).and(Sort.by("id"));
         Specification<Patient> filter = PatientSpecifications.search(query.search());
@@ -176,17 +177,17 @@ public class PatientService {
 
     @Transactional(readOnly = true)
     public PatientResponse get(Authentication actor, String id) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+        UserAccount account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         UUID patientId = profileId(id);
-        Patient patient = hasRole(actor, "PATIENT")
-                ? patients.findByIdAndUser_Id(patientId, actorId(actor)).orElseThrow(PatientNotFoundException::new)
+        Patient patient = account.getRole() == Role.PATIENT
+                ? patients.findByIdAndUser_Id(patientId, account.getId()).orElseThrow(PatientNotFoundException::new)
                 : patients.findById(patientId).orElseThrow(PatientNotFoundException::new);
         return mapper.toResponse(patient);
     }
 
     @Transactional
     public PatientResponse update(Authentication actor, String id, @Valid UpdatePatientRequest request) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST");
+        currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
         UUID patientId = profileId(id);
         validateBirthDate(request.dateOfBirth());
         Patient patient = patients.findWithLockById(patientId).orElseThrow(PatientNotFoundException::new);
@@ -221,7 +222,7 @@ public class PatientService {
     }
 
     private void requireRole(Authentication actor, String... roles) {
-        if (actor == null || !actor.isAuthenticated()) {
+        if (actor == null || !actor.isAuthenticated() || actor instanceof AnonymousAuthenticationToken) {
             throw new PatientAuthenticationException();
         }
         for (String role : roles)
@@ -231,6 +232,10 @@ public class PatientService {
     }
 
     private UUID actorId(Authentication actor) {
-        return UUID.fromString(actor.getName());
+        try {
+            return UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw new PatientAuthenticationException();
+        }
     }
 }
