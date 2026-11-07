@@ -1,5 +1,25 @@
 # Backend permissions audit
 
+## Users Management follow-up (2026-11-06)
+
+The current users contract is [USERS_API.md](USERS_API.md). Three additive
+ADMIN-only operations are GET /api/users/page and PATCH /api/users/bulk/block,
+/api/users/bulk/unblock. Both HTTP and service boundaries enforce current
+persisted eligible ADMIN state. Bulk actions accept only 1-100 explicit distinct
+IDs, share individual-action coordination, validate every target before changes,
+and commit or roll back together. Self/last-admin protections and counting rules
+are retained. The legacy GET /api/users array remains unchanged.
+
+F3 is addressed prospectively: changes away from PATIENT reject linked accounts
+with 409 PATIENT_ACCOUNT_LINKED, coordinated with profile creation/linking.
+Existing historical links are not altered. Deletion with retained references now
+returns 409 USER_HAS_RETAINED_REFERENCES and rolls back token/record changes.
+Optional account username/phone omission preserves current values. New nullable
+last-login telemetry and derived statuses grant no permissions and do not change
+login eligibility or temporary lockout. Counts are now 94 endpoints (9 public,
+85 protected); account administration has 13. Other findings below remain the
+historical audit snapshot. Executed verification is recorded in TESTING.md.
+
 ## F1/F2 remediation follow-up (2026-11-06)
 
 Status: F1 DONE; F2 DONE after successful verification on 2026-11-06. The audit below remains

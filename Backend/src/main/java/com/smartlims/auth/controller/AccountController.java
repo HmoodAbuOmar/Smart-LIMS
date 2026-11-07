@@ -31,6 +31,12 @@ public class AccountController {
         return accounts.get(authentication, id);
     }
 
+    @GetMapping("/page")
+    public UserPageResponse page(@RequestParam org.springframework.util.MultiValueMap<String, String> parameters,
+                                 JwtAuthenticationToken authentication) {
+        return accounts.page(authentication, parameters);
+    }
+
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccountResponse> create(@Valid @RequestBody CreateAccountRequest request,
                                                  JwtAuthenticationToken authentication) {
@@ -58,6 +64,18 @@ public class AccountController {
     @PatchMapping("/{id}/block")
     public AccountResponse block(@PathVariable UUID id, JwtAuthenticationToken authentication) {
         return accounts.setBlocked(authentication, id, true);
+    }
+
+    @PatchMapping(path = "/bulk/block", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public List<AccountResponse> blockBulk(@Valid @RequestBody BulkAccountRequest request,
+                                           JwtAuthenticationToken authentication) {
+        return accounts.setBlockedBulk(authentication, request.ids(), true);
+    }
+
+    @PatchMapping(path = "/bulk/unblock", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public List<AccountResponse> unblockBulk(@Valid @RequestBody BulkAccountRequest request,
+                                             JwtAuthenticationToken authentication) {
+        return accounts.setBlockedBulk(authentication, request.ids(), false);
     }
 
     @PatchMapping("/{id}/unblock")

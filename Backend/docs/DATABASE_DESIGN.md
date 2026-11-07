@@ -253,6 +253,18 @@ not the wider proposed audit_logs subsystem.
 
 System accounts and authentication state. Preserve the existing implementation.
 
+Users Management extension (2026-11-06): V26 adds nullable `last_login_at`
+TIMESTAMPTZ with no default/backfill. Shared successful login writes it; ordinary
+requests and failed logins do not. Status is derived from existing enabled,
+origin, invitation_accepted_at and email_verified_at; no lifecycle reconstruction
+or authentication/last-admin rule change. [USERS_API.md](USERS_API.md) defines
+the read projection, query boundaries and actions. Page count/content share a
+read-only REPEATABLE_READ transaction. Bulk writes share administrator advisory
+coordination, lock selected account rows in UUID order and validate all targets
+before changes. Patient-role changes hold the same account lock used by linking.
+Physical deletion flushes in-transaction and translates FK violations to 409
+USER_HAS_RETAINED_REFERENCES; clinical/audit FKs and retained rows are unchanged.
+
 Implementation status: implemented in V1/V2; preserve the actual migrations and current account behavior. T-AUTH-01 records bounded verification, not deployment readiness.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
@@ -268,6 +280,7 @@ Implementation status: implemented in V1/V2; preserve the actual migrations and 
 | `enabled` | `BOOLEAN` | No | DEFAULT FALSE | Account enabled state |
 | `email_verified_at` | `TIMESTAMPTZ` | Yes | - | Email verification time |
 | `invitation_accepted_at` | `TIMESTAMPTZ` | Yes | - | Invitation acceptance time |
+| `last_login_at` | `TIMESTAMPTZ` | Yes | V26; no default/backfill | Most recent successful authentication recorded after this change |
 | `failed_login_attempts` | `INTEGER` | No | DEFAULT 0 | Failed login count |
 | `locked_until` | `TIMESTAMPTZ` | Yes | - | Temporary lock expiry |
 | `reset_code_hash` | `VARCHAR(255)` | Yes | - | Password-reset code hash |

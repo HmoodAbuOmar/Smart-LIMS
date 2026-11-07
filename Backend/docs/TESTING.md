@@ -1,5 +1,144 @@
 # Database-backed test setup
 
+## ADMIN Users Management verification (2026-11-06)
+
+Status: DONE for implementation and focused acceptance. Aggregate full-suite
+verification is PARTIAL: the single full invocation had two stale migration
+expectation failures, both corrected and passing in the targeted rerun; no
+second complete invocation was requested or executed. Branch backend-hmood,
+HEAD a9e5f1b, clean entry working tree. The contract in [USERS_API.md](USERS_API.md)
+was written before implementation. No AGENTS.md, deleted planning/history/help
+files, frontend, dependencies, local Maven/Surefire mapping, isolation guard or
+applied V1-V25 migration was changed. No commit, push or deployment.
+
+### Independently isolated execution target
+
+The documented recovery-20261031 cluster was initially stopped. Before starting
+only that cluster, read PG_VERSION=16, postmaster.opts with its exact data path,
+loopback-only postgresql.conf and test-only pg_hba.conf; independently confirmed
+55432 was free with a TCP socket. After pg_ctl startup, postmaster.pid and Windows
+process executable/command agreed on PID 27300 and
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`.
+Explicit psql identity on only smartlims_auth_regression confirmed server
+127.0.0.1:55432, that actual data directory, listen_addresses=127.0.0.1,
+cluster_name=smartlims-disposable-regression-20261031 and fsync/full_page_writes=on.
+CHECKPOINT succeeded. Maven help:evaluate confirmed the unchanged effective URL
+`jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression`.
+
+Imported only SMARTLIMS_TEST_POSTGRES_BIN, SMARTLIMS_TEST_POSTGRES_DATA and
+SMARTLIMS_TEST_DATABASE_URL from Windows User environment into each Maven
+process; guarded the exact test URL. All application tests inherit the unchanged
+IsolatedPostgresTest and mock VerificationEmailSender. Migration suites create
+and remove only their guarded smartlims_migration_<32 hex> databases on this
+same instance. Synthetic data only. No smart_lims_db, development/shared database,
+application datasource defaults, real email or Windows PostgreSQL service used.
+Immediately before the full suite, rechecked process/executable/data directory,
+exact SQL identity, durability and a successful checkpoint (same PID 27300).
+
+### Exact commands and executed results
+
+Run directly from Backend after the non-secret test environment import above:
+
+```powershell
+# Initial listing/login slice
+.\mvnw.cmd '-Dtest=UserListingTest,AuthenticationRegressionTest,RegistrationTest' test '-Dspring.test.mockmvc.print=NONE'
+# Individual/bulk slice and corrected listing fixture
+.\mvnw.cmd '-Dtest=UserListingTest,UserActionsTest' test '-Dspring.test.mockmvc.print=NONE'
+# Expanded authorization, rollback/concurrency and migration verification
+.\mvnw.cmd '-Dtest=UserListingTest,UserActionsTest,AuthenticationRegressionTest,MigrationLineageTest,PatientMigrationCompatibilityTest,LabTestCategoryMigrationTest,OrderMigrationTest,AppointmentMigrationTest' test '-Dspring.test.mockmvc.print=NONE'
+# Final focus after distinct last-login sort cases and optional-phone validation
+.\mvnw.cmd '-Dtest=UserListingTest,UserActionsTest' test '-Dspring.test.mockmvc.print=NONE'
+# Single complete suite
+.\mvnw.cmd test
+# Correct only the two stale V25 expectations found by that complete run
+.\mvnw.cmd '-Dtest=ResultMigrationTest,PatientManagementTest' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+| Invocation | Actual result | Finished (Asia/Jerusalem) | Maven duration |
+|---|---|---|---|
+| Initial slice | Exit 1; 91 tests, 1 failure, 0 errors/skips | 21:25:26 +02:00 | 01:56 |
+| Corrected listing and action slice | Exit 0; 48 tests / 2 suites, 0 failures/errors/skips | 21:29:58 +02:00 | 01:10 |
+| Expanded focus | Exit 0; 118 tests / 8 suites, 0 failures/errors/skips | 21:34:18 +02:00 | 03:30 |
+| Final focus | Exit 0; 55 tests / 2 suites, 0 failures/errors/skips | 21:36:16 +02:00 | 01:10 |
+| Single complete suite | Exit 1; 494 tests / 55 fresh suites, 2 failures, 0 errors/skips | 21:43:53 +02:00 | 06:51 |
+| Corrected migration expectations focus | Exit 0; 28 tests / 2 suites, 0 failures/errors/skips | 21:45:19 +02:00 | 50.326 seconds |
+
+The complete run's only failures were stale current-head expectations:
+ResultMigrationTest expected five upgrades from V20 rather than six through V26;
+PatientManagementTest expected history versions 1-25 rather than 1-26. Updated
+only those tests. The result migration test still compares every prior value
+and additionally asserts no historical last-login backfill. No production source
+changed after final focus or during/after the full run. All 55 reports were newer
+than the full invocation, unique, and independently totaled 494 tests, 2 failures,
+0 errors/skips. The full run itself is not a passing full-suite result. No second
+complete invocation is made because the owner requested the full suite once.
+
+The corrective run passed all 27 PatientManagementTest cases and the
+ResultMigrationTest preservation case. Thus both failures are resolved with
+executed evidence; the original full invocation remains recorded as failed.
+Post-run SQL and process identity still matched PID 27300 and the dedicated
+cluster. Confirmed 26 successful migrations through V26, zero remaining owned
+smartlims_migration_* databases and zero synthetic bulk triggers. CHECKPOINT
+succeeded; pg_ctl stopped only this instance normally and confirmed no server
+running at 21:45:52 +02:00, restoring its initial stopped state.
+
+The initial failure was an incorrect expected alphabetical fixture order
+(Administrator vs Alpha), corrected to assert the actual case-insensitive
+lexical order. AuthenticationRegressionTest (38) and RegistrationTest (26)
+already passed in that run. Later runs overlap; counts must not be summed.
+Expected synthetic FK violations and the deliberately injected bulk write
+failure exercise conflicts/rollback and are not unexpected test errors.
+Logs are machine-local Temp files smartlims-users-slice1.log,
+smartlims-users-slice2.log, smartlims-users-slice3.log,
+smartlims-users-final-focus.log, smartlims-users-full.log and
+smartlims-users-migration-correction.log.
+
+### Acceptance coverage and changed files
+
+| Approved requirement | Implemented behavior / focused evidence |
+|---|---|
+| 1 | Additive /api/users/page, six row fields and conventional page metadata; legacy array HTTP regression |
+| 2 | Literal case-insensitive name/email search, combined role/status filters, inclusive/exclusive offset-normalized creation bounds, unknown/duplicate/invalid query rejection |
+| 3 | All eight sorting directions, ID ties, different login timestamps, null-last, size 7, bounded size and overflow-safe empty pages |
+| 4 | Both login HTTP modes record successful authentication only; failed/blocked/locked/unverified attempts and /me reads preserve last-login value |
+| 5 | All four statuses and precedence, first-admin invitation, expired/reissued/consumed invitation, accepted-account reset tokens and separate temporary lockout |
+| 6 | Existing individual HTTP regression, optional-field retention/validation, canonical email prohibition, invitation proof/expiry/reuse and transactional mail failures; no profile auto-creation |
+| 7 | Linked PATIENT role conflicts, same-role no-op, unchanged profile rows, concurrent profile-creation/role-change invariant |
+| 8 | Patient-link/creator and append-only laboratory-event actor references yield stable HTTP 409 and preserve rows/tokens; eligible deletion removes only account/tokens |
+| 9 | Explicit ordered targets, maximum 100, malformed/missing/self-protected batch rollback, database failure rollback, idempotence, concurrent bulk/individual revocation and overlapping bulk requests, cookie CSRF |
+| Authorization | Extended existing 15-state service denial matrix to page and both bulk actions; new HTTP/current-state tests including staff roles and forged/stale authority |
+| Migration | V25-to-V26 nullable/no-backfill/type/default/history preservation and reapplication; affected current-head migration assertions advanced without weakening historical lineage checks |
+
+Source inspection additionally confirms shared administrator coordination and
+unchanged last-enabled-confirmed-admin counting, authentication eligibility,
+JWT non-revocation and historical links. V26 is the sole new migration; it is
+ALTER TABLE users ADD COLUMN last_login_at TIMESTAMPTZ, with no data update.
+
+Changed production files (under src/main/java/com/smartlims/auth):
+controller/AccountController.java; dto/UpdateAccountRequest.java;
+dto/BulkAccountRequest.java; dto/UserListRow.java; dto/UserPageResponse.java;
+dto/UserQueryRequest.java; entity/UserAccount.java; entity/AccountStatus.java;
+repository/UserAccountRepository.java; repository/UserAccountQueries.java;
+service/AccountManagementService.java; service/LoginService.java.
+Migration: src/main/resources/db/migration/V26__user_last_login.sql.
+Tests (under src/test/java/com/smartlims): auth/AuthenticationRegressionTest.java;
+auth/UserListingTest.java; auth/UserActionsTest.java;
+migrations/MigrationLineageTest.java; patients/PatientMigrationCompatibilityTest.java;
+labtests/LabTestCategoryMigrationTest.java; orders/OrderMigrationTest.java;
+appointments/AppointmentMigrationTest.java.
+Additional full-run expectation corrections: laboratory/ResultMigrationTest.java
+and patients/PatientManagementTest.java.
+Docs: USERS_API.md (new), AUTH_API.md, PATIENTS_API.md, DATABASE_DESIGN.md,
+ENDPOINT_PERMISSIONS.md, PERMISSIONS_REPORT.md and this TESTING.md.
+
+Runtime deployment, frontend/browser integration and real SMTP delivery are
+outside this isolated backend execution. Existing lastLoginAt history remains
+unknown/null until a successful login; no history is fabricated.
+Final git diff --check passed. All 30 changed/new files are within Backend;
+the named inventory above includes every file. No implementation gap remains
+for the approved nine requirements. A clean single final full-suite invocation
+after the test-only corrections is not claimed.
+
 ## Security remediation F1/F2 verification (2026-11-06)
 
 Status: DONE. Both F1 and F2 accepted after the final passing complete suite

@@ -53,6 +53,10 @@ A PATIENT with no linked profile uses the explicit phase-2 workflow, never the s
 Relationships:
 
 - `patients.user_id -> users.id`: optional one-to-one account link. A linked account must have role PATIENT. Several NULL links are allowed.
+- Administrative changes away from PATIENT now reject a linked account with 409
+  `PATIENT_ACCOUNT_LINKED`; same-role requests remain no-ops. Account row locking
+  coordinates this check with profile creation/linking. Historical links are not
+  rewritten. See [Users API](USERS_API.md).
 - `patients.created_by -> users.id`: the authenticated creator; staff for walk-ins, the patient account for self-creation. It remains unchanged on linking.
 - Future `test_orders.patient_id -> patients.id`: one profile may have many orders. This phase does not implement orders.
 - Keep referenced profiles/accounts under the documented RESTRICT/NO ACTION policy; do not add cascading deletion of clinical history.

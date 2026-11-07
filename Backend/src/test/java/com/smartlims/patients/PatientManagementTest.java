@@ -331,7 +331,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 () -> jdbc.update("DELETE FROM users WHERE id = ?", actors.get(Role.ADMIN).getId()));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE patients SET created_by = ? WHERE id = ?", UUID.randomUUID(), second));
-        assertEquals(java.util.stream.IntStream.rangeClosed(1, 25).mapToObj(Integer::toString).toList(), jdbc.queryForList(
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, 26).mapToObj(Integer::toString).toList(), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals("V5__lab_tests.sql", jdbc.queryForObject(
                 "SELECT script FROM flyway_schema_history WHERE version = '5'", String.class));

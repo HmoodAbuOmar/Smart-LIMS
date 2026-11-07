@@ -538,12 +538,15 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         clearInvocations(email);
         List<Runnable> operations = List.of(
                 () -> accounts.all(actor),
+                () -> accounts.page(actor, java.util.Map.of()),
                 () -> accounts.get(actor, target.id()),
                 () -> accounts.create(actor, new CreateAccountRequest("Denied Account", "denied@example.invalid", "denied", "000001", Role.ADMIN)),
                 () -> accounts.update(actor, target.id(), new UpdateAccountRequest("Changed Name", target.email(), "changed", "000002")),
                 () -> accounts.sendSetPassword(actor, target.id()),
                 () -> accounts.setBlocked(actor, target.id(), true),
                 () -> accounts.setBlocked(actor, target.id(), false),
+                () -> accounts.setBlockedBulk(actor, List.of(target.id()), true),
+                () -> accounts.setBlockedBulk(actor, List.of(target.id()), false),
                 () -> accounts.changeRole(actor, target.id(), Role.ADMIN),
                 () -> accounts.delete(actor, target.id()));
         for (Runnable operation : operations) {

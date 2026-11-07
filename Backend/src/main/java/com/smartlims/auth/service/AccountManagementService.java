@@ -3,6 +3,9 @@ package com.smartlims.auth.service;
 import com.smartlims.auth.dto.AccountResponse;
 import com.smartlims.auth.dto.CreateAccountRequest;
 import com.smartlims.auth.dto.UpdateAccountRequest;
+import com.smartlims.auth.dto.UserPageResponse;
+import com.smartlims.auth.dto.UserQueryRequest;
+import com.smartlims.auth.repository.UserAccountQueries;
 import com.smartlims.auth.email.VerificationEmailSender;
 import com.smartlims.auth.entity.EmailActionPurpose;
 import com.smartlims.auth.entity.EmailActionToken;
@@ -36,11 +39,12 @@ public class AccountManagementService {
     private final PasswordEncoder passwords;
     private final UserNames userNames;
     private final AdministratorCoordination administrators;
+    private final UserAccountQueries queries;
 
     public AccountManagementService(UserAccountRepository users, EmailActionTokenRepository tokens,
                                     VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
                                     PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
-                                    AdministratorCoordination administrators) {
+                                    AdministratorCoordination administrators, UserAccountQueries queries) {
         this.users = users;
         this.tokens = tokens;
         this.values = values;
@@ -50,6 +54,7 @@ public class AccountManagementService {
         this.passwords = passwords;
         this.userNames = userNames;
         this.administrators = administrators;
+        this.queries = queries;
     }
 
     @Transactional
@@ -132,6 +137,12 @@ public class AccountManagementService {
         return users.findAll(Sort.by("userName")).stream().map(AccountResponse::from).toList();
     }
 
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public UserPageResponse page(Authentication actor, java.util.Map<String, List<String>> parameters) {
+        currentAdministrator(actor);
+        return queries.page(UserQueryRequest.from(parameters));
+    }
+
     @Transactional(readOnly = true)
     public AccountResponse get(Authentication actor, UUID id) {
         currentAdministrator(actor);
@@ -148,12 +159,12 @@ public class AccountManagementService {
             throw new AuthRequestException(HttpStatus.BAD_REQUEST, "EMAIL_CHANGE_NOT_ALLOWED",
                     "Changing the email address is not supported.", "email");
         }
-        String name = userNames.normalize(request.userName());
-        if (!name.equalsIgnoreCase(user.getUserName()) && users.existsByUserNameIgnoreCase(name)) {
+        String name = request.userName() == null ? user.getUserName() : userNames.normalize(request.userName());
+        if (name != null && !name.equalsIgnoreCase(user.getUserName()) && users.existsByUserNameIgnoreCase(name)) {
             throw UserNames.conflict();
         }
         user.setProfile(request.fullName().strip(), canonical, name,
-                request.phoneNumber().strip());
+                request.phoneNumber() == null ? user.getPhoneNumber() : request.phoneNumber().strip());
         try {
             users.flush();
         } catch (DataIntegrityViolationException error) {
@@ -183,6 +194,9 @@ public class AccountManagementService {
             throw protectedAdmin();
         if (user.getRole() == role)
             return AccountResponse.from(user);
+        if (user.getRole() == Role.PATIENT && users.hasLinkedPatient(id))
+            throw new AuthRequestException(HttpStatus.CONFLICT, "PATIENT_ACCOUNT_LINKED",
+                    "An account linked to a patient profile must retain the PATIENT role.", "role");
         guardLastAdmin(user, true);
         user.setRole(role);
         email.sendRoleChanged(user.getEmail(), role.name());
@@ -197,7 +211,42 @@ public class AccountManagementService {
         if (administrator.getId().equals(id))
             throw protectedAdmin();
         guardLastAdmin(user, true);
-        users.delete(user);
+        try {
+            users.delete(user);
+            users.flush();
+        } catch (DataIntegrityViolationException error) {
+            for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+                if (cause instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState()))
+                    throw new AuthRequestException(HttpStatus.CONFLICT, "USER_HAS_RETAINED_REFERENCES",
+                            "This account is referenced by retained records and cannot be deleted.", null);
+            }
+            throw error;
+        }
+    }
+
+    @Transactional
+    public List<AccountResponse> setBlockedBulk(Authentication actor, List<UUID> ids, boolean blocked) {
+        administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
+        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(java.util.Objects::isNull)
+                || new java.util.HashSet<>(ids).size() != ids.size())
+            throw UserQueryRequest.invalid("ids");
+        List<UUID> selected = List.copyOf(ids);
+        var targets = new java.util.HashMap<UUID, UserAccount>();
+        selected.stream().sorted(java.util.Comparator.comparing(UUID::toString)).forEach(id -> targets.put(id, locked(id)));
+        long removing = 0;
+        for (UserAccount user : targets.values()) {
+            if (blocked && user.getId().equals(administrator.getId())) throw protectedAdmin();
+            if (blocked && user.isEnabled() && user.getRole() == Role.ADMIN && user.getEmailVerifiedAt() != null)
+                removing++;
+        }
+        if (removing > 0 && users.countByRoleAndEnabledTrueAndEmailVerifiedAtIsNotNull(Role.ADMIN) <= removing)
+            throw protectedAdmin();
+        // Every target and safeguard has been checked before changing any managed entity.
+        targets.values().forEach(user -> {
+            if (user.isEnabled() == blocked) user.setEnabled(!blocked);
+        });
+        return selected.stream().map(id -> AccountResponse.from(targets.get(id))).toList();
     }
 
     private UserAccount currentAdministrator(Authentication actor) {
