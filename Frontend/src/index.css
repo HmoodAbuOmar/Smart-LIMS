@@ -118,10 +118,20 @@ section[id] {
   --font-ar: 'Alexandria', sans-serif;
   --font-en: 'IBM Plex Sans', sans-serif;
   --font-ui: var(--font-en);
+  --font-heading: var(--font-ui);
   --weight-body: 400;
   --weight-medium: 500;
   --weight-ui: 600;
   --weight-heading: 700;
+  --type-heading-page: clamp(24px, 2vw, 26px);
+  --type-heading-section: 20px;
+  --type-heading-card: 17px;
+  --type-body: 14px;
+  --type-label: 13px;
+  --type-caption: 12px;
+  --leading-heading: 1.4;
+  --leading-body: 1.7;
+  --leading-body-ar: 1.9;
 }
 :root:lang(ar), [lang='ar'] {
   --font-ui: var(--font-ar);
@@ -132,6 +142,11 @@ section[id] {
 [lang] {
   font-family: var(--font-ui);
 }
+/* All current and future surfaces inherit the active language typography. */
+body, #root, #root *, dialog, dialog *, [role='listbox'], [role='listbox'] * { font-family: var(--font-ui); }
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
+h1, h2, h3 { font-weight: var(--weight-heading); }
+body:lang(ar), [lang='ar'] { line-height: var(--leading-body-ar); }
 /* Keep longer translations and user-entered values inside their existing boxes. */
 h1, h2, h3, p, blockquote, label, .quote-person strong, .role-tags span {
   overflow-wrap: anywhere;

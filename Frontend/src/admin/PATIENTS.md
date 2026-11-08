@@ -1,8 +1,8 @@
 # Admin Patients
 
 In development, open `/#/__admin/patients` directly, or open `/admin/index.html`
-and select **Patients** in the existing Admin sidebar. The overview preview is
-`/#/__admin/overview`.
+and select **Patients** in the existing Admin sidebar. Other direct previews are
+`/#/__admin/overview` and `/#/__admin/users`.
 The Admin language control switches all patient UI between English/LTR and Arabic/RTL.
 Patient records contain required `nameAr` and `nameEn` fields. `patientName()`
 selects the display name everywhere, and search matches both variants. The editor

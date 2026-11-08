@@ -91,3 +91,4 @@ export default function EmailVerification({ registration }) {
     canResend={Boolean(verificationId) || Boolean(email && !Object.keys(validateEmail({ email })).length)}
     error={status === 'verified' ? undefined : failure ? actionErrorKey(failure, 'errors.verificationUnavailable') : checkError} onResend={resend} />
 }
+

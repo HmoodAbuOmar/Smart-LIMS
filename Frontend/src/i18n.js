@@ -27,7 +27,7 @@ function syncLanguage(language) {
   const resolved = supportedLanguages.includes(language) ? language : 'en'
   document.documentElement.lang = resolved
   document.documentElement.dir = i18n.dir(resolved)
-  document.title = 'Smart-LIMS'
+  document.title = 'Smart-LIMS | Laboratory Platform'
   document.querySelector('meta[name="description"]')?.setAttribute(
     'content', i18n.t('landing:meta.description', { lng: resolved }),
   )

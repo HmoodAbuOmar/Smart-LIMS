@@ -79,7 +79,8 @@ try {
       await evaluate(`location.hash=${JSON.stringify(route?'#'+route:'#home')}`)
       await waitFor("!!document.querySelector('h1')")
       await delay(120)
-      assert.equal(await evaluate('document.title'),'Smart-LIMS',language+' '+route)
+      const expectedTitle = route.startsWith('/__portal/') ? 'Smart-LIMS | Patient Portal' : 'Smart-LIMS | Laboratory Platform'
+      assert.equal(await evaluate('document.title'), expectedTitle, language+' '+route)
       assert.ok(await evaluate("[...document.querySelectorAll('link[rel=icon]')].length===2 && [...document.querySelectorAll('link[rel=icon]')].every(el=>el.href.includes('v=flask-dna-20261026'))"))
     }
   }

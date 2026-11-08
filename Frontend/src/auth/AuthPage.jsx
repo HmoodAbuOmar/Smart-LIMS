@@ -18,3 +18,4 @@ export default function AuthPage({ mode, step = 'account', registration, onRegis
     {children ?? (step === 'verification' ? <EmailVerification registration={registration} /> : step === 'forgotPassword' ? <ForgotPassword /> : step === 'resetPassword' ? <ResetPassword /> : mode === 'login' ? <Login mode={mode} /> : <RegistrationForm onRegistered={onRegistered} />)}
   </AuthLayout>
 }
+

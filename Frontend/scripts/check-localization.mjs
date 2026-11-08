@@ -72,3 +72,4 @@ try {
   delete globalThis.window
   delete globalThis.document
 }
+

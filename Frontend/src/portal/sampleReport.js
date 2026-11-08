@@ -1,4 +1,5 @@
 // Development fixture export only. Never used to manufacture a clinical report.
+import { patientDisplayName } from '../utils/patientDisplayName.js'
 export async function downloadSampleReport({ profile, result, test, t, local, date }) {
   if (!import.meta.env.DEV || !result.id.startsWith('SAMPLE-') || result.status !== 'published') throw new Error('Sample report only')
   await document.fonts.ready
@@ -17,7 +18,7 @@ export async function downloadSampleReport({ profile, result, test, t, local, da
   ctx.font = 'bold 23px sans-serif'; ctx.fillText('INTERNAL TEST REPORT - NOT FOR CLINICAL USE', x, 150)
   ctx.font = '24px sans-serif'; ctx.fillText(t('resultReport'), x, 205)
   const lines = [
-    `${t('name')}: ${profile.name}`, `${t('dob')}: ${date(profile.dateOfBirth)}`,
+    `${t('name')}: ${patientDisplayName(profile.name, t('samplePatient'))}`, `${t('dob')}: ${date(profile.dateOfBirth)}`,
     `${t('fileNumber')}: ${profile.fileNumber}`, `${t('orderNumber')}: ${result.orderId}`,
     `${t('sampleDate')}: ${date(result.sampleDate)}`, `${t('resultDate')}: ${date(result.date)}`,
     '', local(test.name), '',

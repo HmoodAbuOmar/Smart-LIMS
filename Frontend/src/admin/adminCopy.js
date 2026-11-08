@@ -1,6 +1,7 @@
 export const adminCopy = {
   en: {
     title: 'Admin Dashboard', workspace: 'Administration', navigation: 'Admin navigation',
+    usersManagementTitle: 'Users Management',
     content: 'Main content', skip: 'Skip to main content', openMenu: 'Open navigation',
     closeMenu: 'Close navigation', language: 'Switch to Arabic', logout: 'Logout',
     logoutUnavailable: 'Logout will be available after authentication integration.',
@@ -18,6 +19,7 @@ export const adminCopy = {
     },
   },
   ar: {
+    usersManagementTitle: 'إدارة المستخدمين',
     title: 'لوحة تحكم المسؤول', workspace: 'الإدارة', navigation: 'قائمة تنقل المسؤول',
     content: 'المحتوى الرئيسي', skip: 'انتقل إلى المحتوى الرئيسي', openMenu: 'فتح قائمة التنقل',
     closeMenu: 'إغلاق قائمة التنقل', language: 'التبديل إلى الإنجليزية', logout: 'تسجيل الخروج',

@@ -2,6 +2,7 @@
   "heading": "Take a Closer Look at the Platform",
   "description": "Samples, reports, and patient records. All in one place.",
   "illustrative": "Platform overview",
+  "collectedOn": "Collected on",
   "tabsLabel": "Laboratory workflows",
   "tabs": {
     "samples": "Samples",
@@ -23,7 +24,10 @@
   "types": {
     "cbc": "Complete blood count",
     "lipid": "Lipid profile",
-    "thyroid": "Thyroid panel"
+    "thyroid": "Thyroid panel",
+    "glucose": "Fasting blood glucose",
+    "liver": "Liver function panel",
+    "renal": "Renal function panel"
   },
   "patients": {
     "first": "Patient",
@@ -31,6 +35,11 @@
     "third": "Patient"
   },
   "statuses": {
+    "processing": "Processing",
+    "rejected": "Rejected",
+    "ready": "Ready",
+    "pending": "Pending",
+    "underReview": "Under Review",
     "collected": "Collected",
     "analysis": "In analysis",
     "review": "Awaiting review",

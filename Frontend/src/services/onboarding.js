@@ -37,3 +37,4 @@ export function preparePatientDraft(values) {
   const errors = validatePatientDraft(values)
   return { status: Object.keys(errors).length ? 'invalid' : 'draftValidated', errors }
 }
+

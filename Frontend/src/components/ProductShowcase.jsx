@@ -1,19 +1,20 @@
 import BrandLogo from './BrandLogo.jsx'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Clock, FileText, FlaskConical, TestTubes, Users } from 'lucide-react'
+import { Check, Clock, FileText, FlaskConical, TestTubes, Users, X } from 'lucide-react'
+import { productShowcaseDemo } from './productShowcaseDemo.js'
 import './ProductShowcase.css'
 
-// Deliberately fictional, local-only records. This component has no API or writes.
+// Local-only showcase records, separate from patient accounts and API payloads.
 const previews = [
-  { id: 'samples', icon: TestTubes, columns: ['sampleId', 'testType', 'status'], rows: [] },
-  { id: 'reports', icon: FileText, columns: ['reportId', 'reportType', 'status'], rows: [] },
-  { id: 'patients', icon: Users, columns: ['patientId', 'recordLabel', 'recordStatus'], rows: [] },
+  { id: 'samples', icon: TestTubes, columns: ['sampleId', 'testType', 'status'], rows: productShowcaseDemo.samples },
+  { id: 'reports', icon: FileText, columns: ['reportId', 'reportType', 'status'], rows: productShowcaseDemo.reports },
+  { id: 'patients', icon: Users, columns: ['patientId', 'recordLabel', 'recordStatus'], rows: productShowcaseDemo.patients },
 ]
 
 function PreviewStatus({ status, label }) {
-  const complete = status === 'reviewed' || status === 'completed'
-  const StatusIcon = complete ? Check : status === 'analysis' ? FlaskConical : Clock
+  const complete = status === 'ready' || status === 'completed'
+  const StatusIcon = complete ? Check : status === 'rejected' ? X : status === 'processing' ? FlaskConical : Clock
   return <span className={`showcase-status ${complete ? 'is-complete' : ''}`}><StatusIcon size={13} aria-hidden="true" />{label}</span>
 }
 
@@ -21,6 +22,10 @@ export default function ProductShowcase() {
   const { t, i18n } = useTranslation('showcase')
   const [activeTab, setActiveTab] = useState('samples')
   const tabRefs = useRef({})
+  const language = i18n.resolvedLanguage?.startsWith('ar') ? 'ar' : 'en'
+  const collectionDate = value => new Intl.DateTimeFormat(language, {
+    year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`))
 
   function navigateTabs(event, index) {
     const rtl = i18n.dir() === 'rtl'
@@ -75,8 +80,8 @@ export default function ProductShowcase() {
             <table>
               <thead><tr>{columns.map(column => <th key={column} scope="col">{t(`columns.${column}`)}</th>)}</tr></thead>
               <tbody>{!rows.length && <tr><td colSpan={columns.length} style={{ height: 156 }}>{t('empty')}</td></tr>}{rows.map(row => <tr key={row.id}>
-                <th scope="row"><span className="showcase-record-id" lang="en" dir="ltr">{row.id}</span></th>
-                <td>{t(row.label)}</td>
+                <th scope="row"><span className="showcase-record-id" lang="en" dir="ltr">{row.id.replace(/^DEMO-/, '')}</span></th>
+                <td>{row.name ? row.name[language] : t(row.label)}{row.collectedOn && <small className="showcase-collection-date">{t('collectedOn')}: <time dateTime={row.collectedOn}>{collectionDate(row.collectedOn)}</time></small>}</td>
                 <td><PreviewStatus status={row.status} label={t(`statuses.${row.status}`)} /></td>
               </tr>)}</tbody>
             </table>

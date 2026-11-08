@@ -39,6 +39,7 @@ main .product-showcase .section-heading > p { max-width: 64ch; margin-inline: au
 .showcase-table-scroll tbody tr:hover { background: var(--surface-card); }
 .showcase-table-scroll tbody th { font-weight: var(--weight-medium); }
 .showcase-record-id { color: var(--color-mint); font-variant-numeric: tabular-nums; letter-spacing: .025em; }
+.product-showcase .showcase-collection-date { display: block; color: var(--color-muted-green); font-size: 11px; line-height: 1.7; margin-block-start: 3px; }
 .showcase-status { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; background: var(--color-navy); border: 1px solid var(--border-dark); border-radius: 5px; color: var(--color-muted-green); font-size: 11px; line-height: 1.6; }
 .showcase-status.is-complete { background: var(--color-emerald); color: var(--text-on-dark); }
 .showcase-disclaimer { display: flex; align-items: flex-start; gap: 9px; padding: 12px 20px; border-top: 1px solid var(--border-dark); color: var(--color-muted-green); }

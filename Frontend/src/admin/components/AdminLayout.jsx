@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import AdminSidebar from './AdminSidebar.jsx'
 import AdminNavbar from './AdminNavbar.jsx'
 import AdminOverview from './AdminOverview.jsx'
+import AdminUsers from './AdminUsers.jsx'
 import AdminPatients from './AdminPatients.jsx'
 import { adminCopy } from '../adminCopy.js'
 
@@ -63,8 +64,9 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
         onToggleMenu={() => setMobileOpen(open => !open)} />
       <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} language={language}
         onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />
-      <main id="admin-main" className="admin-main" aria-label={copy.content} tabIndex={-1}>
+      <main id="admin-main" className={`admin-main${activeId === 'users' ? ' admin-main-users' : ''}`} aria-label={copy.content} tabIndex={-1}>
         {activeId === 'overview' && <AdminOverview language={language} />}
+        {activeId === 'users' && <AdminUsers language={language} />}
         {activeId === 'patients' && <AdminPatients language={language} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
       </main>
     </div>

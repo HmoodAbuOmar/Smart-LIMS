@@ -1,0 +1,36 @@
+/* Stage 4: existing illustrative health chart, without fabricated lab KPIs. */
+main .insights-section { gap: clamp(32px, 5vw, 68px); }
+main .insights-copy h2 { margin-block: 16px 22px; }
+main .insights-copy > p { max-width: 44ch; }
+main .check-list { margin-block: 24px 28px; gap: 14px; font-size: 13px; line-height: 1.75; }
+main .check-list svg { width: 18px; height: 18px; }
+main .chart-card { padding: clamp(22px, 2.2vw, 30px); border-radius: 14px; }
+main .chart-card::before { display: none; }
+main .chart-header { gap: 14px; align-items: center; }
+main .chart-header .small-label { font-size: var(--lp-type-label); line-height: 1.8; letter-spacing: .07em; }
+main .chart-header h3 { margin-block-start: 8px; font-size: 16px; font-weight: var(--weight-ui); line-height: var(--lp-leading-heading); }
+main .chart-header .icon-box { width: 40px; height: 40px; flex-shrink: 0; }
+main .chart-controls { margin-block-start: 26px; gap: 12px; flex-wrap: wrap; }
+main .metric-tabs { padding: 4px; }
+main .metric-tabs button { padding: 8px 11px; font-size: var(--lp-type-small); line-height: 1.5; }
+main .chart-controls select { padding: 8px; font-size: var(--lp-type-small); }
+main .chart-value { margin-block-start: 24px; font-size: 34px; font-weight: var(--weight-ui); line-height: 1.4; gap: 8px; }
+main .chart-value > span { font-size: var(--lp-type-small); }
+main .chart-value .trend { font-size: var(--lp-type-label); line-height: 1.7; }
+main .chart { margin-block-start: 18px; }
+main .chart svg text { font-size: 12px; font-family: var(--font-ui); }
+main .chart-months { font-size: var(--lp-type-label); line-height: 1.6; }
+main .chart-note { margin-block-start: 22px; padding-block-start: 16px; gap: 8px; font-size: var(--lp-type-label); line-height: 1.75; }
+main .chart-note > span:last-child { font-size: var(--lp-type-label); }
+@media (max-width: 800px) and (min-width: 581px) {
+  main .insights-section { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  main .insights-copy > p { max-width: 65ch; }
+}
+@media (max-width: 580px) {
+  main .chart-card { margin-inline-end: 0; padding: 20px; }
+  main .chart-header h3 { font-size: 15px; }
+  main .chart-header .small-label { font-size: 10px; }
+  main .chart svg text { font-size: 20px; }
+  main .chart-value .trend { margin-inline-start: 0; flex-basis: 100%; }
+  main .chart-note > span:last-child { margin-inline-start: 0; flex-basis: 100%; }
+}

@@ -1,0 +1,23 @@
+/* Shared refinement tokens stay loaded when individual stages are disabled. */
+:root {
+  --lp-type-section: clamp(28px, 2.7vw, 36px);
+  --lp-type-card: clamp(18px, 1.6vw, 20px);
+  --lp-type-body: clamp(14px, 1.12vw, 15px);
+  --lp-type-small: 12px;
+  --lp-type-label: 11px;
+  --lp-leading-body: 1.8;
+  --lp-leading-heading: 1.3;
+  --lp-tracking-heading: -.035em;
+  --lp-section-space: clamp(56px, 6.5vw, 88px);
+  --lp-content-gap: clamp(28px, 3vw, 40px);
+  --lp-card-padding: clamp(24px, 2.5vw, 32px);
+  --lp-card-gap: 24px;
+  --lp-motion-time: 220ms;
+  --lp-card-highlight: color-mix(in srgb, var(--color-turquoise) 48%, var(--border-dark));
+  --lp-card-shadow: 0 10px 28px color-mix(in srgb, var(--color-navy) 18%, transparent);
+}
+:root:lang(ar) {
+  --lp-leading-body: 1.95;
+  --lp-leading-heading: 1.6;
+  --lp-tracking-heading: 0;
+}

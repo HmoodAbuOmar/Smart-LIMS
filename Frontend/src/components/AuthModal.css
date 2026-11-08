@@ -118,11 +118,20 @@ main.auth-content { display: grid; place-items: center; min-height: 100svh; padd
 .auth-switch { display: inline-block; margin-block-start: 20px; border: 0; padding: 0; background: transparent; color: var(--medical-green); font-size: 12px; line-height: 1.8; text-decoration: underline; text-underline-offset: 4px; }
 .patient-auth .registration-success { border: 1px solid var(--medical-border-light); border-radius: 12px; padding: 12px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; }
 .auth-secondary { display: inline-block; margin-block-start: 16px; padding: 11px 15px; border: 1px solid #a8cfc7; border-radius: 10px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; line-height: 1.7; }
+.workflow-preview-nav { padding-block-end: 14px; margin-block-end: 22px; border-bottom: 1px solid var(--medical-border-light); }
+.workflow-preview-nav summary { cursor: pointer; color: var(--medical-green); font-size: 11px; font-weight: 600; }
+.workflow-preview-nav[open] > :not(summary) { display: block; margin-block-start: 8px; }
+.workflow-preview-nav label { color: var(--medical-green); font-size: 11px; font-weight: 600; }
+.workflow-preview-nav select { width: 100%; min-width: 0; padding: 9px 12px; border: 1px solid var(--medical-border-light); border-radius: 9px; color: var(--medical-deep); background: var(--medical-mint); font-size: 12px; }
+.workflow-preview-nav small { color: var(--medical-secondary); font-size: 11px; line-height: 1.6; }
+.workflow-next { margin-block-start: 24px; }
 .workflow-choices { display: grid; gap: 16px; margin-block-start: 26px; }
 .workflow-choice { display: grid; gap: 8px; padding: 20px; border: 1px solid #a8cfc7; border-radius: 14px; background: #edf5f2; color: var(--medical-deep); text-align: start; transition: border-color .2s, background .2s; }
 .workflow-choice:hover { border-color: var(--medical-fresh); background: var(--medical-mint); }
 .workflow-choice strong { font-size: 14px; }
 .workflow-choice span { font-size: 12px; line-height: 1.7; color: var(--medical-secondary); }
+.workflow-contract { min-width: 0; padding: 18px; border: 1px solid var(--medical-border-light); border-radius: 12px; }
+.workflow-contract legend { font-size: 12px; color: var(--medical-deep); }
 .patient-auth :is(button, a, select):focus-visible { outline: 2px solid var(--medical-fresh); outline-offset: 3px; }
 .patient-auth h1:focus { outline: none; }
 .patient-auth:dir(rtl) .auth-submit svg { transform: rotate(180deg); }

@@ -6,6 +6,7 @@ import BrandLogo from '../components/BrandLogo.jsx'
 import MedicalHistory from './MedicalHistory.jsx'
 import { portalReducer, todayValue, totalPrice } from './portalModel.js'
 import { formatCurrency } from '../utils/currency.js'
+import { patientDisplayName } from '../utils/patientDisplayName.js'
 import './BookingFlow.css'
 import BookingCheckout from './pages/BookAppointment.jsx'
 import BookingReceipt from './pages/BookingConfirmation.jsx'
@@ -53,10 +54,10 @@ export default function PatientPortal({ initialData, development = false, route 
   const money = value => <bdi dir="ltr">{formatCurrency(value, language)}</bdi>
   const number = value => new Intl.NumberFormat(language).format(value)
   const datetime = value => new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-  const name = language === 'ar' && state.profile.nameAr ? state.profile.nameAr : state.profile.name || t('samplePatient')
+  const name = patientDisplayName(language === 'ar' && state.profile.nameAr ? state.profile.nameAr : state.profile.name, t('samplePatient')) || t('samplePatient')
   const navigate = path => { if (bookingLock.current) return; setMobileOpen(false); setAccountOpen(false); setNotice(''); onNavigate(path) }
   const [path, query = ''] = route.split('?'), [page = 'dashboard', id] = path.split('/')
-  useEffect(() => { document.title = 'Smart-LIMS'; document.querySelector('.portal-page-title')?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }) }, [route, t, page])
+  useEffect(() => { document.title = 'Smart-LIMS | Patient Portal'; document.querySelector('.portal-page-title')?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }) }, [route, t, page])
   useEffect(() => {
     function close(event) { if (accountRef.current && !accountRef.current.contains(event.target)) setAccountOpen(false) }
     function escape(event) { if (event.key === 'Escape') { setMobileOpen(false); setAccountOpen(false) } }

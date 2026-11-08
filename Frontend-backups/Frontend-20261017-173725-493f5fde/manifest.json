@@ -1,0 +1,232 @@
+﻿[
+    {
+        "Path":  ".gitignore",
+        "SHA256":  "FE718E7BABB14F3CBAD2D97F08889B9CE5215ED3FE0E43B2B8CFBFB3B9B844E8",
+        "Bytes":  253
+    },
+    {
+        "Path":  ".oxlintrc.json",
+        "SHA256":  "1BE899E45C49B2A2EDC715BC3BFB31D8ED8E866ED7EBAB2065FF6E55E88C2396",
+        "Bytes":  231
+    },
+    {
+        "Path":  "index.html",
+        "SHA256":  "FE876F5F8D512D06FB4F3AE4BA2EDE7D39A60FF32D68BC8C176281A591D54316",
+        "Bytes":  957
+    },
+    {
+        "Path":  "package-lock.json",
+        "SHA256":  "6B7D3B951795FEACA4FA9F72D669BB98C79C6DFD1186D01375DE2DE40A3D8EA9",
+        "Bytes":  44454
+    },
+    {
+        "Path":  "package.json",
+        "SHA256":  "8B700F76742A93F735F75C55B4FEDF2F895124A52030DF6E521B44EF1C06E95F",
+        "Bytes":  653
+    },
+    {
+        "Path":  "README.md",
+        "SHA256":  "8E404B5C5514EA513B0B7A0ED2F7C0B35232377ABA9730C211715C2A0021EFA9",
+        "Bytes":  3030
+    },
+    {
+        "Path":  "vite.config.js",
+        "SHA256":  "E1EEFD0ED1639C88D1213884EF760516884DB9E168190E223FEE6B063AD3E088",
+        "Bytes":  161
+    },
+    {
+        "Path":  "dist\\favicon.svg",
+        "SHA256":  "7E881F501EA14DC4D9A6CDE27535864AC81412B784A0687BC48B886140C3279B",
+        "Bytes":  255
+    },
+    {
+        "Path":  "dist\\icons.svg",
+        "SHA256":  "B45FA506195CFCDEF406BA9F0C77B36DDC1A7C224040926EC70ABC2FDEA7B93A",
+        "Bytes":  5031
+    },
+    {
+        "Path":  "dist\\index.html",
+        "SHA256":  "CEEC3F4B7B3694899FCAB1EE6E41608493D6D084D1BB1E95E66F3A1833C1EF2E",
+        "Bytes":  1055
+    },
+    {
+        "Path":  "dist\\assets\\index-Cy9DffgB.css",
+        "SHA256":  "3E4BFED27CB4FE05316E0AE39A82E74927DAC48B48B5A260C0EF0AE5110BC03D",
+        "Bytes":  45964
+    },
+    {
+        "Path":  "dist\\assets\\index-DbH4_TWk.js",
+        "SHA256":  "000A6FDFD2C0003CD0E4D69D4648CA1346888BD00B2E9F291846957B77813097",
+        "Bytes":  318502
+    },
+    {
+        "Path":  "dist\\images\\lab-team.png",
+        "SHA256":  "20E390FE86A335DDD54233E321B2B17C0B62CA5127B26B0E983D88EEEAEDCE5F",
+        "Bytes":  1712668
+    },
+    {
+        "Path":  "dist\\images\\laboratory.jpg",
+        "SHA256":  "B0570C1BF0EE141A33A5E625DFC7A032FD64F577D0CAC0695A62E164830C63ED",
+        "Bytes":  247392
+    },
+    {
+        "Path":  "dist\\images\\lims-tube.png.PNG",
+        "SHA256":  "912B7630D8C92DB888674C7259A715300698C17B0C030CCB98BD186785407EF3",
+        "Bytes":  2258289
+    },
+    {
+        "Path":  "dist\\images\\medical-professional.jpg",
+        "SHA256":  "C8C5BD3738BF62FAF24EEE3CC35F8888D41A9BFA36F1CFE70E6EF1528E247DD8",
+        "Bytes":  140364
+    },
+    {
+        "Path":  "public\\favicon.svg",
+        "SHA256":  "7E881F501EA14DC4D9A6CDE27535864AC81412B784A0687BC48B886140C3279B",
+        "Bytes":  255
+    },
+    {
+        "Path":  "public\\icons.svg",
+        "SHA256":  "B45FA506195CFCDEF406BA9F0C77B36DDC1A7C224040926EC70ABC2FDEA7B93A",
+        "Bytes":  5031
+    },
+    {
+        "Path":  "public\\images\\lab-team.png",
+        "SHA256":  "20E390FE86A335DDD54233E321B2B17C0B62CA5127B26B0E983D88EEEAEDCE5F",
+        "Bytes":  1712668
+    },
+    {
+        "Path":  "public\\images\\laboratory.jpg",
+        "SHA256":  "B0570C1BF0EE141A33A5E625DFC7A032FD64F577D0CAC0695A62E164830C63ED",
+        "Bytes":  247392
+    },
+    {
+        "Path":  "public\\images\\lims-tube.png.PNG",
+        "SHA256":  "912B7630D8C92DB888674C7259A715300698C17B0C030CCB98BD186785407EF3",
+        "Bytes":  2258289
+    },
+    {
+        "Path":  "public\\images\\medical-professional.jpg",
+        "SHA256":  "C8C5BD3738BF62FAF24EEE3CC35F8888D41A9BFA36F1CFE70E6EF1528E247DD8",
+        "Bytes":  140364
+    },
+    {
+        "Path":  "scripts\\check-auth.mjs",
+        "SHA256":  "AF77B65FAC10F376C4CE070E2D23A87E1B72153105107C8ADC3C11EA95D81418",
+        "Bytes":  1407
+    },
+    {
+        "Path":  "scripts\\check-localization.mjs",
+        "SHA256":  "534B9CE88C6E5558C2AD17254D6491A1872FF157EF25681DA0A35F26F85C1128",
+        "Bytes":  3501
+    },
+    {
+        "Path":  "src\\App.css",
+        "SHA256":  "8FF6E74DFFCFBB76FAAD0C79993F2A116A30EF96DEC77B56CB73117117AFE0DC",
+        "Bytes":  29272
+    },
+    {
+        "Path":  "src\\App.jsx",
+        "SHA256":  "6029B8901798BBCE1F4CF9327A9548B792D1C5C41B37FB3AF7866B84C2EA16AD",
+        "Bytes":  12959
+    },
+    {
+        "Path":  "src\\Hero.css",
+        "SHA256":  "A91FD79AE8A84249AE6EC61D49FC324EAB294D93AEC7AB55E885F332350A8ACF",
+        "Bytes":  7645
+    },
+    {
+        "Path":  "src\\i18n.js",
+        "SHA256":  "7EA496CCF72F0F5B5798BB8E650FAFE52F3FF820BE4F270F2F14A0B154B45368",
+        "Bytes":  1875
+    },
+    {
+        "Path":  "src\\index.css",
+        "SHA256":  "B3FAC80516AE2DFCF111EDDEA830109C34F508BC6712FA9F03C95B62DDE54B6F",
+        "Bytes":  3510
+    },
+    {
+        "Path":  "src\\main.jsx",
+        "SHA256":  "25F7CED316A7C87232DDE5AF04E63FA80B9EBF9AE9DEFE175349C4F98DBA18A1",
+        "Bytes":  248
+    },
+    {
+        "Path":  "src\\theme.css",
+        "SHA256":  "FB652346BFA3E6FEC1378F5C170E7D7220A6005BD60D8974346A8243732CD512",
+        "Bytes":  8757
+    },
+    {
+        "Path":  "src\\assets\\hero.png",
+        "SHA256":  "881FFBCAAFC212E49ADDAD08846A5B82761355FA20624253AF3477BA33262C5C",
+        "Bytes":  13057
+    },
+    {
+        "Path":  "src\\assets\\react.svg",
+        "SHA256":  "35EF61ED53B323AE94A16A8EC659B3D0AF3880698791133F23B084085AB1C2E5",
+        "Bytes":  4126
+    },
+    {
+        "Path":  "src\\assets\\vite.svg",
+        "SHA256":  "5BE21ACD42EB7B896E517F4E0F0F11EB5C5D9E54FBBCEBE9453F033008FCCA6F",
+        "Bytes":  8709
+    },
+    {
+        "Path":  "src\\components\\AuthModal.css",
+        "SHA256":  "32584E99AE4E33033587C7F0905B840D73A66B8532C3A9A6ADDFD2FFE02F051C",
+        "Bytes":  1525
+    },
+    {
+        "Path":  "src\\components\\AuthModal.jsx",
+        "SHA256":  "8DFCB65773D501A751EE2D62F6F45F02A8A5FB7ADE2DB10736A3FBF473E646EE",
+        "Bytes":  5557
+    },
+    {
+        "Path":  "src\\components\\LanguageSwitcher.jsx",
+        "SHA256":  "AB95FDE8750F688E567ABE8BCC652F99BFE581BD533AD65FE0474288A6A292B8",
+        "Bytes":  3468
+    },
+    {
+        "Path":  "src\\components\\Navbar.css",
+        "SHA256":  "B09C37292CEB66CA281F30F06EAE5020E69EC256F0F9FA0E5EC243E4BD6FA857",
+        "Bytes":  4123
+    },
+    {
+        "Path":  "src\\components\\Navbar.jsx",
+        "SHA256":  "C369A37D6857E94CB7EE1C68D54E24614103CEA2C55D0B3B7B94ADFC90313D49",
+        "Bytes":  3481
+    },
+    {
+        "Path":  "src\\locales\\ar\\auth.json",
+        "SHA256":  "F69558F0ED462B1423405ED14AF7C98531D6DBA1F03E55C2DBDBE6287B7473D6",
+        "Bytes":  1920
+    },
+    {
+        "Path":  "src\\locales\\ar\\common.json",
+        "SHA256":  "AA8F06BD9360A22186569AAB74FE60EC19DDE1E02874E4E21DEA14A394266175",
+        "Bytes":  983
+    },
+    {
+        "Path":  "src\\locales\\ar\\landing.json",
+        "SHA256":  "884661C5EBDBFB32EBFF4A9D8E2ECD013B11891E3958D6DEA9DDD0A7F22A8157",
+        "Bytes":  8815
+    },
+    {
+        "Path":  "src\\locales\\en\\auth.json",
+        "SHA256":  "66123610FFE17718D3F0FE6AE42F28047DBE106174781C30083A22B1EA1646D2",
+        "Bytes":  1458
+    },
+    {
+        "Path":  "src\\locales\\en\\common.json",
+        "SHA256":  "1A11C6EAC51B1CB38F051558564AD9801BFC4C715FAEBF56058C396B479D08DA",
+        "Bytes":  691
+    },
+    {
+        "Path":  "src\\locales\\en\\landing.json",
+        "SHA256":  "68422B8C27E4F6F7D0CD3C1D66735E10E248150B2E2C26807CE22310B2E6583A",
+        "Bytes":  7110
+    },
+    {
+        "Path":  "src\\utils\\authValidation.js",
+        "SHA256":  "8D9D6AF7753AD8A0D00B1B5917DEBEDA440FAB464015F11349BF9250909D388D",
+        "Bytes":  902
+    }
+]

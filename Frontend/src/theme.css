@@ -289,6 +289,23 @@ blockquote { color: var(--medical-secondary); }
 .footer-bottom svg { color: var(--color-muted-green); }
 .footer-top a:hover, .footer-top button:hover { color: var(--medical-white); text-decoration-color: var(--medical-fresh); }
 
+.modal-surface {
+  color: var(--text-on-dark);
+  background: linear-gradient(145deg, var(--surface-deep-green), var(--color-navy));
+  border-color: var(--border-dark);
+  box-shadow: var(--shadow-hover);
+}
+.modal-surface::backdrop { background: color-mix(in srgb, var(--color-navy) 75%, transparent); }
+.modal-surface p, .modal-surface small { color: var(--color-muted-green); }
+.modal-surface input, .modal-surface select {
+  background: var(--surface-card);
+  color: var(--text-on-dark);
+  border-color: var(--color-muted-green);
+}
+.modal-surface input::placeholder { color: var(--color-muted-green); opacity: 1; }
+.dialog-close { background: var(--color-emerald); color: var(--text-on-dark); }
+.dialog-close:hover { background: var(--surface-card-hover); }
+
 @media (max-width: 980px) {
   .navigation { background: var(--color-navy); border-color: var(--border-dark); box-shadow: var(--shadow-soft); }
 }
@@ -315,3 +332,4 @@ blockquote { color: var(--medical-secondary); }
     box-shadow: 0 0 0 1000px var(--field-background) inset, var(--field-focus-glow);
   }
 }
+.modal-surface input::placeholder { color: var(--medical-secondary); }

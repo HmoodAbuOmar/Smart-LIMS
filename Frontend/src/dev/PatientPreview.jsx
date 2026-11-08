@@ -20,14 +20,14 @@ const copy = {
     back: 'Back', home: 'Back to Home',
     fileFormat: 'Enter 1–64 letters or digits. Hyphens, underscores, slashes and periods are allowed.',
     resendHint: 'You can continue to Login.',
-    patient: 'Sample Patient', file: 'SAMPLE-001', activity: 'Sample laboratory activity',
+    patient: 'Patient', file: 'SAMPLE-001', activity: 'Laboratory activity',
     test: 'Laboratory panel', status: 'Status', date: 'Date', ready: 'Ready',
   },
   ar: {
     back: 'العودة', home: 'العودة إلى الرئيسية',
     fileFormat: 'أدخل من حرف أو رقم واحد إلى ٦٤. يمكن استخدام الشرطات والشرطات السفلية والشرطة المائلة والنقاط.',
     resendHint: 'يمكنك المتابعة إلى تسجيل الدخول.',
-    patient: 'مريض توضيحي', file: 'SAMPLE-001', activity: 'نشاط مخبري توضيحي',
+    patient: 'المريض', file: 'PAT-001', activity: 'النشاط المخبري',
     test: 'فحص مخبري', status: 'الحالة', date: 'التاريخ', ready: 'جاهز',
   },
 }
