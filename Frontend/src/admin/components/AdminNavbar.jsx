@@ -9,7 +9,9 @@ export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, 
         {mobileOpen ? <X size={21} aria-hidden="true" /> : <Menu size={21} aria-hidden="true" />}
       </button>
 
-      <div className="admin-header-heading"><h1>{copy.title}</h1>{activeId !== 'overview' && <span>{copy.items[activeId]}</span>}</div>
+      <div className="admin-header-heading"><h1>{activeId === 'patients' ? copy.items.patients : copy.title}</h1>
+        {activeId !== 'overview' && activeId !== 'patients' && <span>{copy.items[activeId]}</span>}
+      </div>
 
       <div className="admin-navbar-search" title={copy.navbar.searchUnavailable}>
         <Search size={16} aria-hidden="true" />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import AdminSidebar from './AdminSidebar.jsx'
 import AdminNavbar from './AdminNavbar.jsx'
 import AdminOverview from './AdminOverview.jsx'
+import AdminPatients from './AdminPatients.jsx'
 import { adminCopy } from '../adminCopy.js'
 
 const languageKey = 'smart-lims.admin.language'
@@ -10,9 +11,9 @@ function initialLanguage() {
   catch { return 'en' }
 }
 
-export default function AdminLayout() {
+export default function AdminLayout({ initialPage = 'overview', developmentPreview = false }) {
   const [language, setLanguage] = useState(initialLanguage)
-  const [activeId, setActiveId] = useState('overview')
+  const [activeId, setActiveId] = useState(initialPage)
   const [mobileOpen, setMobileOpen] = useState(false)
   const menuButton = useRef(null)
   const copy = adminCopy[language]
@@ -28,13 +29,13 @@ export default function AdminLayout() {
     const previous = { lang: root.lang, dir: root.dir, title: document.title }
     root.lang = language
     root.dir = direction
-    document.title = 'Smart-LIMS | ' + copy.title
+    document.title = 'Smart-LIMS | ' + (activeId === 'patients' ? copy.items.patients : copy.title)
     return () => {
       root.lang = previous.lang
       root.dir = previous.dir
       document.title = previous.title
     }
-  }, [language, direction, copy.title])
+  }, [language, direction, copy.title, copy.items.patients, activeId])
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 901px)')
@@ -54,7 +55,7 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="admin-layout" lang={language} dir={direction} onKeyDown={event => {
+    <div className="admin-layout" lang={language} dir={direction} data-admin-development-preview={developmentPreview || undefined} onKeyDown={event => {
       if (event.key === 'Escape' && mobileOpen) closeMenu()
     }}>
       <a className="admin-skip-link" href="#admin-main">{copy.skip}</a>
@@ -64,6 +65,7 @@ export default function AdminLayout() {
         onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />
       <main id="admin-main" className="admin-main" aria-label={copy.content} tabIndex={-1}>
         {activeId === 'overview' && <AdminOverview language={language} />}
+        {activeId === 'patients' && <AdminPatients language={language} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
       </main>
     </div>
   )

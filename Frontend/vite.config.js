@@ -5,5 +5,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   // The user-owned design reference lives in dist/images; never clear it on build.
-  build: { emptyOutDir: false },
+  build: {
+    emptyOutDir: false,
+    rollupOptions: { input: { main: 'index.html', admin: 'admin/index.html' } },
+  },
 })
