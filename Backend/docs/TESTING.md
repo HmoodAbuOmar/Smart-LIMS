@@ -1,5 +1,52 @@
 # Database-backed test setup
 
+## Configured Reference Ranges — CAT-RANGE-01 (2026-11-09)
+
+Status: IN_PROGRESS. Contract, implementation and focused coverage are added;
+test compilation/execution, Postman updates and deployment verification are
+deferred. Entry branch backend-hmood, clean tree. Contract/design were recorded
+before implementation in LAB_TESTS_API.md and DATABASE_DESIGN.md. Screenshot
+Test_Catlog3.jpeg and RESULTS_API.md were inspected. A scoped local-only
+IMPLEMENTATION_PLAN.md was created because the index was absent.
+
+Added ReferenceRangeRequestTest for blank/unbounded versus strict JSON bounds,
+applicability, age/decimal/date limits, half-open validation and date status.
+Added ReferenceRangeTest on the existing IsolatedPostgresTest guard/fixtures for
+ADMIN/current-account/CSRF checks, nested identity and numeric type, inactive
+configuration, strict JSON/query validation, empty/default/expired paging with
+UUID ties and huge offsets, both-dimensional overlap/applicability/parameter
+separation, blocked concurrent creates over an initially empty set, scalar/FK
+constraints, numeric-type retention, unchanged manual draft/correction references
+and published snapshots. MigrationLineageTest adds a V26→V27 preservation check
+over synthetic retained data including publications, one new empty table and
+unchanged previous Flyway history. Other test edits only adapt the added FK's
+explicit cleanup lists, current migration counts or the parameter service's
+constructor dependency; the independent database guard is unchanged.
+
+Static review only: no Maven, test, application, SQL/database, Flyway execution,
+Postman, frontend, dependency, credential, commit or push operation was performed.
+Source/diff review and `git -c core.safecrlf=false diff --check` passed. A Python
+file-integrity check confirmed all 26 prior migration contents match HEAD under
+normal Windows CRLF normalization and have no Git diff, exactly one new migration
+with one CREATE TABLE, and all 13 existing explicit cleanup fixtures include the
+new table. The first content comparison rejected ordinary CRLF/LF differences;
+it was corrected to account for the repository's line endings. No migration was
+changed to pass the comparison. These are static checks, not Java/SQL execution.
+No historical passing evidence is treated as verification of this slice.
+Pending commands below have NOT RUN. Independently verify the disposable loopback
+PostgreSQL instance and import the existing saved test settings as required by
+this document before any database-backed invocation. Never use app defaults.
+
+```powershell
+.\mvnw.cmd '-Dtest=ReferenceRangeRequestTest,TestParameterServiceTest' test
+.\mvnw.cmd '-Dtest=ReferenceRangeTest,LaboratoryFoundationTest,ResultDraftTest,ResultPublicationTest,MigrationLineageTest' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+The full suite is also deferred; changed migration-count/cleanup expectations
+across older suites remain unexecuted. V27 application and concurrency behavior
+require execution evidence before marking this task DONE. No clinical ranges,
+automatic matching or result population are seeded or enabled.
+
 ## Admin Patients account-link status verification (2026-11-09)
 
 Status: DONE for the scoped implementation and focused acceptance in

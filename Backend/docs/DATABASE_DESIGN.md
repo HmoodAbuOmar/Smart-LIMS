@@ -1039,3 +1039,34 @@ original chartValue/comparator semantics. Existing trend grouping loads the owne
 numeric history before limiting; large-history performance remains unbenchmarked.
 Existing FK/current-result indexes are reused. No writers, locks, lifecycle
 changes, popularity tracking or notifications storage are introduced.
+
+## Configured reference range slice (CAT-RANGE-01, 2026-11-09)
+
+Additive V27__reference_ranges.sql creates exactly one table, reference_ranges,
+with UUID identity, retained parameter_id FK to test_parameters, exact
+MALE/FEMALE/ANY applicability, nullable integer min_age_days/max_age_days,
+NUMERIC(38,12) lower_limit/upper_limit, nullable DATE valid_from/valid_to and
+UTC created_at. Checks enforce nonnegative ages, nonempty bounded half-open
+age/date intervals, supported applicability, finite numeric limits, at least
+one numeric limit and lower <= upper. Index (parameter_id,applicability) supports
+overlap lookup and (parameter_id,created_at,id) supports stable paging. No seeds,
+extension requirement, result FK, snapshot backfill or change to V1–V26.
+
+Both nested IDs and NUMERIC type are verified in the service. Creates take the
+existing LabTestRepository.findForUpdate parent lock BEFORE parameter lookup,
+overlap query and insert; explicit READ_COMMITTED isolation ensures a waiting
+create's overlap query sees its predecessor's committed insert. All configuration
+writers use this path, including when there are no existing ranges. Parameter
+updates use the same parent lock and reject NUMERIC→TEXT while ranges exist.
+No order lock is acquired, preserving existing order→catalog lock ordering.
+Overlap is an intersection in both half-open age and date dimensions, scoped
+to parameter and exact applicability, including expired configurations.
+The scalar checks/FK are database constraints; overlap/type checks are service
+invariants coordinated by the shared row lock (direct SQL bypass is not an API).
+No database extension or speculative patient matching rule is introduced.
+
+API/date classification: [LAB_TESTS_API.md](LAB_TESTS_API.md#configured-reference-ranges--cat-range-01-2026-11-09).
+Only storage/create/list are enabled; older “automatic reference_ranges deferred”
+statements continue to apply to matching/flags/population. Existing manual
+result_values references and immutable published snapshots remain authoritative.
+Migration/test execution and deployment are unverified for this slice.

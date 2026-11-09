@@ -74,6 +74,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests/{testId}/parameters").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests/{testId}/parameters").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{testId}/parameters/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/lab-tests/{testId}/parameters/{parameterId}/reference-ranges").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/lab-tests/{testId}/parameters/{parameterId}/reference-ranges").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")

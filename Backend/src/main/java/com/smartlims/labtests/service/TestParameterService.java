@@ -28,13 +28,15 @@ public class TestParameterService {
     private final LabTestRepository tests;
     private final TestParameterRepository parameters;
     private final ResultValueRepository values;
+    private final ReferenceRangeRepository ranges;
     private final EntityManager entities;
 
-    public TestParameterService(LaboratoryAccess access, LabTestRepository tests, TestParameterRepository parameters, ResultValueRepository values, EntityManager entities) {
+    public TestParameterService(LaboratoryAccess access, LabTestRepository tests, TestParameterRepository parameters, ResultValueRepository values, ReferenceRangeRepository ranges, EntityManager entities) {
         this.access = access;
         this.tests = tests;
         this.parameters = parameters;
         this.values = values;
+        this.ranges = ranges;
         this.entities = entities;
     }
 
@@ -59,6 +61,8 @@ public class TestParameterService {
         var type = TestParameter.ValueType.valueOf(body.resultType());
         if (key != null && values.existsByParameter_Id(key) && (!Objects.equals(p.getName(), body.name()) || p.getResultType() != type || !Objects.equals(p.getUnit(), body.unit()) || !Objects.equals(p.getMethod(), body.method()) || p.getDisplayOrder() != body.displayOrder() || p.isRequired() != body.required()))
             throw LaboratoryException.conflict("PARAMETER_IN_USE");
+        if (key != null && type != TestParameter.ValueType.NUMERIC && ranges.existsByParameter_Id(key))
+            throw LaboratoryException.conflict("PARAMETER_HAS_REFERENCE_RANGES");
         p.setName(body.name());
         p.setResultType(type);
         p.setUnit(body.unit());

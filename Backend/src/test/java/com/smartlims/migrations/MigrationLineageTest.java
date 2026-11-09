@@ -301,6 +301,28 @@ class MigrationLineageTest {
     }
 
     @Test
+    void referenceRangesUpgradeAddsOneEmptyTableAndRetainsAllDataIncludingPublishedSnapshots() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "26").migrate();
+        execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
+        var before = data(url);
+        var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "27");
+        assertEquals(1, current.info().pending().length);
+        assertEquals("V27__reference_ranges.sql", current.info().pending()[0].getScript());
+        String sql = resource("/db/migration/V27__reference_ranges.sql");
+        assertEquals(1, Pattern.compile("(?im)^CREATE TABLE\\s+").matcher(sql).results().count());
+        assertFalse(Pattern.compile("(?im)^INSERT\\s").matcher(sql).find());
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        var after = data(url);
+        assertEquals(List.of(), after.remove("reference_ranges"));
+        assertEquals(before, after);
+        assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=26 ORDER BY installed_rank"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+    }
+
+    @Test
     void lastLoginUpgradePreservesExistingAccountsAndHistoryWithoutFabricatedLogins() throws Exception {
         String url = database();
         migration(url, SPLIT, "25").migrate();

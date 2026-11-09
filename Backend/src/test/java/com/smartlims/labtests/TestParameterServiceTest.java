@@ -4,6 +4,7 @@ import com.smartlims.labtests.entity.LabTest;
 import com.smartlims.labtests.entity.TestParameter;
 import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.repository.TestParameterRepository;
+import com.smartlims.labtests.repository.ReferenceRangeRepository;
 import com.smartlims.labtests.service.TestParameterService;
 import com.smartlims.laboratory.dto.LaboratoryQuery;
 import com.smartlims.laboratory.service.LaboratoryAccess;
@@ -33,7 +34,7 @@ class TestParameterServiceTest {
     private final LabTestRepository tests = mock(LabTestRepository.class);
     private final TestParameterRepository parameters = mock(TestParameterRepository.class);
     private final ResultValueRepository values = mock(ResultValueRepository.class);
-    private final TestParameterService service = new TestParameterService(access, tests, parameters, values, mock(EntityManager.class));
+    private final TestParameterService service = new TestParameterService(access, tests, parameters, values, mock(ReferenceRangeRepository.class), mock(EntityManager.class));
     private final Authentication actor = mock(Authentication.class);
     private final UUID testId = UUID.randomUUID();
 
