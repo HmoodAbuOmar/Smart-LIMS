@@ -1,0 +1,72 @@
+.history-sample-note { font-size: 12px; margin-block: 0 20px !important; }
+.patient-portal .portal-sidebar { overflow-y: auto; overscroll-behavior: contain; }
+.patient-portal .history-visit h2 { letter-spacing: normal; font-weight: 500; }
+.history-filters { display: grid; grid-template-columns: minmax(180px, 1.5fr) repeat(4, minmax(120px, 1fr)) auto; align-items: end; gap: 14px; margin-block: 24px; }
+.history-timeline { display: grid; gap: 22px; border-inline-start: 2px solid var(--medical-border-light); padding-inline-start: 25px; }
+.history-visit { position: relative; }
+.history-visit::before { content: ''; position: absolute; inset-inline-start: -32px; top: 36px; width: 12px; height: 12px; background: var(--medical-green); border: 3px solid #edf6f3; border-radius: 50%; box-sizing: content-box; }
+.history-visit > header { display: flex; align-items: center; gap: 14px; }
+.history-visit > header h2, .history-visit > header p { margin: 0; }
+.history-visit > header .portal-status { margin-inline-start: auto; }
+.history-visit-summary { margin-block: 20px; }
+.history-visit-summary > div { display: flex; flex-wrap: wrap; gap: 12px 30px; font-size: 12px; }
+.history-expand { gap: 12px; }
+.history-expand[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.history-visit-references { display: flex; flex-wrap: wrap; gap: 15px 35px; margin-block: 25px; }
+.history-visit-references dt { font-size: 11px; color: var(--portal-muted); }
+.history-visit-references dd { margin: 5px 0 0; }
+.history-report-section { margin-block: 25px; }
+.history-report-section .portal-card-heading { flex-wrap: wrap; }
+.status-critical { color: #842d2b; background: #f5d8d5; }
+.status-unclassified { color: var(--medical-secondary); background: #e7eeeb; }
+.history-trends-card, .history-dashboard-card { background: linear-gradient(135deg, var(--medical-deep), #105c56); color: var(--medical-mint); border-radius: 15px; border: 1px solid #28716a; }
+.history-trends-card { padding: 26px; box-shadow: 0 8px 28px #083f3d12; }
+.history-trends-heading { display: flex; align-items: start; gap: 15px; justify-content: space-between; }
+.patient-portal .history-trends-card h2, .patient-portal .history-trends-card p { color: var(--medical-mint); }
+.history-trends-heading h2 { margin-block-end: 6px; font-weight: 500; letter-spacing: normal; }
+.history-trends-controls { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(120px, .7fr); gap: 18px; margin-block: 22px; }
+.history-trends-controls label { color: var(--medical-mint); font-weight: 400; }
+.history-trends-controls select { font-size: 12px; }
+.history-latest { display: grid; gap: 4px; margin-block: 25px; }
+.history-latest > span { font-size: 12px; color: #c3dfd7; }
+.history-latest > strong { display: flex; gap: 12px; align-items: baseline; font-size: 38px; line-height: 1.4; font-weight: 500; }
+.history-latest small { font-size: 14px; font-weight: 400; }
+.history-chart { width: 100%; min-width: 0; }
+.history-chart > svg { display: block; width: 100%; height: auto; overflow: visible; }
+.history-chart text { fill: #b9d8d0; font-size: 11px; font-family: inherit; }
+.history-chart-grid { stroke: #d9eee925; stroke-width: 1; }
+.history-chart-line { fill: none; stroke: #75d7c4; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.history-chart-point { stroke: #9aecd9; stroke-width: 2; fill: var(--medical-deep); cursor: pointer; }
+.history-chart-point:focus { outline: none; stroke: #fff; stroke-width: 4; }
+.history-chart-tooltip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 13px 16px; border: 1px solid #d9eee930; background: #ffffff0a; border-radius: 9px; margin-block: 14px; font-size: 11px; }
+.history-chart-tooltip strong { font-weight: 500; }
+.history-chart-tooltip button { background: transparent; color: var(--medical-mint); font-size: inherit; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+.history-chart-empty { padding: 35px 15px; text-align: center; }
+.history-trend-statistics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid #d9eee926; padding-block-start: 20px; margin-block-start: 20px; gap: 18px; }
+.history-trend-statistics > div { display: grid; gap: 8px; }
+.history-trend-statistics span { font-size: 11px; color: #c3dfd7; }
+.history-trend-statistics strong { font-size: 16px; font-weight: 500; }
+.patient-portal .history-comparison-note { font-size: 11px; margin-block: 22px 0; color: #c3dfd7; }
+.history-understanding { margin-block: 22px; }
+.history-measurements { margin-block: 22px; }
+.history-understanding > a { display: block; width: fit-content; margin-block: 18px; color: var(--medical-green); text-decoration: underline; text-underline-offset: 3px; }
+.history-disclaimer { border-top: 1px solid var(--portal-line); padding-block-start: 18px; margin-block-start: 20px !important; font-size: 12px; }
+.history-dashboard-card { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 30px; width: 100%; padding: 24px; margin-block: 22px; text-align: start; }
+.history-dashboard-card > div:first-child { display: grid; gap: 9px; }
+.history-dashboard-card strong { font-size: 20px; font-weight: 500; }
+.history-dashboard-card span { font-size: 12px; }
+.history-preview-label, .history-dashboard-card > div > span:last-child { display: flex; align-items: center; gap: 9px; }
+.history-dashboard-card .history-chart-point { cursor: inherit; }
+@media (max-width: 1200px) { .history-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 650px) {
+  .history-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .history-filters > :first-child { grid-column: 1 / -1; }
+  .history-trends-controls { grid-template-columns: minmax(0, 1fr); }
+  .history-trends-card { padding: 20px 15px; }
+  .history-trend-statistics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .history-timeline { padding-inline-start: 16px; }
+  .history-visit::before { inset-inline-start: -23px; }
+  .history-visit > header { flex-wrap: wrap; }
+  .history-visit > header h2 { font-size: 14px; }
+  .history-dashboard-card { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+}

@@ -1,0 +1,11 @@
+/* Verification-only hierarchy; the approved split card remains unchanged. */
+.email-verification-card { padding-block: 12px; }
+.email-verification-icon { display: grid; place-items: center; width: 68px; height: 68px; margin-block-end: 26px; border: 1px solid var(--medical-border-light); border-radius: 22px; color: var(--medical-green); background: var(--medical-mint); box-shadow: 0 8px 24px #083f3d08; }
+.patient-auth .email-verification-card h1 { margin-block: 0 18px; }
+.patient-auth .email-verification-address { margin-block: 18px 0; color: var(--medical-deep); font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.patient-auth .email-verification-status { margin-block: 24px; color: var(--medical-green); font-size: 12px; }
+.email-verification-error { display: block; margin-block: 0 18px; }
+.patient-auth .email-verification-card form { margin-block-start: 0; }
+.patient-auth .email-verification-helper { margin-block: 16px 0; font-size: 12px; line-height: 1.8; }
+.email-verification-card .auth-switch { margin-block-start: 24px; }
+@media (max-width: 520px) { .email-verification-icon { width: 60px; height: 60px; margin-block-end: 22px; } }

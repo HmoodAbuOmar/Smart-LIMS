@@ -1,0 +1,68 @@
+/* An illustrative workspace, isolated from authentication and real records. */
+.product-showcase {
+  background: var(--color-navy);
+  border-block: 1px solid var(--border-dark);
+}
+main .product-showcase > .container.section { width: min(1040px, calc(100% - 48px)); min-width: 0; padding-block: clamp(40px, 4vw, 56px); }
+main .product-showcase .section-heading { margin-block-end: 22px; }
+main .product-showcase .section-heading h2 { font-size: clamp(20.8px, 2vw, 27.2px); margin-block: 0 10px; }
+main .product-showcase .section-heading > p { max-width: 64ch; margin-inline: auto; font-size: clamp(12.6px, 1.008vw, 13.5px); }
+.showcase-workspace {
+  min-width: 0;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--lp-preview-radius, 14px);
+  background: var(--surface-deep-green);
+  box-shadow: var(--lp-card-shadow);
+}
+.showcase-chrome { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border-dark); }
+.showcase-brand { display: flex; align-items: center; gap: 11px; }
+.showcase-mark { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; color: var(--color-mint); background: var(--color-emerald); border: 1px solid var(--border-dark); border-radius: 10px; }
+.showcase-brand strong { display: block; font-size: 15px; font-weight: var(--weight-ui); line-height: 1.4; }
+.showcase-preview-label { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--border-dark); border-radius: 6px; color: var(--color-mint); font-size: 11px; line-height: 1.6; }
+.showcase-tabs { display: flex; gap: 6px; padding: 8px 20px; border-bottom: 1px solid var(--border-dark); }
+.showcase-tabs button { display: flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; padding: 8px 14px; min-height: 40px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--color-muted-green); font-size: 13px; line-height: 1.6; font-weight: var(--weight-ui); transition: background var(--lp-motion-time), border-color var(--lp-motion-time), color var(--lp-motion-time); }
+.showcase-tabs button:hover { background: var(--surface-card); color: var(--text-on-dark); }
+.showcase-tabs button[aria-selected='true'] { background: var(--color-emerald); border-color: var(--lp-card-highlight); color: var(--text-on-dark); }
+.showcase-tabs button:focus-visible, .showcase-table-scroll:focus-visible, .showcase-panel:focus-visible { outline: 2px solid var(--color-turquoise); outline-offset: 3px; }
+.showcase-panel { min-width: 0; padding: 18px 20px; border-radius: 5px; }
+.showcase-panel:not([hidden]) { animation: showcase-enter 180ms ease-out both; }
+.showcase-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 16px; }
+.showcase-panel-heading > div { min-width: 0; }
+.showcase-panel-heading h3 { font-size: 17px; font-weight: var(--weight-ui); line-height: var(--lp-leading-heading); }
+.showcase-record-count { flex-shrink: 0; font-size: 11px; line-height: 1.7; color: var(--color-muted-green); }
+.showcase-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; border: 1px solid var(--border-dark); border-radius: 9px; scrollbar-color: var(--color-emerald) var(--color-navy); scrollbar-width: thin; }
+.showcase-table-scroll table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; text-align: start; }
+.showcase-table-scroll th, .showcase-table-scroll td { padding: 12px 14px; text-align: start; font-size: 13px; line-height: 1.7; overflow-wrap: break-word; }
+.showcase-table-scroll thead { color: var(--color-muted-green); background: color-mix(in srgb, var(--color-navy) 55%, var(--surface-deep-green)); }
+.showcase-table-scroll thead th { font-size: 11px; font-weight: var(--weight-ui); }
+.showcase-table-scroll tbody tr { border-top: 1px solid var(--border-dark); transition: background var(--lp-motion-time); }
+.showcase-table-scroll tbody tr:hover { background: var(--surface-card); }
+.showcase-table-scroll tbody th { font-weight: var(--weight-medium); }
+.showcase-record-id { color: var(--color-mint); font-variant-numeric: tabular-nums; letter-spacing: .025em; }
+.product-showcase .showcase-collection-date { display: block; color: var(--color-muted-green); font-size: 11px; line-height: 1.7; margin-block-start: 3px; }
+.showcase-status { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; background: var(--color-navy); border: 1px solid var(--border-dark); border-radius: 5px; color: var(--color-muted-green); font-size: 11px; line-height: 1.6; }
+.showcase-status.is-complete { background: var(--color-emerald); color: var(--text-on-dark); }
+.showcase-disclaimer { display: flex; align-items: flex-start; gap: 9px; padding: 12px 20px; border-top: 1px solid var(--border-dark); color: var(--color-muted-green); }
+.showcase-disclaimer > svg { margin-top: 3px; }
+.showcase-disclaimer p { font-size: 11px; line-height: 1.8; }
+.showcase-disclaimer strong { font-weight: var(--weight-ui); color: var(--color-mint); }
+@keyframes showcase-enter { from { opacity: .5; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 580px) {
+  main .product-showcase > .container.section { width: calc(100% - 32px); }
+  .showcase-chrome, .showcase-panel { padding: 14px; }
+  .showcase-tabs { padding: 10px; gap: 4px; }
+  .showcase-tabs button { flex: 1; padding: 9px 7px; gap: 6px; font-size: 12px; }
+  .showcase-tabs button svg { width: 16px; height: 16px; }
+  .showcase-panel-heading { align-items: flex-start; flex-direction: column; gap: 9px; margin-bottom: 14px; }
+  .showcase-disclaimer { padding: 12px 14px; }
+  .showcase-preview-label { font-size: 10px; }
+  .showcase-table-scroll th, .showcase-table-scroll td { padding: 10px 7px; font-size: 12px; }
+  .showcase-table-scroll th:first-child { width: 26%; }
+  .showcase-table-scroll th:last-child { width: 35%; }
+  .showcase-status { gap: 4px; padding: 4px 5px; overflow-wrap: anywhere; }
+  .showcase-status svg { flex-shrink: 0; width: 12px; height: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .showcase-panel:not([hidden]) { animation: none; }
+  .showcase-tabs button, .showcase-table-scroll tbody tr { transition: none; }
+}

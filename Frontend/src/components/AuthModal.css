@@ -1,0 +1,178 @@
+﻿/* Split authentication composition. All decoration is CSS; only the logo is an image. */
+.auth-nav-button { background: transparent; padding: 0; text-align: start; }
+.navigation .auth-nav-button { font-size: inherit; color: var(--color-mint); }
+.patient-auth { min-height: 100svh; color-scheme: light; color: var(--medical-deep); background: linear-gradient(135deg, #edf6f2, var(--medical-mint)); --muted: var(--medical-secondary); }
+main.auth-content { display: grid; place-items: center; min-height: 100svh; padding: 36px 16px; background: transparent; overflow: visible; }
+.auth-card { position: relative; width: min(100%, 1000px); min-width: 0; border: 1px solid var(--medical-border-light); border-radius: 28px; background: var(--medical-off-white); box-shadow: 0 24px 80px #083f3d20, 0 0 12px #23a99a12; }
+.auth-layout { display: grid; grid-template-columns: .85fr 1.15fr; min-height: 620px; border-radius: 27px; overflow: hidden; }
+.auth-branding { position: relative; isolation: isolate; display: flex; flex-direction: column; padding: 42px 32px 34px; overflow: hidden; color: var(--medical-mint); background: linear-gradient(155deg, var(--medical-deep) 35%, var(--medical-green)); }
+.auth-brand-tools { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 14px; z-index: 2; }
+.auth-branding > .language-switcher { position: absolute; left: 30px; bottom: 30px; right: auto; z-index: 2; margin: 0; background: transparent; border-color: #d9eee926; box-shadow: none; backdrop-filter: none; filter: none; }
+.auth-branding .language-switcher__segment:not([aria-pressed='true']) { color: var(--medical-white); }
+/* Offset the PNG's 220px transparent left inset without affecting vertical alignment. */
+.auth-logo-link { display: inline-flex; align-items: center; translate: -12.401353% 0; }
+@media (min-width: 761px) {
+  .auth-logo-link { transform: translateY(var(--auth-logo-heading-offset, 0px)); }
+}
+.patient-auth .auth-logo { display: block; width: 170px; max-width: 100%; height: auto; object-fit: contain; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+/* The official PNG has genuine alpha transparency; this preserves its silhouette. */
+.auth-branding .auth-logo { filter: brightness(0) invert(1); }
+.auth-brand-tools > a { min-width: 0; }
+.auth-brand-copy { position: relative; z-index: 1; margin-block: auto; padding-block: 130px 65px; padding-inline-end: 66px; }
+.auth-brand-rule { display: block; width: 38px; height: 2px; margin-block-end: 24px; background: var(--medical-fresh); box-shadow: 0 0 10px #23a99a40; }
+.patient-auth .auth-brand-copy p { color: var(--medical-mint); font-size: clamp(24px, 2.7vw, 30px); line-height: 1.55; text-wrap: balance; }
+/* Five deliberate light features cover the panel; the text region stays dim. */
+@property --auth-ribbon-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.auth-light-ribbons {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+  mask-image: linear-gradient(180deg, #000 0% 24%, #0009 38%, #0006 47% 76%, #000 88%);
+}
+.auth-light-ribbons::before {
+  content: ''; position: absolute; inset: -10%;
+  background: radial-gradient(ellipse at 10% 12%, #23a99a30, transparent 37%), radial-gradient(ellipse at 94% 83%, #23a99a25, transparent 35%);
+  animation: auth-ambient-drift 12s ease-in-out infinite alternate;
+}
+.auth-light-ribbons span {
+  position: absolute; border-radius: 48% 60% 44% 58%;
+  transform: rotate(var(--ribbon-tilt, -28deg)); filter: drop-shadow(0 0 5px #23a99a65);
+  animation: auth-ribbon-drift var(--ribbon-duration, 9s) ease-in-out var(--ribbon-delay, -3s) infinite alternate;
+}
+.auth-light-ribbons span::before, .auth-light-ribbons span::after {
+  content: ''; position: absolute; inset: 0; padding: var(--ribbon-width, 3px); border-radius: inherit;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+}
+.auth-light-ribbons span::before {
+  background: linear-gradient(120deg, #23a99a10 8%, #23a99ab0 35%, #83e9e5c0 52%, #23a99a90 70%, #23a99a20);
+  opacity: var(--ribbon-opacity, .85);
+  animation: auth-ribbon-breathe var(--ribbon-duration, 9s) ease-in-out var(--ribbon-delay, -3s) infinite alternate;
+}
+.auth-light-ribbons span::after {
+  padding: 2px;
+  background: conic-gradient(from var(--auth-ribbon-angle), transparent 0deg 235deg, #23a99a55 272deg, #b6f5efed 300deg, #51d8ce80 320deg, transparent 345deg);
+  animation: auth-ribbon-flow var(--ribbon-duration, 9s) linear var(--ribbon-delay, -3s) infinite;
+}
+/* Upper-left arc, upper-right streak, middle-left trail, lower-left ribbon, lower-right accent. */
+.auth-light-ribbons span:nth-child(1) { left: -44%; top: -16%; width: 93%; height: 38%; --ribbon-tilt: -32deg; --ribbon-duration: 9s; --ribbon-delay: -4s; }
+.auth-light-ribbons span:nth-child(2) { right: -27%; top: 19%; width: 76%; height: 11%; --ribbon-tilt: -38deg; --ribbon-duration: 11s; --ribbon-delay: -8s; --ribbon-width: 2px; --ribbon-opacity: .7; }
+.auth-light-ribbons span:nth-child(3) { left: -67%; top: 28%; width: 95%; height: 37%; --ribbon-tilt: 22deg; --ribbon-duration: 8s; --ribbon-delay: -2s; --ribbon-width: 4px; }
+.auth-light-ribbons span:nth-child(4) { left: -35%; bottom: -15%; width: 117%; height: 34%; --ribbon-tilt: 24deg; --ribbon-duration: 12s; --ribbon-delay: -6s; --ribbon-width: 4px; --ribbon-opacity: .9; }
+.auth-light-ribbons span:nth-child(5) { right: -34%; bottom: 10%; width: 62%; height: 15%; --ribbon-tilt: -36deg; --ribbon-duration: 10s; --ribbon-delay: -7s; --ribbon-width: 2px; --ribbon-opacity: .6; }
+/* Edge tabs belong to the card, outside the clipped decorative layer. */
+.auth-tabs {
+  position: absolute; z-index: 5; isolation: isolate; overflow: visible;
+  top: 210px; inset-inline-start: calc(42.5% - 112px);
+  display: grid; grid-template-columns: 112px; grid-template-rows: 44px 44px; gap: 16px;
+}
+.auth-tabs::before {
+  content: ''; position: absolute; z-index: 0; inset-block-start: 0; inset-inline-start: 0; width: 112px; height: 44px;
+  border-start-start-radius: 999px; border-end-start-radius: 999px;
+  background: var(--medical-off-white);
+  transition: inset-block-start .35s ease, inset-inline-start .35s ease;
+}
+.auth-tabs[data-mode='signup']::before { inset-block-start: 60px; }
+.auth-tabs a {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 112px; padding: 10px 12px; border: 1px solid transparent;
+  border-start-start-radius: 999px; border-end-start-radius: 999px; text-align: center; white-space: nowrap; font-size: 12px; font-weight: 600;
+  color: var(--medical-mint); background: transparent; transition: color .3s ease, background .3s ease, box-shadow .3s ease;
+}
+.auth-tabs a:hover { background: #d9eee914; }
+.auth-tabs a[aria-current='page'] { color: var(--medical-deep); background: transparent; }
+.auth-tabs a[aria-current='page']::before,
+.auth-tabs a[aria-current='page']::after {
+  content: ''; position: absolute; inset-inline-end: -1px; width: 14px; height: 14px; pointer-events: none;
+  background: radial-gradient(circle at top left, transparent 13.5px, var(--medical-off-white) 14px);
+}
+.auth-tabs a[aria-current='page']::before { inset-block-start: -15px; }
+.auth-tabs a[aria-current='page']::after { inset-block-end: -15px; transform: scaleY(-1); }
+.auth-tabs:dir(rtl) a[aria-current='page']::before,
+.auth-tabs:dir(rtl) a[aria-current='page']::after {
+  background: radial-gradient(circle at top right, transparent 13.5px, var(--medical-off-white) 14px);
+}
+.auth-tabs a:focus-visible { outline: 2px solid var(--medical-fresh); outline-offset: 2px; }
+/* Existing boundary clearance remains unchanged. */
+.auth-brand-copy { padding-inline-end: 78px; }
+.auth-form-panel { min-width: 0; padding: 44px 40px 36px; padding-inline-start: 78px; background: var(--medical-off-white); }
+.patient-auth .eyebrow { color: var(--medical-green); font-size: 11px; font-weight: 600; letter-spacing: .08em; }
+.patient-auth h1 { font-size: clamp(26px, 3vw, 34px); line-height: 1.3; margin-block: 14px 10px; letter-spacing: -.025em; color: var(--medical-deep); text-wrap: balance; }
+.patient-auth p { color: var(--medical-secondary); font-size: 13px; line-height: 1.8; }
+.patient-auth form { display: grid; gap: 17px; margin-block-start: 24px; }
+.patient-auth .registration-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.registration-wide { grid-column: 1 / -1; }
+.auth-field { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.auth-field label { color: var(--medical-deep); font-size: 12px; font-weight: 600; }
+.auth-field :is(input, select) { width: 100%; min-width: 0; padding: 12px 13px; border: 1px solid #a8cfc7; border-radius: 12px; background: #edf5f2; color: var(--medical-deep); font-size: 14px; transition: border-color .2s, box-shadow .2s; }
+.auth-field input::placeholder { color: var(--medical-secondary); opacity: .8; }
+.auth-field :is(input, select):focus { outline: 0; border-color: var(--medical-fresh); box-shadow: 0 0 0 3px #23a99a20; }
+.auth-field :is(input, select)[aria-invalid='true'] { border-color: #a44439; }
+.auth-field small { font-size: 11px; line-height: 1.7; color: var(--medical-secondary); }
+.auth-password { position: relative; }
+.auth-password input { padding-inline-end: 44px; }
+.auth-password-toggle { position: absolute; inset-inline-end: 5px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--medical-green); background: transparent; }
+.auth-password-toggle:hover { background: var(--medical-mint); }
+.auth-error { font-size: 12px; line-height: 1.7; color: #963b32; }
+.patient-auth .auth-submit { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 46px; padding: 12px 16px; border: 1px solid var(--button-primary-bg); border-radius: 12px; font-size: 13px; line-height: 1.6; text-align: center; }
+
+.patient-auth :is(.auth-submit, .auth-secondary):disabled { cursor: not-allowed; opacity: .65; }
+.auth-notice { margin-block-start: 22px; padding: 12px 14px; border: 1px solid var(--medical-border-light); border-inline-start: 3px solid var(--medical-fresh); border-radius: 10px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; line-height: 1.8; }
+.patient-auth .auth-supporting { font-size: 12px; margin-block-start: 16px; }
+.auth-switch { display: inline-block; margin-block-start: 20px; border: 0; padding: 0; background: transparent; color: var(--medical-green); font-size: 12px; line-height: 1.8; text-decoration: underline; text-underline-offset: 4px; }
+.patient-auth .registration-success { border: 1px solid var(--medical-border-light); border-radius: 12px; padding: 12px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; }
+.auth-secondary { display: inline-block; margin-block-start: 16px; padding: 11px 15px; border: 1px solid #a8cfc7; border-radius: 10px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; line-height: 1.7; }
+.workflow-preview-nav { padding-block-end: 14px; margin-block-end: 22px; border-bottom: 1px solid var(--medical-border-light); }
+.workflow-preview-nav summary { cursor: pointer; color: var(--medical-green); font-size: 11px; font-weight: 600; }
+.workflow-preview-nav[open] > :not(summary) { display: block; margin-block-start: 8px; }
+.workflow-preview-nav label { color: var(--medical-green); font-size: 11px; font-weight: 600; }
+.workflow-preview-nav select { width: 100%; min-width: 0; padding: 9px 12px; border: 1px solid var(--medical-border-light); border-radius: 9px; color: var(--medical-deep); background: var(--medical-mint); font-size: 12px; }
+.workflow-preview-nav small { color: var(--medical-secondary); font-size: 11px; line-height: 1.6; }
+.workflow-next { margin-block-start: 24px; }
+.workflow-choices { display: grid; gap: 16px; margin-block-start: 26px; }
+.workflow-choice { display: grid; gap: 8px; padding: 20px; border: 1px solid #a8cfc7; border-radius: 14px; background: #edf5f2; color: var(--medical-deep); text-align: start; transition: border-color .2s, background .2s; }
+.workflow-choice:hover { border-color: var(--medical-fresh); background: var(--medical-mint); }
+.workflow-choice strong { font-size: 14px; }
+.workflow-choice span { font-size: 12px; line-height: 1.7; color: var(--medical-secondary); }
+.workflow-contract { min-width: 0; padding: 18px; border: 1px solid var(--medical-border-light); border-radius: 12px; }
+.workflow-contract legend { font-size: 12px; color: var(--medical-deep); }
+.patient-auth :is(button, a, select):focus-visible { outline: 2px solid var(--medical-fresh); outline-offset: 3px; }
+.patient-auth h1:focus { outline: none; }
+.patient-auth:dir(rtl) .auth-submit svg { transform: rotate(180deg); }
+.auth-skip { position: fixed; top: -100px; inset-inline-start: 16px; padding: 12px; background: var(--medical-mint); z-index: 10; }
+.auth-skip:focus { top: 10px; }
+@property --patient-auth-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.auth-card::before { content: ''; position: absolute; z-index: 1; inset: -1px; padding: 1px; border-radius: inherit; pointer-events: none; background: conic-gradient(from var(--patient-auth-angle), transparent 65%, #23a99a90 80%, transparent 95%); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; animation: patient-auth-border 10s linear infinite; }
+@keyframes patient-auth-border { to { --patient-auth-angle: 360deg; } }
+@keyframes auth-ribbon-flow { to { --auth-ribbon-angle: 360deg; } }
+@keyframes auth-ribbon-drift { to { transform: translateY(5px) rotate(calc(var(--ribbon-tilt, 18deg) + 2deg)); } }
+@keyframes auth-ambient-drift { to { transform: translate(4%, 3%); opacity: .65; } }
+@keyframes auth-ribbon-breathe { from { opacity: var(--ribbon-opacity, .9); } to { opacity: calc(var(--ribbon-opacity, .9) * .7); } }
+@media (max-width: 760px) {
+  main.auth-content { padding: 20px 12px; }
+  .auth-card { max-width: 550px; display: grid; }
+  .auth-layout { display: contents; }
+  .auth-branding { padding: 24px; }
+  .auth-brand-copy { padding-block: 24px; }
+  .patient-auth .auth-brand-copy p { font-size: 19px; }
+  .auth-brand-rule { display: none; }
+  .auth-brand-copy { padding-inline-end: 0; }
+  .auth-branding { padding-block-end: 80px; }
+  .auth-light-ribbons { opacity: .65; }
+  .auth-branding { grid-area: 1 / 1; border-radius: 27px 27px 0 0; }
+  .auth-form-panel { grid-area: 2 / 1; border-radius: 0 0 27px 27px; }
+  .auth-form-panel { padding-inline-start: 40px; }
+  .auth-tabs { position: relative; grid-area: 1 / 1; align-self: end; justify-self: center; width: min(280px, calc(100% - 48px)); margin: 0 24px; inset: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 44px; gap: 6px; }
+  .auth-tabs::before { width: calc((100% - 6px) / 2); inset-block-start: 0; border-radius: 20px 20px 0 0; }
+  .auth-tabs[data-mode='signup']::before { inset-block-start: 0; inset-inline-start: calc(50% + 3px); }
+  .auth-tabs a, .auth-tabs a[aria-current='page'] { width: 100%; }
+  .auth-tabs a { border-radius: 20px 20px 0 0; }
+  .auth-tabs a[aria-current='page']::before, .auth-tabs a[aria-current='page']::after { display: none; }
+
+}
+@media (max-width: 520px) {
+  .patient-auth .registration-form { grid-template-columns: minmax(0, 1fr); }
+  .auth-field :is(input, select) { font-size: 16px; }
+  .auth-form-panel { padding: 28px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-card::before, .auth-light-ribbons::before, .auth-light-ribbons span, .auth-light-ribbons span::before, .auth-light-ribbons span::after { animation: none; }
+  .auth-light-ribbons span::after { opacity: .35; }
+  .patient-auth *, .patient-auth *::before { transition: none; }
+}

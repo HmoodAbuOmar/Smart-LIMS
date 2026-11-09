@@ -1,0 +1,28 @@
+/* Stage 5: stronger icons with a faint outlined shield, not a certification. */
+main .security-inner { padding-block: var(--lp-section-space); gap: clamp(36px, 6vw, 88px); }
+main .security-copy h2 { margin-block: 16px 22px; }
+main .security-copy > p { max-width: 44ch; }
+main .security-features { gap: 28px; }
+main .security-feature { gap: 18px; align-items: flex-start; }
+main .security-feature > span { width: 52px; height: 52px; border-radius: 12px; }
+main .security-feature > span svg { width: 25px; height: 25px; stroke-width: 1.8; }
+main .security-feature h3 { margin-block: 2px 9px; font-size: 16px; font-weight: var(--weight-ui); line-height: var(--lp-leading-heading); }
+main .security-feature p { max-width: 38ch; }
+main .security-section::after {
+  width: clamp(190px, 23vw, 290px);
+  height: 320px;
+  top: 50%;
+  inset-inline-start: calc(50% - 145px);
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--color-turquoise);
+  opacity: .045;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 140'%3E%3Cpath d='M60 8 108 28v38c0 31-24 53-48 66C36 119 12 97 12 66V28Z' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='m38 68 15 15 31-33' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 580px) {
+  main .security-feature { gap: 15px; }
+  main .security-feature > span { width: 46px; height: 46px; }
+  main .security-section::after { opacity: .025; }
+}

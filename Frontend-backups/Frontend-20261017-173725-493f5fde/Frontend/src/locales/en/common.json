@@ -1,0 +1,26 @@
+{
+  "navigation": {
+    "home": "Home",
+    "howItWorks": "How It Works",
+    "userRoles": "User Roles",
+    "insights": "Health Insights",
+    "security": "Security",
+    "vision": "Our Vision"
+  },
+  "home": "Home",
+  "features": "Features",
+  "howItWorks": "How it works",
+  "security": "Security",
+  "login": "Login",
+  "loginSupport": "Login support",
+  "getStarted": "Get started",
+  "mainNavigation": "Main navigation",
+  "openMenu": "Open menu",
+  "closeMenu": "Close menu",
+  "close": "Close",
+  "homeLabel": "Smart-LIMS home",
+  "language": "Language",
+  "switchToArabic": "Switch to Arabic",
+  "switchToEnglish": "Switch to English",
+  "loginSubject": "Smart-LIMS login access"
+}

@@ -1,0 +1,36 @@
+/* Stage 1: shared scale, scoped to landing-page content, never auth or navbar. */
+main .section { padding-block: var(--lp-section-space); }
+main .section-heading { margin-block-end: var(--lp-content-gap); }
+main .section-heading h2,
+.platform-section .section-heading h2,
+main .insights-copy h2,
+main .security-copy h2,
+main .testimonial-copy h2 {
+  font-size: var(--lp-type-section);
+  font-weight: var(--weight-heading);
+  line-height: var(--lp-leading-heading);
+  letter-spacing: var(--lp-tracking-heading);
+  text-wrap: balance;
+}
+main :is(.section-heading, .step-card, .role-card, .insights-copy, .security-copy, .final-cta) > p,
+main .security-feature p {
+  font-size: var(--lp-type-body);
+  font-weight: var(--weight-body);
+  line-height: var(--lp-leading-body);
+  text-wrap: pretty;
+}
+main .section-heading h2 { margin-block: 14px; }
+.platform-section .section-heading h2 { margin-block: 0; }
+main .eyebrow { font-size: var(--lp-type-label); line-height: 1.8; }
+main .text-link { font-size: 13px; line-height: 1.7; }
+main .tech-hero__description { font-size: clamp(14px, 1.12vw, 16px); line-height: var(--lp-leading-body); }
+main .tech-hero__title { font-weight: var(--weight-heading); }
+main:lang(ar) :is(h1, h2, h3, p, blockquote, li) {
+  overflow-wrap: break-word;
+  word-break: normal;
+  letter-spacing: normal;
+}
+main .trust-inner > span, main .trust-inner > div { font-size: var(--lp-type-small); }
+@media (max-width: 580px) {
+  main .trust-inner > span, main .trust-inner > div { font-size: var(--lp-type-label); }
+}

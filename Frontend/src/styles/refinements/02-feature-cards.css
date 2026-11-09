@@ -1,0 +1,29 @@
+/* Stage 2: three existing workflow cards, with a quieter shared interaction. */
+main .steps-grid { gap: var(--lp-card-gap); align-items: stretch; }
+main .step-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--lp-card-padding);
+  box-shadow: none;
+  transition: transform var(--lp-motion-time), border-color var(--lp-motion-time), box-shadow var(--lp-motion-time), background var(--lp-motion-time);
+}
+main .step-top { margin-block-end: 24px; }
+main .step-card .icon-box { width: 48px; height: 48px; flex-shrink: 0; }
+main .step-card .icon-box svg { width: 24px; height: 24px; stroke-width: 1.8; }
+main .step-card h3 {
+  margin-block-end: 12px;
+  font-size: var(--lp-type-card);
+  font-weight: var(--weight-ui);
+  line-height: var(--lp-leading-heading);
+  letter-spacing: var(--lp-tracking-heading);
+}
+main .step-card p { flex-grow: 1; }
+main .step-detail { margin-block-start: 24px; padding-block-start: 18px; font-size: var(--lp-type-small); line-height: 1.65; }
+main .step-card:hover { transform: translateY(calc(-1 * var(--lp-motion-distance))); border-color: var(--lp-card-highlight); box-shadow: var(--lp-card-shadow); }
+@media (max-width: 700px) {
+  main .steps-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  main .step-card:hover { transform: none; }
+}

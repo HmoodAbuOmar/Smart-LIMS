@@ -1,0 +1,58 @@
+/* Navbar-only refinements; preserve the original header sizes and auth buttons. */
+html { scroll-padding-block-start: calc(var(--navbar-height, 94px) + 12px); }
+.site-header .nav-inner { column-gap: 16px; }
+.site-header .navigation { gap: clamp(12px, 1.15vw, 19px); flex-shrink: 0; }
+.site-header .nav-actions { flex-shrink: 0; }
+.site-header .navigation a { position: relative; white-space: nowrap; }
+.site-header .navigation a::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: -9px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-turquoise);
+  opacity: 0;
+  transform: scaleX(.45);
+  transition: opacity .2s, transform .2s;
+}
+.site-header .navigation a[aria-current='location'] { color: var(--color-turquoise); }
+.site-header .navigation a[aria-current='location']::after { opacity: .85; transform: scaleX(1); }
+
+/* Six links stay on one row on full desktops; tablets retain the mobile menu. */
+@media (min-width: 981px) and (max-width: 1199px) {
+  .site-header .navigation {
+    display: none;
+    position: absolute;
+    top: 93px;
+    inset-inline: 0;
+    padding: 24px;
+    background: var(--color-navy);
+    border-bottom: 1px solid var(--border-dark);
+    box-shadow: var(--shadow-soft);
+    flex-direction: column;
+    gap: 22px;
+    font-size: 14px;
+  }
+  .site-header .navigation.is-open { display: flex; }
+  .site-header .menu-toggle { display: grid; place-items: center; padding: 5px; background: transparent; }
+  .site-header .mobile-contact { display: block; }
+  .site-header .login-link { display: none; }
+  .site-header .nav-actions { margin-inline-start: auto; }
+}
+@media (max-width: 1199px) {
+  .site-header .navigation {
+    max-height: calc(100svh - var(--navbar-height, 94px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 22px;
+  }
+  .site-header .navigation a { align-self: flex-start; }
+}
+@media (max-width: 580px) {
+  .site-header .nav-inner { column-gap: 8px; }
+  .language-switcher { margin-inline-start: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header .navigation a::after { transition: none; }
+}

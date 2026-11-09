@@ -1,0 +1,19 @@
+/* Stage 7: the original CTA, with deliberate breathing room and a clearer action. */
+main .final-cta-section { display: flow-root; padding-block: 52px 24px; }
+main .final-cta { margin-block-start: 0; margin-block-end: 0; scroll-margin-block-start: 12px; padding: clamp(24px, 2.3vw, 32px) clamp(22px, 4vw, 48px); }
+main .final-cta h2 { margin-block: 10px; font-size: clamp(24.3px, 2.43vw, 34.2px); font-weight: var(--weight-heading); line-height: 1.25; letter-spacing: var(--lp-tracking-heading); text-wrap: balance; }
+main .final-cta p { margin-block-end: 18px; font-size: clamp(14px, 1.05vw, 15px); line-height: 1.7; }
+main .final-cta .button { min-height: 46px; border-radius: var(--lp-control-radius); padding: 10px 22px; gap: 14px; font-size: 14px; font-weight: var(--weight-ui); line-height: 1.6; transition: transform var(--lp-motion-time), box-shadow var(--lp-motion-time), background var(--lp-motion-time); }
+main .final-cta .button:hover { transform: translateY(-2px); box-shadow: var(--lp-card-shadow); }
+main .cta-footnote { margin-block-start: 10px; font-size: var(--lp-type-small); line-height: 1.65; }
+:root:lang(ar) main .final-cta h2 { line-height: 1.45; }
+main .cta-decoration { opacity: .035; }
+@media (max-width: 800px) {
+  main .final-cta-section { padding-block-start: 44px; }
+}
+@media (max-width: 580px) {
+  main .final-cta-section { padding-block: 36px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  main .final-cta .button:hover { transform: none; }
+}

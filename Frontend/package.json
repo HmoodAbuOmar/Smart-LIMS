@@ -6,14 +6,35 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "lint": "oxlint",
+    "test:i18n": "node scripts/check-localization.mjs",
+    "test:auth": "node scripts/check-auth.mjs",
+    "preview": "vite preview",
+    "test:portal": "node scripts/check-portal-model.mjs",
+    "test:portal:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:booking": "node scripts/check-booking-model.mjs",
+    "test:booking:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:history": "node scripts/check-history-model.mjs",
+    "test:history:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:patient-facing": "node scripts/check-patient-facing.mjs",
+    "test:patient-facing:browser": "node scripts/check-patient-facing-browser.mjs",
+    "test:walkthrough:browser": "node scripts/check-development-preview.mjs",
+    "test:restored-data:browser": "node scripts/check-restored-data.mjs",
+    "test:health-charts:browser": "node scripts/check-health-charts.mjs",
+    "test:hosted-payment": "node scripts/check-hosted-payment.mjs"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "i18next": "^26.4.7",
+    "lucide-react": "^1.59.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.20"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^5.1.0",
-    "vite": "^7.2.0"
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "vite": "^8.3.0"
   }
 }

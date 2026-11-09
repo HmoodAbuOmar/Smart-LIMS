@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "title": "Smart-LIMS — Every sample. Every result. One clear picture.",
+    "description": "Smart-LIMS connects patients, laboratory teams, samples, and results. Discover a clearer approach to laboratory care."
+  },
+  "hero": {
+    "eyebrow": "THE NEXT CHAPTER IN LABORATORY CARE",
+    "title1": "Every Sample.",
+    "title2": "Every Result.",
+    "title3": "One Smart System.",
+    "description": "From the first sample to the final result, we make every step smarter, every test more accurate, and every experience more seamless. Because better care begins with a smarter laboratory.",
+    "seeHow": "See how it works",
+    "privacy": "Built around your privacy.",
+    "designedForYou": "Designed around you.",
+    "imageLabel": "PRECISION MEETS POSSIBILITY",
+    "imageAlt": "3D LIMS blood sample tube surrounded by luminous cyan molecular strands",
+    "caption1": "Behind every sample,",
+    "caption2": "there’s a person.",
+    "waiting": "A little less waiting.",
+    "peaceOfMind": "A lot more peace of mind.",
+    "connected": "Care, connected.",
+    "exploreFeatures": "Explore Features"
+  },
+  "trust": {
+    "intro": "Thoughtfully built for",
+    "everySide": "every side of care.",
+    "patients": "Patient-first experiences",
+    "labs": "Connected laboratories",
+    "privacy": "Privacy by design",
+    "insights": "Meaningful insights"
+  },
+  "steps": {
+    "eyebrow": "A SIMPLER PATH TO ANSWERS",
+    "title": "Good care should feel effortless.",
+    "description": "Three connected steps. One reassuring experience.",
+    "book": {
+      "title": "Book with confidence.",
+      "text": "Find the right test and choose a time that works for you. A simpler start to better care.",
+      "detail": "Your schedule. Your peace of mind."
+    },
+    "track": {
+      "title": "Follow your sample.",
+      "text": "From collection to analysis, know where your sample is and what happens next.",
+      "detail": "Clarity at every step."
+    },
+    "results": {
+      "title": "Receive reviewed results.",
+      "text": "Access clear, professionally reviewed reports, securely and all in one place.",
+      "detail": "Answers you can understand."
+    }
+  },
+  "platform": {
+    "title": "One Platform. Limitless Possibilities.",
+    "description": "Four specialized interfaces working in harmony, connecting every step of the laboratory workflow and transforming daily operations into a more efficient and accurate experience."
+  },
+  "roles": {
+    "patient": {
+      "name": "For patients",
+      "title": "Your health, in your hands.",
+      "text": "Book tests, follow your samples, and understand your results with a personal health dashboard.",
+      "tag1": "Easy appointments",
+      "tag2": "Result history"
+    },
+    "admin": {
+      "name": "For administrators",
+      "title": "The bigger picture. In focus.",
+      "text": "Bring your people, workflows, and lab performance together in one organized workspace.",
+      "tag1": "Team management",
+      "tag2": "Lab analytics"
+    },
+    "reception": {
+      "name": "For receptionists",
+      "title": "A smoother welcome.",
+      "text": "Keep appointments, patient registration, and daily coordination flowing effortlessly.",
+      "tag1": "Patient registration",
+      "tag2": "Smart scheduling"
+    },
+    "technician": {
+      "name": "For lab technicians",
+      "title": "More precision. Less friction.",
+      "text": "Manage samples, record findings, and move results through review with confidence.",
+      "tag1": "Sample tracking",
+      "tag2": "Result review"
+    }
+  },
+  "insights": {
+    "eyebrow": "HEALTH INSIGHTS, MADE HUMAN",
+    "title1": "Beyond a number.",
+    "title2": "See your story.",
+    "description": "A single result is a moment. Your health is a journey. Bring your results together to see trends, understand changes, and have more informed conversations with your care team.",
+    "check1": "Your results, organized over time",
+    "check2": "Clear visuals. Meaningful context.",
+    "check3": "A better starting point for your next conversation",
+    "discover": "Discover a clearer view"
+  },
+  "chart": {
+    "eyebrow": "YOUR HEALTH AT A GLANCE",
+    "title": "A little progress. A bigger picture.",
+    "metricLabel": "Health metric",
+    "periodLabel": "Chart time range",
+    "metrics": {
+      "glucose": "Glucose",
+      "cholesterol": "Cholesterol"
+    },
+    "periods": {
+      "six": "6 months",
+      "twelve": "12 months"
+    },
+    "unit": "mg/dL",
+    "trend": "{{value}} from first test",
+    "accessible": "Illustrative {{metric}} trend over {{period}}: {{values}} milligrams per deciliter",
+    "illustrative": "Illustrative health data",
+    "note": "For a clearer conversation, not a diagnosis."
+  },
+  "months": {
+    "Jan": "Jan",
+    "Feb": "Feb",
+    "Mar": "Mar",
+    "Apr": "Apr",
+    "May": "May",
+    "Jun": "Jun",
+    "Jul": "Jul",
+    "Sep": "Sep",
+    "Nov": "Nov"
+  },
+  "security": {
+    "eyebrow": "TRUST IS PART OF THE TREATMENT",
+    "title1": "Care deserves a",
+    "title2": "stronger foundation.",
+    "description": "Health information is personal. We believe the way it’s handled should reflect that, with thoughtful safeguards at every step.",
+    "contact": "Let’s talk about security",
+    "private": {
+      "title": "Private by design",
+      "text": "Protecting sensitive information is central to the experience."
+    },
+    "access": {
+      "title": "The right access. For the right people.",
+      "text": "Role-based workspaces keep responsibilities clearly defined."
+    },
+    "accountability": {
+      "title": "Accountability at every step",
+      "text": "Connected workflows support careful review and confident care."
+    }
+  },
+  "testimonial": {
+    "imageAlt": "Medical professional in a bright clinical environment",
+    "eyebrow": "Behind the Laboratory Scenes",
+    "title1": "Behind Every Accurate Result,",
+    "title2": "a Smarter System.",
+    "quote": "Accuracy doesn't begin when results are released. It starts with every step that comes before. From sample reception to report approval, intelligent organization makes a difference in laboratory workflow quality.",
+    "person": "Smart-LIMS Vision for the Future of Laboratory Work"
+  },
+  "cta": {
+    "eyebrow": "A CLEARER WAY FORWARD",
+    "title1": "Clear answers.",
+    "title2": "Better care begins here.",
+    "description": "Bring your laboratory, your team, and your patients closer.",
+    "button": "Get started with Smart-LIMS",
+    "footnote": "A thoughtful platform. A more connected experience."
+  },
+  "footer": {
+    "tagline1": "Connecting every step.",
+    "tagline2": "Caring for every detail.",
+    "explore": "Explore",
+    "features": "Platform features",
+    "trust": "Built on trust",
+    "security": "Security & privacy",
+    "insights": "Health insights",
+    "connect": "Let’s connect",
+    "future": "A clearer future for laboratory care.",
+    "partOfYours": "We’d love to be part of yours.",
+    "copyright": "© {{year}} Smart-LIMS. All rights reserved.",
+    "designed": "Thoughtfully designed. Human at heart."
+  }
+}
