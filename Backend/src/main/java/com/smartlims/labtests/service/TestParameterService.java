@@ -72,7 +72,7 @@ public class TestParameterService {
     }
 
     @Transactional(readOnly = true)
-    public LaboratoryQuery.PageBody<TestParameterResponse> list(Authentication actor, String testId, LaboratoryQuery query) {
+    public LaboratoryQuery.PageBody<TestParameterListResponse> list(Authentication actor, String testId, LaboratoryQuery query) {
         access.current(actor, Role.ADMIN, Role.RECEPTIONIST, Role.LAB_TECHNICIAN);
         var id = LaboratoryInput.uuid(testId, "testId");
         boolean all = query.bool("includeInactive");
@@ -80,6 +80,10 @@ public class TestParameterService {
             throw LaboratoryException.missing("LAB_TEST");
         Specification<TestParameter> spec = (r, q, c) -> c.and(c.equal(r.get("labTest").get("id"), id), all ? c.conjunction() : c.isTrue(r.get("active")));
         var page = query.find(parameters, spec, Sort.by("displayOrder", "code", "id"));
-        return LaboratoryQuery.page(page, page.getContent().stream().map(TestParameterResponse::from).toList());
+        Set<UUID> usedIds = page.hasContent()
+                ? values.findUsedParameterIds(page.getContent().stream().map(TestParameter::getId).toList())
+                : Set.of();
+        return LaboratoryQuery.page(page, page.getContent().stream()
+                .map(p -> TestParameterListResponse.from(p, usedIds.contains(p.getId()))).toList());
     }
 }
