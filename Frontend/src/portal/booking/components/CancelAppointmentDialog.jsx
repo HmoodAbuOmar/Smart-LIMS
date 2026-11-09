@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Button } from './PortalUi.jsx'
-import { usePortal } from '../PortalContext.js'
+import { Button } from '../../components/PortalUi.jsx'
+import { usePortal } from '../../PortalContext.js'
 
 export default function ConfirmDialog({ onClose, onConfirm, busy }) {
   const { t } = usePortal(), dialog = useRef(null)

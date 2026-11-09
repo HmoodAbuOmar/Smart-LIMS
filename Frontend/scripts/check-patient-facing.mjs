@@ -41,7 +41,7 @@ try {
   const { default: i18n } = await server.ssrLoadModule('/src/i18n.js')
   const { default: App } = await server.ssrLoadModule('/src/App.jsx')
   const { default: PatientPortal } = await server.ssrLoadModule('/src/portal/PatientPortal.jsx')
-  const { BookingReceipt } = await server.ssrLoadModule('/src/portal/BookingFlow.jsx')
+  const { BookingReceipt } = await server.ssrLoadModule('/src/portal/booking/BookingFlow.jsx')
   const ui = { Title: ({ title }) => createElement('h1', null, i18n.t(title, { ns: 'portal' })), Button: ({ children }) => createElement('button', null, children), Empty: ({ title }) => createElement('p', null, i18n.t(title, { ns: 'portal' })) }
   for (const language of ['ar', 'en']) {
     await i18n.changeLanguage(language)

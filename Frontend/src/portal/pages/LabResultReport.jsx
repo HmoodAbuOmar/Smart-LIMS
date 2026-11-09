@@ -1,6 +1,6 @@
 import { ArrowLeft, Printer } from 'lucide-react'
 import BrandLogo from '../../components/BrandLogo.jsx'
-import { visitForResult } from '../historyModel.js'
+import { visitForResult } from '../history/historyModel.js'
 import ReportDownload from '../components/ReportDownload.jsx'
 import { Title, Button, VisitLink, Status, Empty } from '../components/PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'

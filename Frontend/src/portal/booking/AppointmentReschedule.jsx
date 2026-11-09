@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { dateAtOffset, timeSlots, validSlot } from '../portalModel.js'
-import CalendarPicker from '../components/CalendarPicker.jsx'
+import CalendarPicker from './components/CalendarPicker.jsx'
 import { Title, Button, Empty, Field } from '../components/PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'
 

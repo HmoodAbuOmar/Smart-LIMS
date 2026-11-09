@@ -1,4 +1,4 @@
-import { visitForOrder } from '../historyModel.js'
+import { visitForOrder } from '../history/historyModel.js'
 import { Button, VisitLink, Status } from './PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'
 

@@ -1,5 +1,5 @@
 import { ArrowLeft, Check } from 'lucide-react'
-import { visitForOrder } from '../historyModel.js'
+import { visitForOrder } from '../history/historyModel.js'
 import { Title, Button, VisitLink, Status, Empty } from '../components/PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'
 

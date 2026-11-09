@@ -3,7 +3,7 @@ import OrderTable from '../components/OrderTable.jsx'
 import ResultList from '../components/ResultList.jsx'
 import { Button, Status, Empty, Card } from '../components/PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'
-import { HealthTrendsPreview } from '../MedicalHistory.jsx'
+import { HealthTrendsPreview } from '../history/MedicalHistory.jsx'
 
 export default function Dashboard() {
   const api = usePortal()

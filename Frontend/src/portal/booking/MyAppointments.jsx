@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { visitForAppointment } from '../historyModel.js'
-import ConfirmDialog from '../components/CancelAppointmentDialog.jsx'
+import { visitForAppointment } from '../history/historyModel.js'
+import ConfirmDialog from './components/CancelAppointmentDialog.jsx'
 import { Title, Button, VisitLink, Status, Empty, FilterTabs } from '../components/PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'
 

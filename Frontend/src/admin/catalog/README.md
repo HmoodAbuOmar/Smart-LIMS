@@ -40,10 +40,10 @@ Checks from `Frontend`:
 ```powershell
 npm.cmd run build
 npm.cmd run lint
-node src/admin/check-catalog-model.mjs
-node src/admin/check-catalog-browser.mjs
-node src/admin/check-patients-model.mjs
-node src/admin/check-patients-management-browser.mjs
+node src/admin/catalog/check-catalog-model.mjs
+node src/admin/catalog/check-catalog-browser.mjs
+node src/admin/patients/check-patients-model.mjs
+node src/admin/patients/check-patients-management-browser.mjs
 node scripts/check-preview-build.mjs
 ```
 

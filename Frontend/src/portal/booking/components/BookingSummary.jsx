@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { totalPrice } from '../portalModel.js'
+import { totalPrice } from '../../portalModel.js'
 import { selectedBookingTests } from '../bookingModel.js'
 
 export default function BookingSummary({ api, draft, ui, removable = false, finalReview = false }) {

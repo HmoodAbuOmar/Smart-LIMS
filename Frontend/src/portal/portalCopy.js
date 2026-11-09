@@ -1,6 +1,6 @@
 // Bundled portal copy uses the same i18next language state as authentication.
-import { bookingResources } from './bookingCopy.js'
-import { historyResources } from './historyCopy.js'
+import { bookingResources } from './booking/bookingCopy.js'
+import { historyResources } from './history/historyCopy.js'
 const pairs = {
   dashboard: ['Dashboard', 'لوحة المريض'], profile: ['My Profile', 'ملفي الشخصي'], tests: ['Tests Catalog', 'كتالوج الفحوصات'], orders: ['My Orders', 'طلباتي'], appointments: ['My Appointments', 'مواعيدي'], results: ['My Results', 'نتائجي'], notifications: ['Notifications', 'الإشعارات'],
   sample: ["Patient portal","بوابة المريض"], sampleReport: ["Laboratory report","تقرير الفحوصات المخبرية"],

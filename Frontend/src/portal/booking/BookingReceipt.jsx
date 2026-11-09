@@ -1,6 +1,6 @@
 import { CheckCircle2, Clock } from 'lucide-react'
 import { totalPrice } from '../portalModel.js'
-import { checkoutDraft } from '../bookingModel.js'
+import { checkoutDraft } from './bookingModel.js'
 
 export default function BookingReceipt({ api, ui, id, details = false }) {
   const { state, t, navigate, money, date, local, dispatch, name } = api

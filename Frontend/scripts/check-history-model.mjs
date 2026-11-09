@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { medicalVisits, measurementSeries, measurementsInRange, numericResult, resultFlag, trendStatistics } from '../src/portal/historyModel.js'
+import { medicalVisits, measurementSeries, measurementsInRange, numericResult, resultFlag, trendStatistics } from '../src/portal/history/historyModel.js'
 const now = new Date('2026-10-26T12:00:00')
 const row = { name: ['Hemoglobin', 'Hb'], biomarkerId: 'hemoglobin', value: '12.4', unit: 'g/dL', methodId: 'photometry', specimen: 'blood', reference: { low: 12, high: 16, unit: 'g/dL' } }
 const state = { profile: { fileNumber: 'P1' }, orders: [], appointments: [], results: [] }

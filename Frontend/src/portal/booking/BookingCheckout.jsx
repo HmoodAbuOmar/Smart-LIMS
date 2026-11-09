@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { dateAtOffset, timeSlots, validSlot } from '../portalModel.js'
-import { bookingDraftError, checkoutDraft, selectedBookingTests } from '../bookingModel.js'
-import BookingSummary from '../components/BookingSummary.jsx'
-import BookingDialog from '../components/BookingDialog.jsx'
+import { bookingDraftError, checkoutDraft, selectedBookingTests } from './bookingModel.js'
+import BookingSummary from './components/BookingSummary.jsx'
+import BookingDialog from './components/BookingDialog.jsx'
 
 export default function BookingCheckout({ api, ui, query }) {
   const { state, dispatch, t, navigate } = api

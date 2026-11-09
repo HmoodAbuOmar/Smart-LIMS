@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { portalReducer, dateAtOffset, todayValue } from '../src/portal/portalModel.js'
-import { bookingDraftError, selectedBookingTests } from '../src/portal/bookingModel.js'
+import { bookingDraftError, selectedBookingTests } from '../src/portal/booking/bookingModel.js'
 let date = dateAtOffset(3)
 if (new Date(`${date}T12:00:00`).getDay() === 5) date = dateAtOffset(4)
 const initial = { tests: [{ id: 'cbc', price: 25 }, { id: 'd', price: 20 }], cart: [], orders: [], appointments: [], notifications: [], profile: { name: 'Chosen Patient' } }

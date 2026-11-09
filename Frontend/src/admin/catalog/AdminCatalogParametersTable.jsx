@@ -1,5 +1,5 @@
 import { Check, Minus } from 'lucide-react'
-import { catalogName, catalogText } from '../adminCatalogModel.js'
+import { catalogName, catalogText } from './adminCatalogModel.js'
 import AdminCatalogParameterActions from './AdminCatalogParameterActions.jsx'
 
 const columns = ['orderColumn', 'code', 'name', 'typeColumn', 'unitColumn', 'methodColumn', 'required', 'active', 'actions']

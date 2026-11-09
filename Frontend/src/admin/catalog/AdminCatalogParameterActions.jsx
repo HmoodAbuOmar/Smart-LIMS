@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Ellipsis, Pencil, Power, Ruler } from 'lucide-react'
-import { catalogName } from '../adminCatalogModel.js'
+import { catalogName } from './adminCatalogModel.js'
 
 export default function AdminCatalogParameterActions({ parameter, language, copy, busy, onEdit, onToggle, onRanges }) {
   const [open, setOpen] = useState(false), [position, setPosition] = useState({ visibility: 'hidden' })

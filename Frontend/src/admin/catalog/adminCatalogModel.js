@@ -1,4 +1,4 @@
-import { todayValue } from './adminPatientsModel.js'
+import { todayValue } from '../patients/adminPatientsModel.js'
 export { todayValue }
 export const catalogName = (record, language) => record?.[language === 'ar' ? 'nameAr' : 'nameEn'] || ''
 export const catalogText = (record, field, language) => record?.[field + (language === 'ar' ? 'Ar' : 'En')] || ''

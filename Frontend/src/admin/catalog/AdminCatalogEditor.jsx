@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { catalogName, validateParameter, validateRange, validateTest } from '../adminCatalogModel.js'
+import { catalogName, validateParameter, validateRange, validateTest } from './adminCatalogModel.js'
 
 export default function AdminCatalogEditor({ kind, record, test, parameter, data, service, copy, language, onToggleLanguage, onSaved, onClose, inline = false, onDirtyChange, onBusyChange, onActiveChange, registerForm }) {
   const modal = kind !== 'test' && !inline

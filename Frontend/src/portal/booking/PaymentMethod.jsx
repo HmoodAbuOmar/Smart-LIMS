@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
 import { totalPrice } from '../portalModel.js'
-import BookingReceipt from './BookingConfirmation.jsx'
-import { bookingDraftError, checkoutDraft } from '../bookingModel.js'
+import BookingReceipt from './BookingReceipt.jsx'
+import { bookingDraftError, checkoutDraft } from './bookingModel.js'
 import { Building2, CreditCard } from 'lucide-react'
-import HostedCardForm from '../HostedCardForm.jsx'
+import HostedCardForm from './components/HostedCardForm.jsx'
 import { validReceiptEmail } from '../../services/hostedPayment.js'
-import BookingSummary from '../components/BookingSummary.jsx'
-import BookingDialog from '../components/BookingDialog.jsx'
+import BookingSummary from './components/BookingSummary.jsx'
+import BookingDialog from './components/BookingDialog.jsx'
 
 export default function PaymentMethod({ api, ui }) {
   const { state, t, dispatch, navigate, busy, finishBooking } = api

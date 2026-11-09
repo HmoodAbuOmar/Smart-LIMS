@@ -9,7 +9,7 @@ import react from '@vitejs/plugin-react'
 
 const temporary = mkdtempSync(join(tmpdir(), 'smart-lims-catalog-'))
 const profile = join(temporary, 'chrome')
-const server = await createServer({ configFile: false, root: fileURLToPath(new URL('../../', import.meta.url)), plugins: [react()], cacheDir: join(temporary, 'vite'), server: { host: '127.0.0.1', port: 0 } })
+const server = await createServer({ configFile: false, root: fileURLToPath(new URL('../../../', import.meta.url)), plugins: [react()], cacheDir: join(temporary, 'vite'), server: { host: '127.0.0.1', port: 0 } })
 let browser, socket
 const errors = []
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -168,6 +168,7 @@ try {
   assert.equal(await evaluate("document.querySelector('#catalog-range-lower')"),null)
   await input('#catalog-range-referenceEn','Reviewed'); await input('#catalog-range-referenceAr','تمت المراجعة')
   await click('.ac-form-range button[type=submit]'); await waitFor("document.querySelector('.ac-table-scroll tbody')?.textContent.includes('Reviewed')")
+  await waitFor("!document.querySelector('.ac-heading > button').disabled")
   await click('#catalog-tab-parameters'); await click('.ac-section-heading button')
   await input('#catalog-code','MEASURE-A'); await input('#catalog-nameEn','Extra measurement'); await input('#catalog-nameAr','قياس إضافي')
   await click('dialog .ac-form button[type=submit]'); await waitFor("document.querySelector('#catalog-error-parameter-code')")

@@ -47,8 +47,11 @@ Preview serves the built application; it does not enable the DEV walkthrough or 
 | `src/auth/` | Split-card account forms, email-link verification/resend, password recovery/reset, account API and access policy. |
 | `src/components/PatientOnboarding.jsx`, `PatientFileStateProvider.jsx` | Patient-file selection/creation/linking, access checks and in-memory creation draft. |
 | `src/portal/PatientPortal.jsx`, `PortalEntry.jsx` | Shared state/layout/sidebar/navigation and authenticated workspace loading. |
-| `src/portal/pages/` | Extracted catalog, order, result, profile, appointment, booking and payment pages. |
-| `src/portal/MedicalHistory.jsx` | Visit archive, compatible biomarker trends, measurement list and dashboard trend preview. |
+| `src/admin/patients/` | `AdminPatients.jsx` entry, patient form/avatar, scoped styles, model, local service, translations and feature checks. |
+| `src/admin/catalog/` | `AdminTestCatalog.jsx` entry, parameter/range editors, scoped styles, model, local service, translations and feature checks. |
+| `src/portal/booking/` | `BookingCheckout.jsx` entry, receipt, payment, review, appointments and rescheduling, plus booking components, styles, model and translations. `BookingFlow.jsx` retains the named exports. |
+| `src/portal/history/` | `MedicalHistory.jsx` entry, visit archive, biomarker trends, measurement list, dashboard preview, scoped styles, model and translations. |
+| `src/portal/pages/` | Other portal catalog, order, result, notification and profile pages. |
 | `src/portal/components/`, `PortalContext.js`, `*Model.js` | Reusable controls, tables, dialogs, report download, validation and state helpers. |
 | `src/services/` | Account, patient-file, workspace, booking and hosted-payment boundaries. |
 | `src/dev/` | Isolated walkthrough, fixture workspace and browser-test harnesses; not real authentication. |
@@ -57,6 +60,8 @@ Preview serves the built application; it does not enable the DEV walkthrough or 
 | `scripts/` | Committed Node/model/rendering/browser checks. |
 
 The logo is `public/images/smart-lims-logo.png`, shared through `BrandLogo.jsx`. Homepage chart measurements are illustrative marketing data, separate from the Medical History chart, which consumes the authorized patient workspace or isolated DEV fixtures. Homepage measurements are not actual patient records or clinical diagnoses.
+
+Feature folders own their specific components, copy and styles. Admin layout/navigation stay in `src/admin/components/`; portal layout, context and shared state stay in `src/portal/`. Shared transport/payment boundaries remain in `src/services/`, and account forms remain in `src/auth/`. Routes, permissions, persistence and data contracts are unchanged by this organization.
 
 ## Routes and journey
 

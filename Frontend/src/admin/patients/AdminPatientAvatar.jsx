@@ -1,5 +1,5 @@
 // Stable identity-based palette: independent of gender, search, and row order.
-import { patientAvatarTone, patientName } from '../adminPatientsModel.js'
+import { patientAvatarTone, patientName } from './adminPatientsModel.js'
 
 export default function AdminPatientAvatar({ patient, language, large = false }) {
   const parts = patientName(patient, language).trim().split(/\s+/)

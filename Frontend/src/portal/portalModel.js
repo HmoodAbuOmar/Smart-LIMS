@@ -1,4 +1,4 @@
-import { checkoutDraft, reduceCheckout } from './bookingModel.js'
+import { checkoutDraft, reduceCheckout } from './booking/bookingModel.js'
 
 export const todayValue = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 export function dateAtOffset(days, now = new Date()) { const date = new Date(now); date.setDate(date.getDate() + days); return todayValue(date) }

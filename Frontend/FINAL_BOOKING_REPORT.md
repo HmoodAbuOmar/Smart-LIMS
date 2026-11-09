@@ -63,7 +63,7 @@ still require those backend/provider integrations.
 
 ## Files changed
 
-- `src/portal/BookingFlow.jsx`, `bookingCopy.js`, `bookingModel.js`, `PatientPortal.jsx`
+- `src/portal/booking/BookingFlow.jsx`, `bookingCopy.js`, `bookingModel.js`, `PatientPortal.jsx`
 - `src/dev/DevelopmentPortal.jsx`, `portalWorkspace.js`, `PatientPreview.jsx`
 - `scripts/check-patient-facing.mjs`, `check-patient-facing-browser.mjs`,
   `check-restored-data.mjs`, `check-development-preview.mjs`

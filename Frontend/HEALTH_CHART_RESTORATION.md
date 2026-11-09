@@ -65,8 +65,8 @@ protected routes. Neither browser test submits data or modifies fixtures.
 
 - `src/App.jsx` — mount dedicated homepage chart; remove only its old inline state/markup.
 - `src/components/HomepageHealthChart.jsx` — new component recovered from backups.
-- `src/portal/MedicalHistory.jsx` — archive measurement list and test-specific empty selection.
-- `src/portal/MedicalHistory.css` — existing 22px spacing for the new list only.
+- `src/portal/history/MedicalHistory.jsx` — archive measurement list and test-specific empty selection.
+- `src/portal/history/MedicalHistory.css` — existing 22px spacing for the new list only.
 - `scripts/check-health-charts.mjs` — new bilingual/browser regression checks.
 - `package.json` — test command only.
 - `HEALTH_CHART_RESTORATION.md` — this report.

@@ -1,6 +1,6 @@
 # Hosted payment integration
 
-This guide describes the existing interfaces in [hostedPayment.js](src/services/hostedPayment.js), [HostedCardForm.jsx](src/portal/HostedCardForm.jsx), [PaymentMethod.jsx](src/portal/pages/PaymentMethod.jsx), and [PatientPortal.jsx](src/portal/PatientPortal.jsx). It does not select a processor, invent endpoints, or claim card processing is operational.
+This guide describes the existing interfaces in [hostedPayment.js](src/services/hostedPayment.js), [HostedCardForm.jsx](src/portal/booking/components/HostedCardForm.jsx), [PaymentMethod.jsx](src/portal/booking/PaymentMethod.jsx), and [PatientPortal.jsx](src/portal/PatientPortal.jsx). It does not select a processor, invent endpoints, or claim card processing is operational.
 
 ## Current behavior
 

@@ -92,7 +92,7 @@ integration and verified online payment success are not implemented or tested.
 
 ## Files changed
 
-Created: `src/portal/BookingFlow.jsx`, `BookingFlow.css`, `bookingModel.js`,
+Created: `src/portal/booking/BookingFlow.jsx`, `BookingFlow.css`, `bookingModel.js`,
 `bookingCopy.js`; `src/dev/bookingSimulator.js`; `scripts/check-booking-model.mjs`,
 `check-booking-flow.mjs`; this document.
 

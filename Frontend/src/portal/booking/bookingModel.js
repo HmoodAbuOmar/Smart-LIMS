@@ -1,4 +1,4 @@
-import { dateAtOffset, totalPrice, validSlot } from './portalModel.js'
+import { dateAtOffset, totalPrice, validSlot } from '../portalModel.js'
 
 export function checkoutDraft(state) {
   return state.checkout || { date: dateAtOffset(1), time: '', type: 'collection', orderId: '', method: '', stage: 'editing', requestId: null }

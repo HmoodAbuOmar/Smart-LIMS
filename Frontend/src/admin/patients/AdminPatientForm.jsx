@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { patientName, todayValue, validatePatient } from '../adminPatientsModel.js'
+import { patientName, todayValue, validatePatient } from './adminPatientsModel.js'
 import AdminPatientAvatar from './AdminPatientAvatar.jsx'
 
 export default function AdminPatientForm({ patient, language, onToggleLanguage, copy, service, onSaved, onClose }) {

@@ -133,7 +133,7 @@ retained. Inactive backups and historical build artifacts were not deleted.
 ## Changed frontend files
 
 Created: `src/components/BrandLogo.jsx`, `BrandLogo.css`;
-`src/portal/MedicalHistory.jsx`, `MedicalHistory.css`, `historyModel.js`,
+`src/portal/history/MedicalHistory.jsx`, `MedicalHistory.css`, `historyModel.js`,
 `historyCopy.js`; `src/dev/historySampleData.js`; `scripts/check-history-model.mjs`,
 `check-medical-history.mjs`; this document.
 

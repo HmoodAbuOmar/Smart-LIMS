@@ -36,8 +36,8 @@ Run from `Frontend`:
 npm.cmd run dev -- --host localhost --port 5173 --strictPort
 npm.cmd run build
 npm.cmd run lint
-node src/admin/check-patients-model.mjs
-node src/admin/check-patients-management-browser.mjs
+node src/admin/patients/check-patients-model.mjs
+node src/admin/patients/check-patients-management-browser.mjs
 ```
 
 The browser check starts its own temporary Vite server and headless Chrome, verifies

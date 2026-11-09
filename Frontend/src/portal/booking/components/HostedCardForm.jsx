@@ -1,6 +1,6 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
 import { LockKeyhole } from 'lucide-react'
-import { mountHostedPaymentFields, paymentReference } from '../services/hostedPayment.js'
+import { mountHostedPaymentFields, paymentReference } from '../../../services/hostedPayment.js'
 
 // Card values are never read, received as callbacks, or held in React state.
 // A configured processor owns every card input in cross-origin iframes.

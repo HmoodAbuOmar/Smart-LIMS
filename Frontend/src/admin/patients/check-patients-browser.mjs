@@ -9,7 +9,7 @@ import react from '@vitejs/plugin-react'
 
 const temporary = mkdtempSync(join(tmpdir(), 'smart-lims-patients-'))
 const profile = join(temporary, 'chrome')
-const server = await createServer({ configFile: false, root: fileURLToPath(new URL('../../', import.meta.url)), plugins: [react()], cacheDir: join(temporary, 'vite'), server: { host: '127.0.0.1', port: 0 } })
+const server = await createServer({ configFile: false, root: fileURLToPath(new URL('../../../', import.meta.url)), plugins: [react()], cacheDir: join(temporary, 'vite'), server: { host: '127.0.0.1', port: 0 } })
 let browser, socket, production
 const errors = []
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -112,7 +112,7 @@ try {
   assert.equal(await evaluate("document.querySelectorAll('.admin-patients tbody tr').length"), 7)
   // Every seeded record has a localized name; identity colors never use language.
   await input('.ap-pagination select', '25')
-  const seeded = await evaluate("import('/src/admin/adminPatientsService.js').then(({adminPatientsService:s}) => s.load()).then(data => data.patients)")
+  const seeded = await evaluate("import('/src/admin/patients/adminPatientsService.js').then(({adminPatientsService:s}) => s.load()).then(data => data.patients)")
   const readRows = () => evaluate("[...document.querySelectorAll('.admin-patients tbody tr')].map(row=>({file:row.querySelector('th bdi').textContent,name:row.querySelector('.ap-person > span:last-child').textContent,tone:row.querySelector('.ap-avatar').className,initials:row.querySelector('.ap-avatar').textContent}))")
   const englishRows = await readRows()
   assert.equal(englishRows.length, seeded.length)
@@ -169,7 +169,7 @@ try {
   assert.match(await evaluate("document.querySelector('#patient-error-dateOfBirth').textContent"), /future/)
   await input('#patient-dateOfBirth', '2000-01-02')
   // Inject a one-shot boundary failure; exercise UI recovery without backend calls.
-  await evaluate("import('/src/admin/adminPatientsService.js').then(({adminPatientsService:s}) => { const save=s.save; s.save=async()=>{s.save=save; throw new Error('simulated failure')}; })")
+  await evaluate("import('/src/admin/patients/adminPatientsService.js').then(({adminPatientsService:s}) => { const save=s.save; s.save=async()=>{s.save=save; throw new Error('simulated failure')}; })")
   await click('dialog button[type=submit]')
   await waitFor("!!document.querySelector('dialog .ap-error')")
   assert.equal(await evaluate("document.querySelector('#patient-nameEn').value"), 'Demo Added Patient')
@@ -242,20 +242,20 @@ try {
   await input('.ap-search input', 'Changed Patient Name')
   assert.equal(await evaluate("document.querySelectorAll('.admin-patients tbody tr').length"), 1)
   // One-shot load error and an empty dataset exercise both recovery states.
-  await evaluate("import('/src/admin/adminPatientsService.js').then(({adminPatientsService:s}) => { window.restorePatientLoad=s.load; s.load=async()=>{throw new Error('simulated load failure')}; })")
+  await evaluate("import('/src/admin/patients/adminPatientsService.js').then(({adminPatientsService:s}) => { window.restorePatientLoad=s.load; s.load=async()=>{throw new Error('simulated load failure')}; })")
   await evaluate("document.querySelector('.admin-navigation > button:first-of-type').click()")
   await evaluate("document.querySelector('.admin-navigation > button:nth-of-type(3)').click()")
   await waitFor("!!document.querySelector('.ap-empty [role=alert]')")
-  await evaluate("import('/src/admin/adminPatientsService.js').then(({adminPatientsService:s}) => { s.load=window.restorePatientLoad; })")
+  await evaluate("import('/src/admin/patients/adminPatientsService.js').then(({adminPatientsService:s}) => { s.load=window.restorePatientLoad; })")
   await click('.ap-empty button')
   await waitFor("!!document.querySelector('.ap-search')")
-  await evaluate("import('/src/admin/adminPatientsService.js').then(({adminPatientsService:s}) => { s.load=async()=>({patients:[],orders:[],appointments:[],transactions:[]}); })")
+  await evaluate("import('/src/admin/patients/adminPatientsService.js').then(({adminPatientsService:s}) => { s.load=async()=>({patients:[],orders:[],appointments:[],transactions:[]}); })")
   await evaluate("document.querySelector('.admin-navigation > button:first-of-type').click()")
   await evaluate("document.querySelector('.admin-navigation > button:nth-of-type(3)').click()")
   await waitFor("!!document.querySelector('.ap-search') && !document.querySelector('.admin-patients tbody tr')")
   assert.ok(await evaluate("document.querySelector('.ap-empty').textContent.length > 10"))
   // Exercise the actual built entry points: preview routes cannot expose Admin.
-  production = await preview({ root: fileURLToPath(new URL('../../', import.meta.url)), preview: { host: '127.0.0.1', port: 0, strictPort: false } })
+  production = await preview({ root: fileURLToPath(new URL('../../../', import.meta.url)), preview: { host: '127.0.0.1', port: 0, strictPort: false } })
   const productionUrl = `http://127.0.0.1:${production.httpServer.address().port}`
   for (const page of ['overview', 'users', 'patients']) {
     await send('Page.navigate', { url: `${productionUrl}/#/__admin/${page}` })

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
-import { dateAtOffset, todayValue } from '../portalModel.js'
-import { Field } from './PortalUi.jsx'
-import { usePortal } from '../PortalContext.js'
+import { dateAtOffset, todayValue } from '../../portalModel.js'
+import { Field } from '../../components/PortalUi.jsx'
+import { usePortal } from '../../PortalContext.js'
 
 export default function CalendarPicker({ value, onChange }) {
   const { t, language, number } = usePortal()

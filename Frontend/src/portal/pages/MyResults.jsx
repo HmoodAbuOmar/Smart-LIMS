@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { visitForResult } from '../historyModel.js'
+import { visitForResult } from '../history/historyModel.js'
 import ReportDownload from '../components/ReportDownload.jsx'
 import { Title, Button, VisitLink, Status, Empty, FilterTabs, Field } from '../components/PortalUi.jsx'
 import { usePortal } from '../PortalContext.js'
