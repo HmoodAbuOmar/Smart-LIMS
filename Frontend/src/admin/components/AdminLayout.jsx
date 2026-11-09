@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminSidebar from './AdminSidebar.jsx'
 import AdminNavbar from './AdminNavbar.jsx'
 import AdminOverview from './AdminOverview.jsx'
 import AdminUsers from './AdminUsers.jsx'
 import AdminPatients from './AdminPatients.jsx'
+import AdminTestCatalog from './AdminTestCatalog.jsx'
 import { adminCopy } from '../adminCopy.js'
 
 const languageKey = 'smart-lims.admin.language'
@@ -17,6 +18,8 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
   const [activeId, setActiveId] = useState(initialPage)
   const [mobileOpen, setMobileOpen] = useState(false)
   const menuButton = useRef(null)
+  const catalogGuard = useRef(null)
+  const registerCatalogGuard = useCallback(guard => { catalogGuard.current = guard }, [])
   const copy = adminCopy[language]
   const direction = language === 'ar' ? 'rtl' : 'ltr'
 
@@ -30,13 +33,13 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
     const previous = { lang: root.lang, dir: root.dir, title: document.title }
     root.lang = language
     root.dir = direction
-    document.title = 'Smart-LIMS | ' + (activeId === 'patients' ? copy.items.patients : copy.title)
+    document.title = 'Smart-LIMS | ' + (['patients', 'tests', 'parameters', 'referenceRanges'].includes(activeId) ? copy.items[activeId] : copy.title)
     return () => {
       root.lang = previous.lang
       root.dir = previous.dir
       document.title = previous.title
     }
-  }, [language, direction, copy.title, copy.items.patients, activeId])
+  }, [language, direction, copy.title, copy.items, activeId])
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 901px)')
@@ -49,7 +52,8 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
     setMobileOpen(false)
     menuButton.current?.focus()
   }
-  function navigate(id) {
+  function navigate(id, checked = false) {
+    if (!checked && catalogGuard.current) { catalogGuard.current(() => navigate(id, true)); return }
     // Preserve the existing selection flow; no API or new page routes are invented.
     setActiveId(id)
     if (mobileOpen) closeMenu()
@@ -68,6 +72,7 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
         {activeId === 'overview' && <AdminOverview language={language} />}
         {activeId === 'users' && <AdminUsers language={language} />}
         {activeId === 'patients' && <AdminPatients language={language} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
+        {['tests', 'parameters', 'referenceRanges'].includes(activeId) && <AdminTestCatalog language={language} activePage={activeId} registerNavigationGuard={registerCatalogGuard} onNavigate={id => navigate(id, true)} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
       </main>
     </div>
   )
