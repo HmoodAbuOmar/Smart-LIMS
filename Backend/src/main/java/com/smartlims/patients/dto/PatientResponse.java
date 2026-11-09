@@ -10,5 +10,5 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record PatientResponse(UUID id, String patientNumber, String fullName, LocalDate dateOfBirth,
                               PatientGender gender, String phoneNumber, String address, Instant createdAt,
-                              Instant updatedAt) {
+                              Instant updatedAt) implements PatientReadResponse {
 }

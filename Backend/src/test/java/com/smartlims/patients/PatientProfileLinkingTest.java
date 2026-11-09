@@ -189,11 +189,17 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
         assertFalse(raw.equals(persistedHash));
         assertEquals(actors.get(Role.RECEPTIONIST).getId(), jdbc.queryForObject("SELECT issued_by FROM patient_link_tokens", UUID.class));
         assertEquals(profile.id(), jdbc.queryForObject("SELECT patient_id FROM patient_link_tokens", UUID.class));
+        mvc.perform(bearer(get("/api/patients/" + profile.id()), Role.ADMIN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.linkStatus").value("UNLINKED"));
+        mvc.perform(bearer(get("/api/patients").param("linkStatus", "UNLINKED"), Role.ADMIN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
         assertEquals(Set.of("id", "token_hash", "patient_id", "issued_by", "expires_at", "consumed_at", "revoked_at"),
                 new HashSet<>(jdbc.queryForList("SELECT column_name FROM information_schema.columns "
                         + "WHERE table_name = 'patient_link_tokens'", String.class)));
         UserAccount before = users.findById(actors.get(Role.PATIENT).getId()).orElseThrow();
         JsonNode linked = response(mvc.perform(link(raw)).andExpect(status().isOk()).andReturn());
+        assertEquals(9, linked.size());
+        assertNull(linked.get("linkStatus"));
         assertEquals(profile.id().toString(), linked.get("id").asString());
         assertEquals(profile.patientNumber(), linked.get("patientNumber").asString());
         assertEquals(profile.createdAt(), Instant.parse(linked.get("createdAt").asString()));
@@ -206,6 +212,12 @@ class PatientProfileLinkingTest extends IsolatedPostgresTest {
         mvc.perform(bearer(get("/api/patients/me"), Role.PATIENT)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(profile.id().toString()));
         mvc.perform(bearer(get("/api/patients/" + profile.id()), Role.PATIENT)).andExpect(status().isOk());
+        mvc.perform(bearer(get("/api/patients/" + profile.id()), Role.RECEPTIONIST)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.linkStatus").value("LINKED"));
+        mvc.perform(bearer(get("/api/patients").param("linkStatus", "LINKED"), Role.ADMIN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(bearer(get("/api/patients").param("linkStatus", "UNLINKED"), Role.ADMIN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
         error(link(raw), 400, "INVALID_PATIENT_LINK_TOKEN");
         error(bearer(post("/api/patients/" + profile.id() + "/link-tokens"), Role.ADMIN), 409, "PATIENT_LINK_CONFLICT");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM patients", Integer.class));

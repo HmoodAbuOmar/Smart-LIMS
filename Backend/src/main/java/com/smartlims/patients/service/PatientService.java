@@ -163,7 +163,8 @@ public class PatientService {
         currentAccount(actor, false, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
         String[] sort = query.sort().split(",");
         Sort ordering = Sort.by(Sort.Direction.fromString(sort[1]), sort[0]).and(Sort.by("id"));
-        Specification<Patient> filter = PatientSpecifications.search(query.search());
+        Specification<Patient> filter = PatientSpecifications.search(query.search())
+                .and(PatientSpecifications.linkStatus(query.linkStatus()));
         PageRequest pageable = PageRequest.of(query.page(), query.size(), ordering);
         // JPA uses an integer offset; very distant empty pages can be answered from the count.
         if (pageable.getOffset() > Integer.MAX_VALUE) {
@@ -176,13 +177,13 @@ public class PatientService {
     }
 
     @Transactional(readOnly = true)
-    public PatientResponse get(Authentication actor, String id) {
+    public PatientReadResponse get(Authentication actor, String id) {
         UserAccount account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         UUID patientId = profileId(id);
         Patient patient = account.getRole() == Role.PATIENT
                 ? patients.findByIdAndUser_Id(patientId, account.getId()).orElseThrow(PatientNotFoundException::new)
                 : patients.findById(patientId).orElseThrow(PatientNotFoundException::new);
-        return mapper.toResponse(patient);
+        return account.getRole() == Role.PATIENT ? mapper.toResponse(patient) : mapper.toStaffResponse(patient);
     }
 
     @Transactional

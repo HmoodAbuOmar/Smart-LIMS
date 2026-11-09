@@ -76,7 +76,7 @@ public class PatientController {
     }
 
     @GetMapping("/{id}")
-    public PatientResponse get(@PathVariable String id, JwtAuthenticationToken authentication) {
+    public PatientReadResponse get(@PathVariable String id, JwtAuthenticationToken authentication) {
         return patients.get(authentication, id);
     }
 

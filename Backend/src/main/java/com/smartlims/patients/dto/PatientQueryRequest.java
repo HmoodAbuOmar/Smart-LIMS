@@ -14,12 +14,18 @@ public record PatientQueryRequest(
         @Size(max = 120) String search,
         @Min(0) int page,
         @Min(1) @Max(100) int size,
-        @NotNull @Pattern(regexp = SORT_PATTERN) String sort) {
+        @NotNull @Pattern(regexp = SORT_PATTERN) String sort,
+        @NotNull @Pattern(regexp = "ALL|LINKED|UNLINKED") String linkStatus) {
     private static final String SORT_PATTERN = "(patientNumber|fullName|dateOfBirth|createdAt|updatedAt),(asc|desc)";
+
+    public PatientQueryRequest(String search, int page, int size, String sort) {
+        this(search, page, size, sort, "ALL");
+    }
 
     public PatientQueryRequest {
         search = search == null ? "" : search.strip();
         sort = sort == null ? "createdAt,desc" : sort;
+        linkStatus = linkStatus == null ? "ALL" : linkStatus;
         // Guard construction as well as Bean Validation, preserving the existing query error messages.
         if (page < 0)
             throw new PatientValidationException("page");
@@ -29,6 +35,8 @@ public record PatientQueryRequest(
             throw new PatientValidationException("search");
         if (!sort.matches(SORT_PATTERN))
             throw new PatientValidationException("sort");
+        if (!linkStatus.matches("ALL|LINKED|UNLINKED"))
+            throw new PatientValidationException("linkStatus");
     }
 
     public static PatientQueryRequest fromQueryParameters(Map<String, List<String>> parameters) {
@@ -38,7 +46,11 @@ public record PatientQueryRequest(
         String search = single(parameters, "search", "").strip();
         if (search.length() > 120)
             throw new PatientValidationException("search");
-        return new PatientQueryRequest(search, page, size, single(parameters, "sort", "createdAt,desc"));
+        String sort = single(parameters, "sort", "createdAt,desc");
+        if (!sort.matches(SORT_PATTERN))
+            throw new PatientValidationException("sort");
+        return new PatientQueryRequest(search, page, size, sort,
+                single(parameters, "linkStatus", "ALL"));
     }
 
     private static String single(Map<String, List<String>> parameters, String field, String fallback) {

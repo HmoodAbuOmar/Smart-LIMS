@@ -156,7 +156,10 @@ class PatientSelfProfileTest extends IsolatedPostgresTest {
                 .andExpect(jsonPath("$.address").value(org.hamcrest.Matchers.nullValue())).andExpect(jsonPath("$.completionPercentage").value(100));
         assertEquals(accountBefore, jdbc.queryForMap("SELECT * FROM users WHERE id=?", accounts.get(Role.PATIENT).getId()));
         assertEquals(immutableBefore, jdbc.queryForMap("SELECT id,user_id,patient_number,created_by,created_at FROM patients WHERE id=?", own.id()));
-        assertEquals(foreign, service.get(actor(Role.ADMIN), foreign.id().toString()));
+        assertEquals(new StaffPatientResponse(foreign.id(), foreign.patientNumber(),
+                foreign.fullName(), foreign.dateOfBirth(), foreign.gender(), foreign.phoneNumber(), foreign.address(),
+                foreign.createdAt(), foreign.updatedAt(), PatientLinkStatus.UNLINKED),
+                service.get(actor(Role.ADMIN), foreign.id().toString()));
         assertEquals("Updated Patient", service.getMe(actor(Role.PATIENT)).fullName());
         verifyNoInteractions(email);
     }

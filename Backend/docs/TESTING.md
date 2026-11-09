@@ -1,5 +1,84 @@
 # Database-backed test setup
 
+## Admin Patients account-link status verification (2026-11-09)
+
+Status: DONE for the scoped implementation and focused acceptance in
+[PATIENTS_API.md section 17](PATIENTS_API.md#17-staff-account-link-status-and-filtering).
+Entry branch backend-hmood; clean working tree. IMPLEMENTATION_PLAN.md is absent;
+no removed planning file was recreated. The contract was updated before source.
+
+Independently verified the saved PostgreSQL 16.15 disposable cluster at
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`:
+PG_VERSION, postmaster.opts, loopback-only 55432 configuration, cluster_name and
+test-only pg_hba.conf matched the recorded target. It was stopped; a direct TCP
+connection confirmed the port free before starting only this cluster. After
+startup, postmaster.pid and Windows process executable/command matched PID 35872
+and the exact data directory. Windows TCP enumeration did not expose a listener;
+explicit psql independently confirmed current_database=smartlims_auth_regression,
+server address/port=127.0.0.1:55432, that actual data_directory,
+listen_addresses=127.0.0.1 and cluster_name=smartlims-disposable-regression-20261031.
+fsync/full_page_writes were on and CHECKPOINT succeeded. No application datasource
+defaults, development/shared databases, or Windows PostgreSQL service were used.
+
+Imported only the three saved non-secret Windows User test settings into each
+Maven process and guarded the exact URL. The machine-local .mvn/maven.config,
+Surefire mapping and IsolatedPostgresTest were preserved. Synthetic fixtures and
+mock VerificationEmailSender only. Executed from Backend:
+
+```powershell
+foreach ($testName in @('SMARTLIMS_TEST_POSTGRES_BIN', 'SMARTLIMS_TEST_POSTGRES_DATA', 'SMARTLIMS_TEST_DATABASE_URL')) {
+    $testValue = [Environment]::GetEnvironmentVariable($testName, 'User')
+    if ([string]::IsNullOrWhiteSpace($testValue)) { throw "Missing saved test setting: $testName" }
+    [Environment]::SetEnvironmentVariable($testName, $testValue, 'Process')
+}
+if ($env:SMARTLIMS_TEST_DATABASE_URL -ne 'jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression') {
+    throw 'Unexpected test database URL'
+}
+.\mvnw.cmd '-Dtest=PatientRequestTest,PatientManagementTest,PatientProfileLinkingTest,PatientSelfProfileTest,PatientLinkTokenTest,PersistedServiceAuthorizationTest' test '-Dspring.test.mockmvc.print=NONE'
+git -c core.safecrlf=false diff --check
+```
+
+The same focused Maven command was invoked three times:
+
+- Initial implementation: all six fresh reports passed 103 tests, zero
+  failures/errors/skips, last report 21:20:04 +02:00. The IDE tool returned a
+  timeout while Maven continued; its final exit code was not captured.
+- Validation-order correction: an output-capture helper exited 1 after treating
+  Mockito's native stderr warning as a terminating PowerShell error. This was a
+  helper failure, not an asserted Maven/test failure; no acceptance claim relies
+  on this invocation. No dependency/test setting was changed to suppress it.
+- Final invocation: captured stdout/stderr separately, waited for Maven and
+  captured exit 0, BUILD SUCCESS; 104 tests/6 suites, zero failures/errors/skips.
+  Finished 2026-11-09 21:25:09 +02:00; Maven duration 01:16. Independently checked
+  all six XML reports were fresh and their counts totaled 104.
+
+| Suite | Tests | Failures/errors/skips |
+|---|---:|---|
+| PatientManagementTest | 40 | 0/0/0 |
+| PatientRequestTest | 4 | 0/0/0 |
+| PatientProfileLinkingTest | 26 | 0/0/0 |
+| PatientSelfProfileTest | 16 | 0/0/0 |
+| PatientLinkTokenTest | 2 | 0/0/0 |
+| PersistedServiceAuthorizationTest | 16 | 0/0/0 |
+
+Acceptance verified all three staff roles, original fields and explicit null
+address, patient/write response compatibility, token issuance versus claim,
+disabled-account relationship status, omitted/ALL equivalence, combined name/
+number/phone search and status filtering, filtered totals and deterministic
+paging (including maximum offsets), empty results, invalid/repeated/padded
+values and existing sort-error precedence. Existing ownership, eligibility,
+token replay/expiry/reissue, rollback and concurrency assertions remained active.
+Only redundant test imports were removed after compilation; no behavior changed
+after the final invocation. Final diff whitespace check passed.
+
+Post-run process and explicit psql identity still matched PID 35872 and the same
+target; 26 successful existing migrations. No other client backends remained;
+CHECKPOINT succeeded and pg_ctl normally stopped only this disposable cluster,
+restoring its initial stopped state. No schema/migration, frontend, Postman,
+dependency, security configuration, commit, push or deployment changes. The full
+suite and manual client/deployment checks were not run; focused acceptance is
+not deployment verification.
+
 ## ADMIN Users Management verification (2026-11-06)
 
 Status: DONE for implementation and focused acceptance. Aggregate full-suite

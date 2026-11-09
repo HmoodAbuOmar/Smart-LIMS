@@ -247,11 +247,118 @@ class PatientManagementTest extends IsolatedPostgresTest {
         }
     }
 
+    @Test
+    void staffReadStatusPreservesDemographicsAndPatientAndWriteResponseShapes() throws Exception {
+        JsonNode linked = create(Role.ADMIN, BODY);
+        JsonNode unlinked = create(Role.RECEPTIONIST, BODY.replace(" Example Address ", " "));
+        UUID linkedId = UUID.fromString(linked.get("id").asString());
+        jdbc.update("UPDATE patients SET user_id = ? WHERE id = ?", actors.get(Role.PATIENT).getId(), linkedId);
+        // A token is only a capability: issuance must not make the profile LINKED.
+        service.issueLinkToken(authentication(Role.ADMIN), unlinked.get("id").asString());
+        List<String> fields = List.of("id", "patientNumber", "fullName", "dateOfBirth", "gender",
+                "phoneNumber", "address", "createdAt", "updatedAt");
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST, Role.LAB_TECHNICIAN)) {
+            for (JsonNode original : List.of(linked, unlinked)) {
+                String expectedStatus = original == linked ? "LINKED" : "UNLINKED";
+                JsonNode detail = json.readTree(mvc.perform(bearer(get("/api/patients/" + original.get("id").asString()), role))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.linkStatus").value(expectedStatus))
+                        .andReturn().getResponse().getContentAsString());
+                JsonNode page = json.readTree(mvc.perform(bearer(get("/api/patients")
+                                .param("search", original.get("patientNumber").asString()).param("linkStatus", expectedStatus), role))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                        .andReturn().getResponse().getContentAsString());
+                JsonNode item = page.get("content").get(0);
+                assertEquals(10, detail.size());
+                assertEquals(detail, item);
+                for (String field : fields)
+                    assertEquals(original.get(field), detail.get(field), field);
+                assertNull(detail.get("userId"));
+                assertNull(detail.get("createdBy"));
+                assertNull(detail.get("token"));
+            }
+        }
+        for (String path : List.of("/api/patients/me", "/api/patients/" + linkedId)) {
+            JsonNode own = json.readTree(mvc.perform(bearer(get(path), Role.PATIENT)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.linkStatus").doesNotExist()).andReturn().getResponse().getContentAsString());
+            assertEquals(linked, own);
+        }
+        JsonNode updated = json.readTree(mvc.perform(bearer(put("/api/patients/" + linkedId), Role.ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.linkStatus").doesNotExist()).andReturn().getResponse().getContentAsString());
+        assertEquals(9, updated.size());
+        // Relationship presence is independent of the linked account's login eligibility.
+        jdbc.update("UPDATE users SET enabled = false WHERE id = ?", actors.get(Role.PATIENT).getId());
+        mvc.perform(bearer(get("/api/patients/" + linkedId), Role.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.linkStatus").value("LINKED"));
+        mvc.perform(bearer(get("/api/patients").param("linkStatus", "LINKED"), Role.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void linkStatusCombinesWithSearchBeforePagingAndCounting() throws Exception {
+        String match = BODY.replace("Example Patient", "Filter Match");
+        JsonNode linked = create(Role.ADMIN, match);
+        JsonNode first = create(Role.ADMIN, match);
+        JsonNode second = create(Role.ADMIN, match);
+        create(Role.ADMIN, BODY.replace("Example Patient", "Outside").replace("000001", "900009"));
+        jdbc.update("UPDATE patients SET user_id = ? WHERE id = ?", actors.get(Role.PATIENT).getId(),
+                UUID.fromString(linked.get("id").asString()));
+        MvcResult omitted = mvc.perform(bearer(get("/api/patients").param("search", "filter match"), Role.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3)).andReturn();
+        MvcResult all = mvc.perform(bearer(get("/api/patients").param("search", "filter match").param("linkStatus", "ALL"), Role.ADMIN))
+                .andExpect(status().isOk()).andReturn();
+        assertEquals(json.readTree(omitted.getResponse().getContentAsString()), json.readTree(all.getResponse().getContentAsString()));
+        mvc.perform(bearer(get("/api/patients").param("search", "filter match").param("linkStatus", "LINKED"), Role.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(linked.get("id").asString()));
+        List<UUID> expected = new ArrayList<>(List.of(UUID.fromString(first.get("id").asString()), UUID.fromString(second.get("id").asString())));
+        // PostgreSQL UUID ordering is unsigned byte order, represented by the canonical strings.
+        expected.sort(Comparator.comparing(UUID::toString));
+        for (int page = 0; page < 2; page++) {
+            mvc.perform(bearer(get("/api/patients").param("search", "fIlTeR mAtCh").param("linkStatus", "UNLINKED")
+                            .param("sort", "fullName,asc").param("size", "1").param("page", String.valueOf(page)), Role.RECEPTIONIST))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].id").value(expected.get(page).toString()))
+                    .andExpect(jsonPath("$.content[0].linkStatus").value("UNLINKED"))
+                    .andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.totalPages").value(2))
+                    .andExpect(jsonPath("$.first").value(page == 0)).andExpect(jsonPath("$.last").value(page == 1));
+        }
+        for (String page : List.of("2", "2147483647")) {
+            mvc.perform(bearer(get("/api/patients").param("search", "Filter Match").param("linkStatus", "UNLINKED")
+                            .param("page", page).param("size", "2"), Role.ADMIN))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty())
+                    .andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.totalPages").value(1));
+        }
+        mvc.perform(bearer(get("/api/patients").param("search", first.get("patientNumber").asString().toLowerCase(Locale.ROOT))
+                        .param("linkStatus", "UNLINKED"), Role.LAB_TECHNICIAN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(bearer(get("/api/patients").param("search", "000001").param("linkStatus", "UNLINKED"), Role.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(bearer(get("/api/patients").param("search", first.get("patientNumber").asString())
+                        .param("linkStatus", "LINKED"), Role.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.totalElements").value(0)).andExpect(jsonPath("$.totalPages").value(0))
+                .andExpect(jsonPath("$.first").value(true)).andExpect(jsonPath("$.last").value(true));
+        mvc.perform(bearer(get("/api/patients").param("linkStatus", "LINKED"), Role.PATIENT)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/patients").param("linkStatus", "UNLINKED")).andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" LINKED", "LINKED ", " UNLINKED ", "\tALL"})
+    void whitespaceInLinkStatusIsRejected(String value) throws Exception {
+        mvc.perform(bearer(get("/api/patients").param("linkStatus", value), Role.ADMIN))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors.linkStatus").value("Please correct the request fields."));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"page=-1", "page=abc", "page=2147483648", "size=0", "size=101", "size=",
             "sort=id,asc", "sort=fullName", "sort=fullName,ASC", "sort=fullName,asc,desc", "sort=",
             "sort=createdAt,desc&sort=fullName,asc", "page=", "page=1.5", "size=1.5", "size=2147483648",
-            "page=0&page=0", "size=20&size=20", "search=Example&search=Example"})
+            "page=0&page=0", "size=20&size=20", "search=Example&search=Example",
+            "linkStatus=", "linkStatus=linked", "linkStatus=all", "linkStatus=UNKNOWN",
+            "linkStatus=ALL&linkStatus=ALL", "linkStatus=LINKED&linkStatus=UNLINKED",
+            "sort=id,asc&linkStatus=ALL&linkStatus=ALL"})
     void invalidQueriesReturnExistingErrorEnvelope(String query) throws Exception {
         MvcResult result = mvc.perform(bearer(get("/api/patients?" + query), Role.ADMIN))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))

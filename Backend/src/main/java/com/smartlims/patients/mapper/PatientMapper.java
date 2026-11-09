@@ -3,6 +3,8 @@ package com.smartlims.patients.mapper;
 import com.smartlims.patients.dto.PatientPageResponse;
 import com.smartlims.patients.dto.PatientResponse;
 import com.smartlims.patients.dto.PatientSelfProfileResponse;
+import com.smartlims.patients.dto.PatientLinkStatus;
+import com.smartlims.patients.dto.StaffPatientResponse;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.patients.entity.Patient;
 
@@ -47,8 +49,15 @@ public class PatientMapper {
     }
 
     public PatientPageResponse toPageResponse(Page<Patient> page) {
-        return new PatientPageResponse(page.getContent().stream().map(this::toResponse).toList(),
+        return new PatientPageResponse(page.getContent().stream().map(this::toStaffResponse).toList(),
                 page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages(),
                 page.isFirst(), page.isLast());
+    }
+
+    public StaffPatientResponse toStaffResponse(Patient patient) {
+        return new StaffPatientResponse(patient.getId(), patient.getPatientNumber(), patient.getFullName(),
+                patient.getDateOfBirth(), patient.getGender(), patient.getPhoneNumber(), patient.getAddress(),
+                patient.getCreatedAt(), patient.getUpdatedAt(),
+                patient.getUser() == null ? PatientLinkStatus.UNLINKED : PatientLinkStatus.LINKED);
     }
 }
