@@ -1,5 +1,9 @@
 package com.smartlims.labtests.service;
 
+import com.smartlims.auth.entity.Role;
+import com.smartlims.auth.entity.UserAccount;
+import com.smartlims.auth.repository.UserAccountRepository;
+import com.smartlims.auth.security.LoginEligibility;
 import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.entity.LabTest;
 import com.smartlims.labtests.entity.LabTestCategory;
@@ -12,6 +16,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +24,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +35,17 @@ import org.springframework.validation.annotation.Validated;
 public class LabTestService {
     private final LabTestRepository tests;
     private final LabTestMapper mapper;
+    private final UserAccountRepository users;
 
-    public LabTestService(LabTestRepository tests, LabTestMapper mapper) {
+    public LabTestService(LabTestRepository tests, LabTestMapper mapper, UserAccountRepository users) {
         this.tests = tests;
         this.mapper = mapper;
+        this.users = users;
     }
 
     @Transactional
     public LabTestResponse create(Authentication actor, @NotNull @Valid LabTestRequest request) {
-        requireRole(actor, "ADMIN");
+        currentAccount(actor, "ADMIN");
         if (tests.existsByCode(request.code()))
             throw LabTestException.duplicate();
         LabTest test = new LabTest(request.code(), request.name(), request.description(),
@@ -48,9 +56,9 @@ public class LabTestService {
 
     @Transactional(readOnly = true)
     public LabTestPageResponse list(Authentication actor, @NotNull LabTestQueryRequest query) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+        UserAccount account = currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         Boolean active = query.active();
-        if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT"))) {
+        if (account.getRole() == Role.PATIENT) {
             if (Boolean.FALSE.equals(active))
                 throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
             active = true;
@@ -70,16 +78,16 @@ public class LabTestService {
 
     @Transactional(readOnly = true)
     public LabTestResponse get(Authentication actor, String id) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+        UserAccount account = currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         LabTest test = tests.findById(identifier(id)).orElseThrow(LabTestException::missing);
-        if (!test.isActive() && actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT")))
+        if (!test.isActive() && account.getRole() == Role.PATIENT)
             throw LabTestException.missing();
         return mapper.toResponse(test);
     }
 
     @Transactional
     public LabTestResponse update(Authentication actor, String id, @NotNull @Valid LabTestRequest request) {
-        requireRole(actor, "ADMIN");
+        currentAccount(actor, "ADMIN");
         UUID testId = identifier(id);
         LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
         if (tests.existsByCodeAndIdNot(request.code(), testId))
@@ -98,7 +106,7 @@ public class LabTestService {
 
     @Transactional
     public LabTestResponse changeStatus(Authentication actor, String id, @NotNull @Valid LabTestStatusRequest request) {
-        requireRole(actor, "ADMIN");
+        currentAccount(actor, "ADMIN");
         LabTest test = tests.findForUpdate(identifier(id)).orElseThrow(LabTestException::missing);
         test.setActive(request.active());
         test.setUpdatedAt(Instant.now());
@@ -130,12 +138,25 @@ public class LabTestService {
         }
     }
 
-    private void requireRole(Authentication actor, String... roles) {
-        if (actor == null || !actor.isAuthenticated())
+    private UserAccount currentAccount(Authentication actor, String... roles) {
+        if (actor == null || !actor.isAuthenticated() || actor instanceof AnonymousAuthenticationToken)
+            throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
+        if (Arrays.stream(roles).noneMatch(role -> actor.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_" + role))))
+            throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
+        UUID id;
+        try {
+            id = UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
+        }
+        UserAccount account = users.findById(id).orElseThrow(() ->
+                new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null));
+        if (!LoginEligibility.eligible(account))
             throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
         for (String role : roles) {
-            if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role)))
-                return;
+            if (account.getRole() == Role.valueOf(role))
+                return account;
         }
         throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
     }

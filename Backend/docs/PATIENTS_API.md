@@ -23,7 +23,7 @@ Account and patient-profile `fullName` values are independent and never automati
 
 Phase 1 supports staff-created, unlinked patient profiles, staff search, profile retrieval, and staff updates. It also defines ownership-protected retrieval for an account that already has a legitimate profile link.
 
-Phase 2 adds GET/POST `/me`, staff-issued link tokens, and POST `/me/link`. All four original endpoints retain their existing contracts. My Profile adds GET/PUT `/me/profile` (section 16); original PUT `/{id}` remains staff-only. Profile/account demographics remain separate.
+Phase 2 adds GET/POST `/me`, staff-issued link tokens, and POST `/me/link`. My Profile adds GET/PUT `/me/profile` (section 16); original PUT `/{id}` remains staff-only. Section 17 adds account-link status to staff GET responses and an optional list filter; patient-facing contracts remain unchanged. Profile/account demographics remain separate.
 
 Out of scope:
 
@@ -53,6 +53,10 @@ A PATIENT with no linked profile uses the explicit phase-2 workflow, never the s
 Relationships:
 
 - `patients.user_id -> users.id`: optional one-to-one account link. A linked account must have role PATIENT. Several NULL links are allowed.
+- Administrative changes away from PATIENT now reject a linked account with 409
+  `PATIENT_ACCOUNT_LINKED`; same-role requests remain no-ops. Account row locking
+  coordinates this check with profile creation/linking. Historical links are not
+  rewritten. See [Users API](USERS_API.md).
 - `patients.created_by -> users.id`: the authenticated creator; staff for walk-ins, the patient account for self-creation. It remains unchanged on linking.
 - Future `test_orders.patient_id -> patients.id`: one profile may have many orders. This phase does not implement orders.
 - Keep referenced profiles/accounts under the documented RESTRICT/NO ACTION policy; do not add cascading deletion of clinical history.
@@ -78,6 +82,12 @@ All endpoints require authentication. No anonymous access is allowed.
 | PUT /api/patients/me/profile | Forbidden | Forbidden | Forbidden | Replace own linked patient demographics only |
 
 Check both role and ownership on the backend. UI visibility is not authorization.
+
+Security remediation F2: basic CRUD also reloads the caller's stored account and
+requires current login eligibility and an allowed stored role, rather than
+trusting supplied authorities alone. Missing/ineligible identities return 401
+`UNAUTHORIZED`; disallowed roles return 403 `FORBIDDEN`. Ownership branching uses
+the verified stored role and account ID, including with stale supplied authorities.
 
 For a PATIENT requesting a valid UUID that is nonexistent or not their linked profile, return 404. This avoids distinguishing another patient's existing profile from a nonexistent one. Ownership is checked using authenticated account ID and `patients.user_id`, never a request-supplied account ID.
 
@@ -185,6 +195,7 @@ Authorized: ADMIN, RECEPTIONIST, LAB_TECHNICIAN.
 | page | 0 | Zero-based integer >= 0 |
 | size | 20 | Integer from 1 to 100 |
 | sort | createdAt,desc | Exactly one `<field>,<direction>` expression |
+| linkStatus | ALL | Exact uppercase ALL, LINKED, or UNLINKED; one value only |
 
 Allowed sort fields: patientNumber, fullName, dateOfBirth, createdAt, updatedAt.
 Allowed directions: asc, desc. Other fields, malformed expressions, repeated sort parameters, and invalid page/size/search values return 400. Repeated page, size, or search parameters also return 400. Page accepts integers from 0 through 2147483647; integer overflow and blank numeric parameters are rejected. Blank search is accepted after trimming; blank sort is rejected.
@@ -196,6 +207,14 @@ Search semantics:
 - Use OR across these three fields; no birth-date/address/account search in this phase.
 - Treat `%` and `_` as literal input, not user-provided SQL wildcard instructions; escape them when constructing LIKE/ILIKE queries.
 - Use parameterized queries. Append `id ASC` as a deterministic tie-breaker after the requested sort.
+
+Account-link filtering is combined with search using AND before pagination and
+counting. LINKED means patients.user_id IS NOT NULL; UNLINKED means IS NULL.
+Omitted linkStatus or ALL adds no relationship filter. Outstanding tokens do not
+count as links; account login eligibility does not change relationship status.
+Invalid, blank, differently cased, whitespace-padded, or repeated linkStatus
+values return 400 VALIDATION_ERROR with fieldErrors.linkStatus in the existing
+error envelope. Permissions and sorting are unchanged.
 
 ### Success
 
@@ -214,7 +233,8 @@ Use a stable custom paginated DTO, not raw Spring Page serialization.
       "phoneNumber": "0591234567",
       "address": "Example Address",
       "createdAt": "2026-10-08T15:30:00Z",
-      "updatedAt": "2026-10-08T15:30:00Z"
+      "updatedAt": "2026-10-08T15:30:00Z",
+      "linkStatus": "UNLINKED"
     }
   ],
   "page": 0,
@@ -248,7 +268,9 @@ PATIENT: fetch by profile ID and authenticated user_id; nonexistent/unlinked/not
 ### Success
 
 Status: `200 OK`.
-Response: the same PatientResponse shape as create.
+Staff response: all nine fields from PatientResponse plus linkStatus, whose value
+is LINKED or UNLINKED. PATIENT ownership-protected retrieval retains the original
+nine-field PatientResponse without linkStatus. See section 17.
 
 Potential errors: 400 malformed UUID; 401 unauthenticated; 403 role outside allowed roles; 404 missing or inaccessible profile.
 
@@ -910,3 +932,41 @@ ordering/limits/empty states, profile-linking/security and destination action ma
 Notifications now use the persisted unread total from [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md).
 Existing profile endpoints are unchanged; authorized linking controls access to
 real subsequent workflow notifications assigned to that profile.
+
+## 17. Staff account-link status and filtering
+
+Task: Admin Patients Management account-link status. Status: DONE, 2026-11-09.
+Authorized extension to R-PAT-01/R-PAT-02. IMPLEMENTATION_PLAN.md is absent in
+this checkout; this section records the selected task and acceptance scope.
+This section supersedes earlier statements of unchanged staff GET response shapes.
+
+GET /api/patients (ADMIN, RECEPTIONIST, LAB_TECHNICIAN) returns the existing page
+envelope with staff items containing every original field plus linkStatus.
+GET /api/patients/{id} returns that same staff item for those three roles.
+linkStatus is derived only from the persisted optional patient-to-account FK:
+LINKED for nonnull user_id, UNLINKED for null. It exposes no account IDs, email,
+credentials, or token state. No schema change or token-table join is required.
+
+Example: GET /api/patients?search=Example&linkStatus=UNLINKED&page=0&size=20&sort=fullName,asc
+returns only unlinked matches; totalElements/totalPages describe the combined
+filter. Empty results and out-of-range pages retain section 6 behavior.
+Accepted values are exact uppercase ALL, LINKED, UNLINKED. Omitted and ALL are
+equivalent. Invalid/repeated values produce 400 VALIDATION_ERROR with
+fieldErrors.linkStatus; existing authentication/authorization and query error
+precedence apply. No new sorting field is introduced.
+
+Patient-facing GET /{id}, GET /me, POST /me, POST /me/link, and GET/PUT /me/profile
+keep their existing contracts. Staff POST /api/patients and PUT /{id} also retain
+the original PatientResponse. No new write, email, retry/idempotency, unlink,
+reassignment, demographic matching, or account-management operation is added.
+The ten-minute single-use issue/reissue/claim workflow is unchanged; issuing a
+token leaves a profile UNLINKED until a successful claim commits.
+
+Acceptance: verify staff status mapping across all three roles, token issuance
+versus claim, relationship status independent of account eligibility, combined
+search/filter/pagination totals and deterministic sorting, omitted/ALL equivalence,
+invalid/repeated values, existing permissions/ownership, and patient/write response
+compatibility. Final focused verification passed 104 tests across six suites,
+zero failures/errors/skips, Maven exit 0 (2026-11-09 21:25:09 +02:00). See
+[execution commands, isolated target and limits](TESTING.md#admin-patients-account-link-status-verification-2026-11-09).
+The complete suite and manual client/deployment verification were not run.

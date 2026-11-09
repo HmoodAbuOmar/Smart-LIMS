@@ -138,9 +138,9 @@ class OrderMigrationTest {
     @Test
     void freshDatabaseAppliesValidatesAndReappliesWithoutChanges() throws SQLException {
         Flyway flyway = migrations(null);
-        assertEquals(25, flyway.migrate().migrationsExecuted);
+        assertEquals(26, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertEquals(java.util.stream.IntStream.rangeClosed(1, 25).mapToObj(Integer::toString).toList(), rows(
+        assertEquals(java.util.stream.IntStream.rangeClosed(1, 26).mapToObj(Integer::toString).toList(), rows(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank"));
         assertEquals(List.of("V8__test_orders.sql"), rows("SELECT script FROM flyway_schema_history WHERE version='8'"));
         assertEquals(List.of("0"), rows("SELECT count(*) FROM test_orders"));
@@ -167,17 +167,19 @@ class OrderMigrationTest {
         assertEquals(List.of("42"), rows("SELECT setval('patient_number_seq', 42, true)"));
         Map<String, List<String>> before = new LinkedHashMap<>();
         for (String table : List.of("users", "email_action_tokens", "patients", "lab_tests", "patient_link_tokens", "lab_test_categories")) {
-            before.put(table, rows("SELECT row_to_json(t)::text FROM " + table + " t ORDER BY 1"));
+            // V26 adds only nullable last_login_at; compare every pre-existing field.
+            before.put(table, rows("SELECT (row_to_json(t)::jsonb - 'last_login_at')::text FROM " + table + " t ORDER BY 1"));
             assertFalse(before.get(table).isEmpty());
         }
         String history = "SELECT row_to_json(h)::text FROM flyway_schema_history h WHERE version::integer <= 7 ORDER BY installed_rank";
         List<String> oldHistory = rows(history);
         Flyway flyway = migrations(null);
-        assertEquals(18, flyway.migrate().migrationsExecuted);
+        assertEquals(19, flyway.migrate().migrationsExecuted);
         flyway.validate();
         for (var entry : before.entrySet()) {
-            assertEquals(entry.getValue(), rows("SELECT row_to_json(t)::text FROM " + entry.getKey() + " t ORDER BY 1"));
+            assertEquals(entry.getValue(), rows("SELECT (row_to_json(t)::jsonb - 'last_login_at')::text FROM " + entry.getKey() + " t ORDER BY 1"));
         }
+        assertEquals(List.of("0"), rows("SELECT count(*) FROM users WHERE last_login_at IS NOT NULL"));
         assertEquals(oldHistory, rows(history));
         assertEquals(List.of("43"), rows("SELECT nextval('patient_number_seq')"));
         assertEquals(List.of("1"), rows("SELECT nextval('order_number_seq')"));

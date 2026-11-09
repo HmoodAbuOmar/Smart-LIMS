@@ -1,5 +1,327 @@
 # Database-backed test setup
 
+## Admin Patients account-link status verification (2026-11-09)
+
+Status: DONE for the scoped implementation and focused acceptance in
+[PATIENTS_API.md section 17](PATIENTS_API.md#17-staff-account-link-status-and-filtering).
+Entry branch backend-hmood; clean working tree. IMPLEMENTATION_PLAN.md is absent;
+no removed planning file was recreated. The contract was updated before source.
+
+Independently verified the saved PostgreSQL 16.15 disposable cluster at
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`:
+PG_VERSION, postmaster.opts, loopback-only 55432 configuration, cluster_name and
+test-only pg_hba.conf matched the recorded target. It was stopped; a direct TCP
+connection confirmed the port free before starting only this cluster. After
+startup, postmaster.pid and Windows process executable/command matched PID 35872
+and the exact data directory. Windows TCP enumeration did not expose a listener;
+explicit psql independently confirmed current_database=smartlims_auth_regression,
+server address/port=127.0.0.1:55432, that actual data_directory,
+listen_addresses=127.0.0.1 and cluster_name=smartlims-disposable-regression-20261031.
+fsync/full_page_writes were on and CHECKPOINT succeeded. No application datasource
+defaults, development/shared databases, or Windows PostgreSQL service were used.
+
+Imported only the three saved non-secret Windows User test settings into each
+Maven process and guarded the exact URL. The machine-local .mvn/maven.config,
+Surefire mapping and IsolatedPostgresTest were preserved. Synthetic fixtures and
+mock VerificationEmailSender only. Executed from Backend:
+
+```powershell
+foreach ($testName in @('SMARTLIMS_TEST_POSTGRES_BIN', 'SMARTLIMS_TEST_POSTGRES_DATA', 'SMARTLIMS_TEST_DATABASE_URL')) {
+    $testValue = [Environment]::GetEnvironmentVariable($testName, 'User')
+    if ([string]::IsNullOrWhiteSpace($testValue)) { throw "Missing saved test setting: $testName" }
+    [Environment]::SetEnvironmentVariable($testName, $testValue, 'Process')
+}
+if ($env:SMARTLIMS_TEST_DATABASE_URL -ne 'jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression') {
+    throw 'Unexpected test database URL'
+}
+.\mvnw.cmd '-Dtest=PatientRequestTest,PatientManagementTest,PatientProfileLinkingTest,PatientSelfProfileTest,PatientLinkTokenTest,PersistedServiceAuthorizationTest' test '-Dspring.test.mockmvc.print=NONE'
+git -c core.safecrlf=false diff --check
+```
+
+The same focused Maven command was invoked three times:
+
+- Initial implementation: all six fresh reports passed 103 tests, zero
+  failures/errors/skips, last report 21:20:04 +02:00. The IDE tool returned a
+  timeout while Maven continued; its final exit code was not captured.
+- Validation-order correction: an output-capture helper exited 1 after treating
+  Mockito's native stderr warning as a terminating PowerShell error. This was a
+  helper failure, not an asserted Maven/test failure; no acceptance claim relies
+  on this invocation. No dependency/test setting was changed to suppress it.
+- Final invocation: captured stdout/stderr separately, waited for Maven and
+  captured exit 0, BUILD SUCCESS; 104 tests/6 suites, zero failures/errors/skips.
+  Finished 2026-11-09 21:25:09 +02:00; Maven duration 01:16. Independently checked
+  all six XML reports were fresh and their counts totaled 104.
+
+| Suite | Tests | Failures/errors/skips |
+|---|---:|---|
+| PatientManagementTest | 40 | 0/0/0 |
+| PatientRequestTest | 4 | 0/0/0 |
+| PatientProfileLinkingTest | 26 | 0/0/0 |
+| PatientSelfProfileTest | 16 | 0/0/0 |
+| PatientLinkTokenTest | 2 | 0/0/0 |
+| PersistedServiceAuthorizationTest | 16 | 0/0/0 |
+
+Acceptance verified all three staff roles, original fields and explicit null
+address, patient/write response compatibility, token issuance versus claim,
+disabled-account relationship status, omitted/ALL equivalence, combined name/
+number/phone search and status filtering, filtered totals and deterministic
+paging (including maximum offsets), empty results, invalid/repeated/padded
+values and existing sort-error precedence. Existing ownership, eligibility,
+token replay/expiry/reissue, rollback and concurrency assertions remained active.
+Only redundant test imports were removed after compilation; no behavior changed
+after the final invocation. Final diff whitespace check passed.
+
+Post-run process and explicit psql identity still matched PID 35872 and the same
+target; 26 successful existing migrations. No other client backends remained;
+CHECKPOINT succeeded and pg_ctl normally stopped only this disposable cluster,
+restoring its initial stopped state. No schema/migration, frontend, Postman,
+dependency, security configuration, commit, push or deployment changes. The full
+suite and manual client/deployment checks were not run; focused acceptance is
+not deployment verification.
+
+## ADMIN Users Management verification (2026-11-06)
+
+Status: DONE for implementation and focused acceptance. Aggregate full-suite
+verification is PARTIAL: the single full invocation had two stale migration
+expectation failures, both corrected and passing in the targeted rerun; no
+second complete invocation was requested or executed. Branch backend-hmood,
+HEAD a9e5f1b, clean entry working tree. The contract in [USERS_API.md](USERS_API.md)
+was written before implementation. No AGENTS.md, deleted planning/history/help
+files, frontend, dependencies, local Maven/Surefire mapping, isolation guard or
+applied V1-V25 migration was changed. No commit, push or deployment.
+
+### Independently isolated execution target
+
+The documented recovery-20261031 cluster was initially stopped. Before starting
+only that cluster, read PG_VERSION=16, postmaster.opts with its exact data path,
+loopback-only postgresql.conf and test-only pg_hba.conf; independently confirmed
+55432 was free with a TCP socket. After pg_ctl startup, postmaster.pid and Windows
+process executable/command agreed on PID 27300 and
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`.
+Explicit psql identity on only smartlims_auth_regression confirmed server
+127.0.0.1:55432, that actual data directory, listen_addresses=127.0.0.1,
+cluster_name=smartlims-disposable-regression-20261031 and fsync/full_page_writes=on.
+CHECKPOINT succeeded. Maven help:evaluate confirmed the unchanged effective URL
+`jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression`.
+
+Imported only SMARTLIMS_TEST_POSTGRES_BIN, SMARTLIMS_TEST_POSTGRES_DATA and
+SMARTLIMS_TEST_DATABASE_URL from Windows User environment into each Maven
+process; guarded the exact test URL. All application tests inherit the unchanged
+IsolatedPostgresTest and mock VerificationEmailSender. Migration suites create
+and remove only their guarded smartlims_migration_<32 hex> databases on this
+same instance. Synthetic data only. No smart_lims_db, development/shared database,
+application datasource defaults, real email or Windows PostgreSQL service used.
+Immediately before the full suite, rechecked process/executable/data directory,
+exact SQL identity, durability and a successful checkpoint (same PID 27300).
+
+### Exact commands and executed results
+
+Run directly from Backend after the non-secret test environment import above:
+
+```powershell
+# Initial listing/login slice
+.\mvnw.cmd '-Dtest=UserListingTest,AuthenticationRegressionTest,RegistrationTest' test '-Dspring.test.mockmvc.print=NONE'
+# Individual/bulk slice and corrected listing fixture
+.\mvnw.cmd '-Dtest=UserListingTest,UserActionsTest' test '-Dspring.test.mockmvc.print=NONE'
+# Expanded authorization, rollback/concurrency and migration verification
+.\mvnw.cmd '-Dtest=UserListingTest,UserActionsTest,AuthenticationRegressionTest,MigrationLineageTest,PatientMigrationCompatibilityTest,LabTestCategoryMigrationTest,OrderMigrationTest,AppointmentMigrationTest' test '-Dspring.test.mockmvc.print=NONE'
+# Final focus after distinct last-login sort cases and optional-phone validation
+.\mvnw.cmd '-Dtest=UserListingTest,UserActionsTest' test '-Dspring.test.mockmvc.print=NONE'
+# Single complete suite
+.\mvnw.cmd test
+# Correct only the two stale V25 expectations found by that complete run
+.\mvnw.cmd '-Dtest=ResultMigrationTest,PatientManagementTest' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+| Invocation | Actual result | Finished (Asia/Jerusalem) | Maven duration |
+|---|---|---|---|
+| Initial slice | Exit 1; 91 tests, 1 failure, 0 errors/skips | 21:25:26 +02:00 | 01:56 |
+| Corrected listing and action slice | Exit 0; 48 tests / 2 suites, 0 failures/errors/skips | 21:29:58 +02:00 | 01:10 |
+| Expanded focus | Exit 0; 118 tests / 8 suites, 0 failures/errors/skips | 21:34:18 +02:00 | 03:30 |
+| Final focus | Exit 0; 55 tests / 2 suites, 0 failures/errors/skips | 21:36:16 +02:00 | 01:10 |
+| Single complete suite | Exit 1; 494 tests / 55 fresh suites, 2 failures, 0 errors/skips | 21:43:53 +02:00 | 06:51 |
+| Corrected migration expectations focus | Exit 0; 28 tests / 2 suites, 0 failures/errors/skips | 21:45:19 +02:00 | 50.326 seconds |
+
+The complete run's only failures were stale current-head expectations:
+ResultMigrationTest expected five upgrades from V20 rather than six through V26;
+PatientManagementTest expected history versions 1-25 rather than 1-26. Updated
+only those tests. The result migration test still compares every prior value
+and additionally asserts no historical last-login backfill. No production source
+changed after final focus or during/after the full run. All 55 reports were newer
+than the full invocation, unique, and independently totaled 494 tests, 2 failures,
+0 errors/skips. The full run itself is not a passing full-suite result. No second
+complete invocation is made because the owner requested the full suite once.
+
+The corrective run passed all 27 PatientManagementTest cases and the
+ResultMigrationTest preservation case. Thus both failures are resolved with
+executed evidence; the original full invocation remains recorded as failed.
+Post-run SQL and process identity still matched PID 27300 and the dedicated
+cluster. Confirmed 26 successful migrations through V26, zero remaining owned
+smartlims_migration_* databases and zero synthetic bulk triggers. CHECKPOINT
+succeeded; pg_ctl stopped only this instance normally and confirmed no server
+running at 21:45:52 +02:00, restoring its initial stopped state.
+
+The initial failure was an incorrect expected alphabetical fixture order
+(Administrator vs Alpha), corrected to assert the actual case-insensitive
+lexical order. AuthenticationRegressionTest (38) and RegistrationTest (26)
+already passed in that run. Later runs overlap; counts must not be summed.
+Expected synthetic FK violations and the deliberately injected bulk write
+failure exercise conflicts/rollback and are not unexpected test errors.
+Logs are machine-local Temp files smartlims-users-slice1.log,
+smartlims-users-slice2.log, smartlims-users-slice3.log,
+smartlims-users-final-focus.log, smartlims-users-full.log and
+smartlims-users-migration-correction.log.
+
+### Acceptance coverage and changed files
+
+| Approved requirement | Implemented behavior / focused evidence |
+|---|---|
+| 1 | Additive /api/users/page, six row fields and conventional page metadata; legacy array HTTP regression |
+| 2 | Literal case-insensitive name/email search, combined role/status filters, inclusive/exclusive offset-normalized creation bounds, unknown/duplicate/invalid query rejection |
+| 3 | All eight sorting directions, ID ties, different login timestamps, null-last, size 7, bounded size and overflow-safe empty pages |
+| 4 | Both login HTTP modes record successful authentication only; failed/blocked/locked/unverified attempts and /me reads preserve last-login value |
+| 5 | All four statuses and precedence, first-admin invitation, expired/reissued/consumed invitation, accepted-account reset tokens and separate temporary lockout |
+| 6 | Existing individual HTTP regression, optional-field retention/validation, canonical email prohibition, invitation proof/expiry/reuse and transactional mail failures; no profile auto-creation |
+| 7 | Linked PATIENT role conflicts, same-role no-op, unchanged profile rows, concurrent profile-creation/role-change invariant |
+| 8 | Patient-link/creator and append-only laboratory-event actor references yield stable HTTP 409 and preserve rows/tokens; eligible deletion removes only account/tokens |
+| 9 | Explicit ordered targets, maximum 100, malformed/missing/self-protected batch rollback, database failure rollback, idempotence, concurrent bulk/individual revocation and overlapping bulk requests, cookie CSRF |
+| Authorization | Extended existing 15-state service denial matrix to page and both bulk actions; new HTTP/current-state tests including staff roles and forged/stale authority |
+| Migration | V25-to-V26 nullable/no-backfill/type/default/history preservation and reapplication; affected current-head migration assertions advanced without weakening historical lineage checks |
+
+Source inspection additionally confirms shared administrator coordination and
+unchanged last-enabled-confirmed-admin counting, authentication eligibility,
+JWT non-revocation and historical links. V26 is the sole new migration; it is
+ALTER TABLE users ADD COLUMN last_login_at TIMESTAMPTZ, with no data update.
+
+Changed production files (under src/main/java/com/smartlims/auth):
+controller/AccountController.java; dto/UpdateAccountRequest.java;
+dto/BulkAccountRequest.java; dto/UserListRow.java; dto/UserPageResponse.java;
+dto/UserQueryRequest.java; entity/UserAccount.java; entity/AccountStatus.java;
+repository/UserAccountRepository.java; repository/UserAccountQueries.java;
+service/AccountManagementService.java; service/LoginService.java.
+Migration: src/main/resources/db/migration/V26__user_last_login.sql.
+Tests (under src/test/java/com/smartlims): auth/AuthenticationRegressionTest.java;
+auth/UserListingTest.java; auth/UserActionsTest.java;
+migrations/MigrationLineageTest.java; patients/PatientMigrationCompatibilityTest.java;
+labtests/LabTestCategoryMigrationTest.java; orders/OrderMigrationTest.java;
+appointments/AppointmentMigrationTest.java.
+Additional full-run expectation corrections: laboratory/ResultMigrationTest.java
+and patients/PatientManagementTest.java.
+Docs: USERS_API.md (new), AUTH_API.md, PATIENTS_API.md, DATABASE_DESIGN.md,
+ENDPOINT_PERMISSIONS.md, PERMISSIONS_REPORT.md and this TESTING.md.
+
+Runtime deployment, frontend/browser integration and real SMTP delivery are
+outside this isolated backend execution. Existing lastLoginAt history remains
+unknown/null until a successful login; no history is fabricated.
+Final git diff --check passed. All 30 changed/new files are within Backend;
+the named inventory above includes every file. No implementation gap remains
+for the approved nine requirements. A clean single final full-suite invocation
+after the test-only corrections is not claimed.
+
+## Security remediation F1/F2 verification (2026-11-06)
+
+Status: DONE. Both F1 and F2 accepted after the final passing complete suite
+and source/diff review. Scope is F1 administrative
+service authorization and F2 persisted-account checks in catalog/basic patient
+CRUD. F3-F6, routes/DTOs, migrations, dependencies, test isolation/mapping and
+local sensitive configuration are unchanged. No development/main database was
+connected to or modified; no Postman operations, commit or push.
+
+Safety: imported only the three documented non-secret test environment settings
+from Windows User scope. The documented recovery-20261031 cluster was stopped;
+confirmed PG_VERSION=16, exact postmaster.opts data path, loopback-only 55432
+configuration, cluster_name and test-only pg_hba rules before starting only that
+cluster. The existing directory was preserved. After startup, postmaster.pid,
+pg_ctl and process executable/command agreed on PID 36140 and
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`.
+The server log independently recorded that PID listening only on 127.0.0.1:55432.
+Windows Get-NetTCPConnection/netstat did not enumerate that listener; a direct
+.NET TCP socket corroborated the reachable loopback endpoint instead. Explicit
+psql to only smartlims_auth_regression verified database, server address/port,
+data_directory, listen_addresses, cluster_name and PostgreSQL 16.15. fsync and
+full_page_writes were on; explicit CHECKPOINT succeeded. Maven help:evaluate
+confirmed the unchanged effective test URL:
+`jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression`.
+Process/PID-file/socket/SQL identity and checkpoint were checked again before
+the full invocation, with exact expected-value guards. The existing Surefire
+environment mapping and IsolatedPostgresTest guard were preserved; fake email
+and synthetic fixtures were used throughout.
+
+Executed directly from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=AuthenticationRegressionTest,RegistrationTest,LabTestServiceTest,PersistedServiceAuthorizationTest,LabTestManagementTest,PatientManagementTest,PatientProfileLinkingTest,ProvisioningContextTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=AuthenticationRegressionTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+.\mvnw.cmd '-Dtest=LabTestCategoryPersistenceTest' test
+.\mvnw.cmd test
+```
+
+| Invocation | Result | Finished (Asia/Jerusalem) | Maven duration |
+|---|---|---|---|
+| Initial focused run | BUILD SUCCESS, exit 0; 157 tests / 8 suites, 0 failures/errors/skips | 2026-11-06 20:16:23 +02:00 | 02:23 min |
+| Additional F1 assertions | BUILD SUCCESS, exit 0; 38 tests / 1 suite, 0 failures/errors/skips | 2026-11-06 20:18:45 +02:00 | 01:03 min |
+| Initial complete suite | BUILD FAILURE, exit 1; 438 tests / 53 suites, 0 failures, 1 error, 0 skips | 2026-11-06 20:25:14 +02:00 | 05:30 min |
+| Corrected category fixture focus | BUILD SUCCESS, exit 0; 3 tests / 1 suite, 0 failures/errors/skips | 2026-11-06 20:26:32 +02:00 | 51.593 s |
+| Final complete suite | BUILD SUCCESS, exit 0; 438 tests / 53 suites, 0 failures/errors/skips | 2026-11-06 20:32:40 +02:00 | 05:38 min |
+
+The second run followed additional assertions for missing administrative
+authority, exact concurrent revocation/self-protection outcomes, same-role
+no-op email behavior and external-writer username uniqueness collisions.
+Expected synthetic constraint warnings in those two collision cases are part
+of passing tests, not failed cases. Counts overlap between invocations.
+
+The first complete suite (started 20:19:40 +02:00) completed all 438 tests;
+independent XML totals confirmed 53 fresh reports, 437 passing and one error.
+The sole error was the existing category-persistence fixture supplying the
+non-UUID principal `synthetic-admin` without a persisted account. The new F2
+check correctly rejected it. Updated only that fixture to persist an eligible
+synthetic ADMIN and use its UUID; all category/status assertions are unchanged.
+No authorization guard or production behavior was relaxed. Focused verification
+of the corrected fixture precedes the final complete invocation.
+
+Final full invocation started 20:26:58 +02:00 after renewed process/socket/SQL
+identity and checkpoint checks. Independently parsed every Surefire XML report:
+53 unique suites, all reports newer than this invocation, exactly 438 tests and
+zero failures/errors/skips. Post-run process/PID/SQL still identified the same
+disposable cluster and regression database. It retained 25 successful migrations
+through V25, with zero remaining smartlims_migration_* databases or synthetic
+triggers. A post-run checkpoint succeeded. Only this dedicated cluster was then
+stopped normally to restore its initial stopped state; no development service
+or database was accessed or changed. All F1/F2 acceptance criteria are satisfied.
+
+Acceptance coverage:
+
+- F1: all administrative service methods reject null/unauthenticated/anonymous,
+  malformed/missing, non-admin/forged/demoted, blocked, unverified, passwordless,
+  unaccepted and missing-authority callers. Full users/token row snapshots and
+  email mock assertions prove denial has no persisted/token/email side effects;
+  missing target lookup does not bypass authorization. An eligible ADMIN uses
+  all ten HTTP operations. Self-protection, same-role no-op, last-admin counts,
+  concurrent removal/provisioning, public invitation acceptance and JWT current
+  account behavior retain regression coverage.
+- F2: every catalog/basic patient method rejects invalid/ineligible accounts;
+  forged/stale privileged authorities do not grant writes. Stored PATIENT role
+  limits catalog lists/detail and patient-owned reads even with stale ADMIN
+  authorities; stored staff roles retain their allowed reads. Existing catalog,
+  patient management/linking and registration regressions cover HTTP matrices,
+  concealment, CRUD behavior and independent account/profile demographics.
+- Administrative writes now share the existing coordination lock so caller
+  eligibility is checked after waiting. Existing concurrent username tests
+  retain one success/one specific conflict; new independent committed external
+  writer cases retain real database constraint-translation/rollback coverage.
+  Concurrent administrator removal now rejects the revoked caller with 401/403
+  before target handling; exact self-protection LAST_ADMIN assertions remain.
+
+Changed files: AccountController, AccountManagementService, LabTestService,
+PatientService; AuthenticationRegressionTest, RegistrationTest,
+LabTestServiceTest, LabTestCategoryPersistenceTest and new
+PersistedServiceAuthorizationTest; AUTH_API.md,
+LAB_TESTS_API.md, PATIENTS_API.md, PERMISSIONS_REPORT.md, this verification
+record and the excluded local IMPLEMENTATION_PLAN.md. No generated output was
+edited manually. Runtime deployment/browser integration and real SMTP remain
+outside this local automated verification.
+
 ## Disposable PostgreSQL recovery and full-suite verification (2026-10-31)
 
 Status: DONE. This section is the current local setup; older Temp-based

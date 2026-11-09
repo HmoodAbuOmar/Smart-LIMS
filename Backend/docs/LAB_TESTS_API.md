@@ -1,5 +1,12 @@
 # Lab Tests API
 
+Security remediation F2: every catalog service operation also requires a
+currently eligible persisted account and an allowed stored role. Missing or
+ineligible identities return 401 `UNAUTHORIZED`; disallowed roles return 403
+`FORBIDDEN`. Verified stored roles select patient active-only visibility,
+including when supplied authentication authorities are stale. Routes and DTOs
+are unchanged.
+
 Migration-version references in historical sections describe the original V1-V9
 implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
@@ -31,6 +38,47 @@ No deletion/seeding or automatic clinical ranges. Current category vocabulary/
 assignment behavior and original order snapshots remain unchanged. Standard errors:
 404 LAB_TEST_NOT_FOUND/PARAMETER_NOT_FOUND; 409 PARAMETER_CHANGED,
 PARAMETER_IN_USE, PARAMETER_CODE_CONFLICT; strict invalid fields→400.
+
+### Parameter list usage indicator (2026-11-09)
+
+GET `/api/lab-tests/{testId}/parameters` adds a read-only boolean `inUse` to
+each content item, preserving all existing fields and the page envelope.
+`inUse: true` supports the Admin Parameters screen's "Historically used" label.
+It means at least one persisted `result_values` row references this parameter,
+using the same rule as the update guard. Unreported draft rows count as use;
+publication, a filled measurement, current-version status, and parameter
+availability are not prerequisites. No referencing row means `inUse: false`.
+
+Usage is fetched in bulk for only the returned page's parameter IDs, with one
+distinct-ID query per nonempty page and none for an empty page. It is response
+metadata, not a filter or sort key, and does not alter counts, ordering, or
+active/includeInactive behavior. Permissions remain ADMIN/RECEPTIONIST/
+LAB_TECHNICIAN for listing; PATIENT remains forbidden. This read has no side
+effects or new retry requirements. Concurrent result creation can change usage
+after a list read; the existing write guard remains authoritative.
+
+POST/PUT request and response contracts are unchanged: `inUse` is not accepted
+as input (400 INVALID_JSON as an unknown JSON field), and their responses do not
+include it. Used-definition restrictions, active-state changes, stable identities,
+expectedVersion checks and all result workflows remain unchanged. No schema or
+Reference Ranges change is included.
+
+Task status: IN_PROGRESS (implementation and focused coverage added; execution
+and Postman updates explicitly deferred by the owner). IMPLEMENTATION_PLAN.md is
+absent in this checkout; this section records the scoped task under R-CAT-01/
+R-CAT-02 and R-NFR-01. Execution evidence will not be inferred from older runs.
+Added TestParameterServiceTest for page-scoped bulk fetching, used/unused mapping
+and the empty-page fast path; LaboratoryFoundationTest adds persisted unreported
+draft usage, inactive usage, staff permissions, paging and response/input
+compatibility coverage. These tests have not been compiled or executed for this
+task. Source/diff review and `git -c core.safecrlf=false diff --check` passed;
+no application startup, database access, schema or Postman operations occurred.
+Deferred focused command (NOT RUN; database isolation must first be independently
+verified as documented in TESTING.md):
+
+```powershell
+.\mvnw.cmd '-Dtest=TestParameterServiceTest,LaboratoryFoundationTest' test '-Dspring.test.mockmvc.print=NONE'
+```
 
 Implemented catalog endpoints use `/api/lab-tests` and JSON. Schema names follow
 DATABASE_DESIGN.md (`active`, not `is_active`). V4 remains unchanged. Old parameter/

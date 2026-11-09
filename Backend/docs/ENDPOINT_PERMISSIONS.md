@@ -1,8 +1,8 @@
 # Implemented endpoint permissions
 
-Audit date: 2026-10-31. Current working copy on `backend-hmood`, including existing modifications and untracked notifications code. **91 unique explicit method/full-path endpoints in 13 application controllers: 9 public, 82 protected.** See [PERMISSIONS_REPORT.md](PERMISSIONS_REPORT.md) for role definitions, security transport, denial behavior, examples, findings and uncertainty.
+Updated 2026-11-06 for Users Management on `backend-hmood`. **94 unique explicit method/full-path endpoints in 13 application controllers: 9 public, 85 protected.** See [PERMISSIONS_REPORT.md](PERMISSIONS_REPORT.md) for role definitions and historical findings; [USERS_API.md](USERS_API.md) defines current account actions and queries.
 
-Each endpoint appears once below. Query parameters are inputs, not part of route identity. Counts exclude implicit framework HEAD/OPTIONS handling, CORS preflight, error dispatch, static resources, non-web first-admin provisioning and unimplemented future APIs. No context-path override was found in the inspected application configuration. No application/test/database execution was performed.
+Each endpoint appears once below. Query parameters are inputs, not part of route identity. Counts exclude implicit framework HEAD/OPTIONS handling, CORS preflight, error dispatch, static resources, non-web first-admin provisioning and unimplemented future APIs. No context-path override was found in the inspected application configuration. The original inventory was source-only; Users Management execution evidence is recorded separately in [TESTING.md](TESTING.md).
 
 ## Reading the inventory
 
@@ -22,7 +22,7 @@ Common enforcement sources: [CurrentAccountAuthenticationConverter.java:22](../s
 | Feature | Endpoints | Public | Protected |
 |---|---:|---:|---:|
 | Authentication | 10 | 9 | 1 |
-| Account administration | 10 | 0 | 10 |
+| Account administration | 13 | 0 | 13 |
 | Patients and profile linking | 10 | 0 | 10 |
 | Patient dashboard | 1 | 0 | 1 |
 | Laboratory catalog and parameters | 8 | 0 | 8 |
@@ -32,9 +32,9 @@ Common enforcement sources: [CurrentAccountAuthenticationConverter.java:22](../s
 | Samples and suitability attestations | 6 | 0 | 6 |
 | Results, publication, patient reports and trends | 14 | 0 | 14 |
 | Patient notifications | 4 | 0 | 4 |
-| **Total** | **91** | **9** | **82** |
+| **Total** | **94** | **9** | **85** |
 
-By explicit HTTP method: **GET: 42**, **POST: 36**, **PUT: 9**, **PATCH: 3**, **DELETE: 1**.
+By explicit HTTP method: **GET: 43**, **POST: 36**, **PUT: 9**, **PATCH: 5**, **DELETE: 1**.
 
 ## Authentication (10)
 
@@ -51,24 +51,32 @@ Route security: [SecurityConfiguration.java:68](../src/main/java/com/smartlims/a
 | `POST /api/auth/logout` | Clear access and CSRF cookies | Public | No account proof; does not revoke JWTs | CSRF unless explicit recognized Bearer selection | [AuthController.java:86](../src/main/java/com/smartlims/auth/controller/AuthController.java#L86) |
 | `POST /api/auth/forgot-password` | Send reset code | Public | Existing eligible account selected by email | Unknown/ineligible 404 USER_NOT_FOUND; code expires in 15 minutes | [AuthController.java:93](../src/main/java/com/smartlims/auth/controller/AuthController.java#L93); [PasswordRecoveryService.java:38](../src/main/java/com/smartlims/auth/service/PasswordRecoveryService.java#L38) |
 | `POST /api/auth/reset-password` | Change password using reset code | Public | Proof for account selected by email; no JWT ownership required | Eligible account; valid code; five incorrect attempts invalidate code; 400 INVALID_RESET_CODE/SAME_PASSWORD or 404 missing account | [AuthController.java:99](../src/main/java/com/smartlims/auth/controller/AuthController.java#L99); [PasswordRecoveryService.java:46](../src/main/java/com/smartlims/auth/service/PasswordRecoveryService.java#L46) |
-| `POST /api/auth/set-password` | Accept invitation/set password | Public | Purpose-bound token must belong to supplied userId; target enabled | Unused unexpired 24-hour proof; 400 INVALID_INVITATION/SAME_PASSWORD; missing user 404 | [AuthController.java:105](../src/main/java/com/smartlims/auth/controller/AuthController.java#L105); [AccountManagementService.java:96](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L96) |
+| `POST /api/auth/set-password` | Accept invitation/set password | Public | Purpose-bound token must belong to supplied userId; target enabled | Unused unexpired 24-hour proof; 400 INVALID_INVITATION/SAME_PASSWORD; missing user 404 | [AuthController.java:105](../src/main/java/com/smartlims/auth/controller/AuthController.java#L105); [AccountManagementService.java:115](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L115) |
 
-## Account administration (10)
+## Account administration (13)
 
 Route security: [SecurityConfiguration.java:71](../src/main/java/com/smartlims/auth/security/SecurityConfiguration.java#L71).
 
+Every account operation also checks current persisted eligible ADMIN state in
+AccountManagementService before target access. Linked PATIENT role
+changes are 409 PATIENT_ACCOUNT_LINKED; retained-reference deletion failures are
+409 USER_HAS_RETAINED_REFERENCES. Full current semantics: [USERS_API.md](USERS_API.md).
+
 | HTTP method and full path | Purpose | Allowed roles | Ownership / additional authorization | Workflow / input prerequisites and special failures | Sources |
 |---|---|---|---|---|---|
-| `GET /api/users` | List accounts | A | All accounts; service relies on ADMIN route guard | No patient link; unpaginated account list | [AccountController.java:19](../src/main/java/com/smartlims/auth/controller/AccountController.java#L19); [AccountManagementService.java:113](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L113) |
-| `GET /api/users/{id}` | Read account | A | Any account; route guard | Valid account ID; 404 USER_NOT_FOUND | [AccountController.java:22](../src/main/java/com/smartlims/auth/controller/AccountController.java#L22); [AccountManagementService.java:118](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L118) |
-| `POST /api/users` | Create invited account | A | May select any stored role including ADMIN/PATIENT; route guard | Unique email/username and valid profile; invitation email; 200 | [AccountController.java:25](../src/main/java/com/smartlims/auth/controller/AccountController.java#L25); [AccountManagementService.java:51](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L51) |
-| `PUT /api/users/{id}` | Update account profile | A | Any account, including self; route guard; cannot change canonical email | 400 EMAIL_CHANGE_NOT_ALLOWED; username conflict 409 | [AccountController.java:30](../src/main/java/com/smartlims/auth/controller/AccountController.java#L30); [AccountManagementService.java:121](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L121) |
-| `PUT /api/users/{id}/role` | Change account role | A | No self role change; last enabled confirmed ADMIN protected; no patient-link check | Same role is no-op; safeguard 400 LAST_ADMIN; missing user 404 | [AccountController.java:35](../src/main/java/com/smartlims/auth/controller/AccountController.java#L35); [AccountManagementService.java:153](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L153) |
-| `POST /api/users/{id}/set-password-email` | Replace/send invitation proof | A | Any enabled target; route guard | Blocked target 403 ACCOUNT_BLOCKED; replaces earlier invitation tokens | [AccountController.java:41](../src/main/java/com/smartlims/auth/controller/AccountController.java#L41); [AccountManagementService.java:85](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L85) |
-| `PATCH /api/users/{id}/block` | Disable account | A | Cannot block self or last enabled confirmed ADMIN | Safeguard 400 LAST_ADMIN; old JWT then fails eligibility | [AccountController.java:47](../src/main/java/com/smartlims/auth/controller/AccountController.java#L47); [AccountManagementService.java:143](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L143) |
-| `PATCH /api/users/{id}/unblock` | Enable account | A | Any target; no explicit self prohibition; blocked caller cannot authenticate | Does not verify/accept invitation or issue JWT; unexpired old JWT may become usable | [AccountController.java:52](../src/main/java/com/smartlims/auth/controller/AccountController.java#L52); [AccountManagementService.java:143](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L143) |
-| `GET /api/users/{id}/isblocked` | Read blocked flag | A | Any account; route guard | 404 USER_NOT_FOUND for missing target | [AccountController.java:57](../src/main/java/com/smartlims/auth/controller/AccountController.java#L57); [AccountManagementService.java:118](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L118) |
-| `DELETE /api/users/{id}` | Delete account | A | Cannot delete self or last enabled confirmed ADMIN | 204 on success; retained FKs may prevent deletion; failure contract unresolved | [AccountController.java:60](../src/main/java/com/smartlims/auth/controller/AccountController.java#L60); [AccountManagementService.java:165](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L165) |
+| `GET /api/users` | List accounts | A | All accounts; persisted eligible ADMIN service check | No patient link; unpaginated account list | [AccountController.java:25](../src/main/java/com/smartlims/auth/controller/AccountController.java#L25); [AccountManagementService.java:135](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L135) |
+| `GET /api/users/page` | Filtered/sorted account page | A | Persisted eligible ADMIN at service boundary | Bounded page/size; account creation date bounds; 400 invalid query | [Users contract](USERS_API.md#paginated-screen-listing) |
+| `PATCH /api/users/bulk/block` | Block explicit selected accounts atomically | A | Current ADMIN; self/last-admin protection | 1-100 distinct IDs; whole-batch validation/rollback; 404 missing, 400 safeguard | [Users contract](USERS_API.md#atomic-selected-id-bulk-operations) |
+| `PATCH /api/users/bulk/unblock` | Unblock explicit selected accounts atomically | A | Current ADMIN; enabled state grants no verification | 1-100 distinct IDs; already-enabled no-op; 404 missing | [Users contract](USERS_API.md#atomic-selected-id-bulk-operations) |
+| `GET /api/users/{id}` | Read account | A | Any account; persisted eligible ADMIN service check | Valid account ID; 404 USER_NOT_FOUND | [AccountController.java:30](../src/main/java/com/smartlims/auth/controller/AccountController.java#L30); [AccountManagementService.java:147](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L147) |
+| `POST /api/users` | Create invited account | A | May select any stored role including ADMIN/PATIENT; persisted ADMIN service check | Unique email/username and valid profile; invitation email; 200 | [AccountController.java:41](../src/main/java/com/smartlims/auth/controller/AccountController.java#L41); [AccountManagementService.java:61](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L61) |
+| `PUT /api/users/{id}` | Update account profile | A | Any account, including self; persisted ADMIN service check; cannot change canonical email | 400 EMAIL_CHANGE_NOT_ALLOWED; username conflict 409 | [AccountController.java:47](../src/main/java/com/smartlims/auth/controller/AccountController.java#L47); [AccountManagementService.java:153](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L153) |
+| `PUT /api/users/{id}/role` | Change account role | A | No self role change; last enabled confirmed ADMIN protected; linked PATIENT changes rejected | Same role is no-op; safeguard 400 LAST_ADMIN; missing user 404 | [AccountController.java:53](../src/main/java/com/smartlims/auth/controller/AccountController.java#L53); [AccountManagementService.java:189](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L189) |
+| `POST /api/users/{id}/set-password-email` | Replace/send invitation proof | A | Any enabled target; persisted ADMIN service check | Blocked target 403 ACCOUNT_BLOCKED; replaces earlier invitation tokens | [AccountController.java:59](../src/main/java/com/smartlims/auth/controller/AccountController.java#L59); [AccountManagementService.java:101](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L101) |
+| `PATCH /api/users/{id}/block` | Disable account | A | Cannot block self or last enabled confirmed ADMIN | Safeguard 400 LAST_ADMIN; old JWT then fails eligibility | [AccountController.java:65](../src/main/java/com/smartlims/auth/controller/AccountController.java#L65); [AccountManagementService.java:177](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L177) |
+| `PATCH /api/users/{id}/unblock` | Enable account | A | Any target; no explicit self prohibition; blocked caller cannot authenticate | Does not verify/accept invitation or issue JWT; unexpired old JWT may become usable | [AccountController.java:82](../src/main/java/com/smartlims/auth/controller/AccountController.java#L82); [AccountManagementService.java:177](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L177) |
+| `GET /api/users/{id}/isblocked` | Read blocked flag | A | Any account; persisted eligible ADMIN service check | 404 USER_NOT_FOUND for missing target | [AccountController.java:87](../src/main/java/com/smartlims/auth/controller/AccountController.java#L87); [AccountManagementService.java:147](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L147) |
+| `DELETE /api/users/{id}` | Delete account | A | Cannot delete self or last enabled confirmed ADMIN | 204 on success; retained FKs return 409 USER_HAS_RETAINED_REFERENCES | [AccountController.java:92](../src/main/java/com/smartlims/auth/controller/AccountController.java#L92); [AccountManagementService.java:207](../src/main/java/com/smartlims/auth/service/AccountManagementService.java#L207) |
 
 ## Patients and profile linking (10)
 

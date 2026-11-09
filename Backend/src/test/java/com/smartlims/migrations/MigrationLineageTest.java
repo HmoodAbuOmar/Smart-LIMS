@@ -301,6 +301,28 @@ class MigrationLineageTest {
     }
 
     @Test
+    void lastLoginUpgradePreservesExistingAccountsAndHistoryWithoutFabricatedLogins() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "25").migrate();
+        execute(url, "INSERT INTO users(id,full_name,email,role,origin) VALUES "
+                + "('00000000-0000-0000-0000-000000000001','Synthetic retained account','retained@example.invalid','PATIENT','PUBLIC_REGISTRATION')");
+        var before = rows(url, "SELECT row_to_json(u)::jsonb::text FROM users u ORDER BY id");
+        var history = rows(url, "SELECT row_to_json(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "26");
+        assertEquals(1, current.info().pending().length);
+        assertEquals("V26__user_last_login.sql", current.info().pending()[0].getScript());
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        assertEquals(List.of("1"), rows(url, "SELECT count(*) FROM users WHERE last_login_at IS NULL"));
+        // Remove only the new nullable field before comparing every retained account value.
+        assertEquals(before, rows(url, "SELECT (row_to_json(u)::jsonb - 'last_login_at')::text FROM users u ORDER BY id"));
+        assertEquals(history, rows(url, "SELECT row_to_json(h)::text FROM flyway_schema_history h WHERE version::integer <= 25 ORDER BY installed_rank"));
+        assertEquals(List.of("timestamp with time zone|YES|none"), rows(url,
+                "SELECT data_type || '|' || is_nullable || '|' || coalesce(column_default,'none') FROM information_schema.columns WHERE table_name='users' AND column_name='last_login_at'"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+    }
+
+    @Test
     void notificationUpgradePreservesAllV24DataDdlSequencesAndHistoryWithoutBackfill() throws Exception {
         String url = database();
         migration(url, SPLIT, "24").migrate();

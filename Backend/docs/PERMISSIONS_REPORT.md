@@ -1,5 +1,47 @@
 # Backend permissions audit
 
+## Users Management follow-up (2026-11-06)
+
+The current users contract is [USERS_API.md](USERS_API.md). Three additive
+ADMIN-only operations are GET /api/users/page and PATCH /api/users/bulk/block,
+/api/users/bulk/unblock. Both HTTP and service boundaries enforce current
+persisted eligible ADMIN state. Bulk actions accept only 1-100 explicit distinct
+IDs, share individual-action coordination, validate every target before changes,
+and commit or roll back together. Self/last-admin protections and counting rules
+are retained. The legacy GET /api/users array remains unchanged.
+
+F3 is addressed prospectively: changes away from PATIENT reject linked accounts
+with 409 PATIENT_ACCOUNT_LINKED, coordinated with profile creation/linking.
+Existing historical links are not altered. Deletion with retained references now
+returns 409 USER_HAS_RETAINED_REFERENCES and rolls back token/record changes.
+Optional account username/phone omission preserves current values. New nullable
+last-login telemetry and derived statuses grant no permissions and do not change
+login eligibility or temporary lockout. Counts are now 94 endpoints (9 public,
+85 protected); account administration has 13. Other findings below remain the
+historical audit snapshot. Executed verification is recorded in TESTING.md.
+
+## F1/F2 remediation follow-up (2026-11-06)
+
+Status: F1 DONE; F2 DONE after successful verification on 2026-11-06. The audit below remains
+the historical 2026-10-31 snapshot. F1 now has explicit Authentication-based
+persisted ADMIN/eligibility checks at every administrative service entry point;
+administrative writes coordinate before checking the caller and target. The
+first-admin private invitation helper and public token-authorized setPassword
+path preserve their existing authority models. F2 now reloads persisted
+roles/eligibility for catalog and basic patient CRUD; verified stored roles
+select active-only visibility and patient ownership. No HTTP route/DTO or schema
+change. F3-F6 remain unchanged and outside this remediation.
+
+Focused verification: 157/157 across eight suites, then 38/38 account regression
+tests after added assertions, with no failures/errors/skips. These overlapping
+runs include direct-service denial/side-effect matrices and authorized HTTP
+regressions on independently verified disposable PostgreSQL only. Full-suite
+results: final direct `.\mvnw.cmd test` passed 438 tests / 53 fresh suites,
+zero failures/errors/skips, exit 0 at 20:32:40 +02:00. The earlier full run had
+one stale category-fixture error, corrected without weakening authorization or
+assertions; that fixture passed 3/3 before the final full run.
+Safety and complete execution evidence: [TESTING.md](TESTING.md#security-remediation-f1f2-verification-2026-11-06).
+
 Audit date: 2026-10-31. Scope: the current working copy on `backend-hmood`, including existing modified files and untracked notifications implementation. This is a source audit, not an audit of a deployed server or its configuration. Existing work was preserved.
 
 There are **91 distinct implemented application endpoints across 13 controllers**. Nine are public authentication actions; 82 require authentication. Public does not mean exempt from CSRF or from proof such as a password, invitation token or reset code. [ENDPOINT_PERMISSIONS.md](ENDPOINT_PERMISSIONS.md) lists every explicit HTTP method/full-path mapping exactly once, with controller and service line references, feature counts and prerequisites.

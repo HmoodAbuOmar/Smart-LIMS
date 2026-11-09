@@ -26,6 +26,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -93,6 +96,11 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         UserAccount user = UserAccount.invite("Regression Account", name + "@example.invalid", name, "0000000000", role);
         user.acceptInvitation(passwords.encode("oldpass1"), Instant.now());
         return users.saveAndFlush(user);
+    }
+
+    private Authentication actor(UUID id) {
+        return new UsernamePasswordAuthenticationToken(id.toString(), null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     }
 
     private AuthRequestException wrongReset(UserAccount user) {
@@ -163,14 +171,15 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     @Test
     void sameNormalizedEmailUpdatesProfileButDifferentEmailIsRejected() {
         UserAccount user = active("patient", Role.PATIENT);
+        var administrator = actor(active("admin", Role.ADMIN).getId());
         recovery.forgot(user.getEmail());
         String previousHash = users.findById(user.getId()).orElseThrow().getResetCodeHash();
-        accounts.update(user.getId(), new UpdateAccountRequest("Updated Profile", " PATIENT@EXAMPLE.INVALID ",
+        accounts.update(administrator, user.getId(), new UpdateAccountRequest("Updated Profile", " PATIENT@EXAMPLE.INVALID ",
                 " patient-updated ", "0000000000"));
         UserAccount updated = users.findById(user.getId()).orElseThrow();
         assertEquals("patient-updated", updated.getUserName());
         assertEquals(previousHash, updated.getResetCodeHash());
-        AuthRequestException failure = assertThrows(AuthRequestException.class, () -> accounts.update(user.getId(),
+        AuthRequestException failure = assertThrows(AuthRequestException.class, () -> accounts.update(administrator, user.getId(),
                 new UpdateAccountRequest("Updated Profile", "different@example.invalid", "patient", "0000000000")));
         assertEquals("EMAIL_CHANGE_NOT_ALLOWED", failure.getCode());
         assertEquals("email", failure.getField());
@@ -180,17 +189,18 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     @Test
     void usernamesAreTrimmedValidatedAndConflictsAreSpecificInAdministrativeFlows() {
         active("registered", Role.PATIENT);
-        AccountResponse created = accounts.create(new CreateAccountRequest("Regression Staff", "staff@example.invalid",
+        var administrator = actor(active("admin", Role.ADMIN).getId());
+        AccountResponse created = accounts.create(administrator, new CreateAccountRequest("Regression Staff", "staff@example.invalid",
                 " staff ", "0000000000", Role.RECEPTIONIST));
         assertEquals("staff", created.userName());
-        assertEquals("USERNAME_IN_USE", assertThrows(AuthRequestException.class, () -> accounts.create(
+        assertEquals("USERNAME_IN_USE", assertThrows(AuthRequestException.class, () -> accounts.create(administrator,
                 new CreateAccountRequest("Regression Staff", "other@example.invalid", " STAFF ",
                         "0000000000", Role.RECEPTIONIST))).getCode());
-        assertEquals("USERNAME_IN_USE", assertThrows(AuthRequestException.class, () -> accounts.update(created.id(),
+        assertEquals("USERNAME_IN_USE", assertThrows(AuthRequestException.class, () -> accounts.update(administrator, created.id(),
                 new UpdateAccountRequest("Regression Staff", "staff@example.invalid", " REGISTERED ", "0000000000"))).getCode());
-        assertEquals("VALIDATION_ERROR", assertThrows(AuthRequestException.class, () -> accounts.update(created.id(),
+        assertEquals("VALIDATION_ERROR", assertThrows(AuthRequestException.class, () -> accounts.update(administrator, created.id(),
                 new UpdateAccountRequest("Regression Staff", "staff@example.invalid", " a ", "0000000000"))).getCode());
-        assertThrows(AuthRequestException.class, () -> accounts.create(new CreateAccountRequest("Regression Staff",
+        assertThrows(AuthRequestException.class, () -> accounts.create(administrator, new CreateAccountRequest("Regression Staff",
                 "other@example.invalid", " a ", "0000000000", Role.RECEPTIONIST)));
     }
 
@@ -263,21 +273,16 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
     void concurrentUsernameUniquenessViolationsReturnUsernameConflict(String competingFlow) throws Exception {
         UserAccount firstAccount = active("first", Role.PATIENT);
         UserAccount existing = active("existing", Role.PATIENT);
-        CyclicBarrier checks = new CyclicBarrier(2);
-        // Force both service prechecks to complete before either writes; PostgreSQL decides the winner.
-        doAnswer(call -> {
-            boolean found = jdbc.queryForObject("SELECT count(*) > 0 FROM users WHERE lower(user_name) = 'race'", Boolean.class);
-            checks.await(10, TimeUnit.SECONDS);
-            return found;
-        }).when(users).existsByUserNameIgnoreCase("race");
-        Supplier<String> first = () -> updateUsernameRace(firstAccount);
+        var administrator = actor(active("admin", Role.ADMIN).getId());
+        // Administrative writes now serialize authorization and uniqueness checks together.
+        Supplier<String> first = () -> updateUsernameRace(administrator, firstAccount);
         Supplier<String> second = () -> {
             try {
                 switch (competingFlow) {
                     case "creation" ->
-                            accounts.create(new CreateAccountRequest("Regression Staff", "two@example.invalid",
+                            accounts.create(administrator, new CreateAccountRequest("Regression Staff", "two@example.invalid",
                                     " race ", "0000000000", Role.RECEPTIONIST));
-                    case "update" -> accounts.update(existing.getId(), new UpdateAccountRequest("Regression Patient",
+                    case "update" -> accounts.update(administrator, existing.getId(), new UpdateAccountRequest("Regression Patient",
                             existing.getEmail(), " race ", "0000000000"));
                     default -> throw new IllegalArgumentException();
                 }
@@ -292,9 +297,9 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM users WHERE lower(user_name) = 'race'", Integer.class));
     }
 
-    private String updateUsernameRace(UserAccount account) {
+    private String updateUsernameRace(Authentication administrator, UserAccount account) {
         try {
-            accounts.update(account.getId(), new UpdateAccountRequest("Regression Patient",
+            accounts.update(administrator, account.getId(), new UpdateAccountRequest("Regression Patient",
                     account.getEmail(), " race ", "0000000000"));
             return "ok";
         } catch (AuthRequestException failure) {
@@ -378,20 +383,24 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         List<String> results = runTogether(() -> removeAdmin(operations[0], first.getId(), second.getId()),
                 () -> removeAdmin(operations[operations.length - 1], second.getId(), first.getId()));
         assertEquals(1, results.stream().filter("ok"::equals).count());
-        assertEquals(1, results.stream().filter("LAST_ADMIN"::equals).count());
+        String winningOperation = results.getFirst().equals("ok") ? operations[0] : operations[operations.length - 1];
+        assertEquals(1, results.stream().filter((winningOperation.equals("demote") ? "FORBIDDEN" : "UNAUTHORIZED")::equals).count());
         assertEquals(1, users.countByRoleAndEnabledTrueAndEmailVerifiedAtIsNotNull(Role.ADMIN));
         UserAccount remaining = users.findAll().stream().filter(u -> u.isEnabled() && u.getRole() == Role.ADMIN).findFirst().orElseThrow();
-        assertThrows(AuthRequestException.class, () -> accounts.delete(remaining.getId(), remaining.getId()));
-        assertThrows(AuthRequestException.class, () -> accounts.setBlocked(remaining.getId(), remaining.getId(), true));
-        assertThrows(AuthRequestException.class, () -> accounts.changeRole(remaining.getId(), remaining.getId(), Role.PATIENT));
+        assertEquals("LAST_ADMIN", assertThrows(AuthRequestException.class, () -> accounts.delete(actor(remaining.getId()), remaining.getId())).getCode());
+        assertEquals("LAST_ADMIN", assertThrows(AuthRequestException.class, () -> accounts.setBlocked(actor(remaining.getId()), remaining.getId(), true)).getCode());
+        assertEquals("LAST_ADMIN", assertThrows(AuthRequestException.class, () -> accounts.changeRole(actor(remaining.getId()), remaining.getId(), Role.PATIENT)).getCode());
+        clearInvocations(email);
+        assertEquals(Role.ADMIN, accounts.changeRole(actor(remaining.getId()), remaining.getId(), Role.ADMIN).role());
+        verifyNoInteractions(email);
     }
 
     private String removeAdmin(String operation, UUID actor, UUID target) {
         try {
             switch (operation) {
-                case "block" -> accounts.setBlocked(actor, target, true);
-                case "demote" -> accounts.changeRole(actor, target, Role.PATIENT);
-                case "delete" -> accounts.delete(actor, target);
+                case "block" -> accounts.setBlocked(actor(actor), target, true);
+                case "demote" -> accounts.changeRole(actor(actor), target, Role.PATIENT);
+                case "delete" -> accounts.delete(actor(actor), target);
                 default -> throw new IllegalArgumentException();
             }
             return "ok";
@@ -406,17 +415,17 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
         UserAccount subject = active("subject", Role.ADMIN);
         String jwt = login.login(new LoginRequest("subject", "oldpass1")).accessToken();
         mvc.perform(get("/api/users").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
-        accounts.changeRole(administrator.getId(), subject.getId(), Role.PATIENT);
+        accounts.changeRole(actor(administrator.getId()), subject.getId(), Role.PATIENT);
         mvc.perform(get("/api/users").header("Authorization", "Bearer " + jwt)).andExpect(status().isForbidden());
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("PATIENT"));
-        accounts.setBlocked(administrator.getId(), subject.getId(), true);
+        accounts.setBlocked(actor(administrator.getId()), subject.getId(), true);
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt)).andExpect(status().isUnauthorized());
-        accounts.setBlocked(administrator.getId(), subject.getId(), false);
+        accounts.setBlocked(actor(administrator.getId()), subject.getId(), false);
         recovery.forgot(subject.getEmail());
         recovery.reset(new ResetPasswordRequest(subject.getEmail(), resetCode.get(), "newpass1"));
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
-        accounts.delete(administrator.getId(), subject.getId());
+        accounts.delete(actor(administrator.getId()), subject.getId());
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jwt)).andExpect(status().isUnauthorized());
     }
 
@@ -481,5 +490,132 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
             start.countDown();
             return List.of(a.get(20, TimeUnit.SECONDS), b.get(20, TimeUnit.SECONDS));
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"null", "unauthenticated", "anonymous", "malformed", "missing",
+            "PATIENT", "RECEPTIONIST", "LAB_TECHNICIAN", "missing-authority", "forged", "demoted", "blocked",
+            "unverified", "passwordless", "unaccepted"})
+    void everyAdministrativeServiceOperationRejectsUnauthorizedCallersWithoutSideEffects(String state) {
+        var administrator = actor(active("administrator", Role.ADMIN).getId());
+        var target = accounts.create(administrator, new CreateAccountRequest("Synthetic Target",
+                "target@example.invalid", "target", "000001", Role.PATIENT));
+        UserAccount caller = active("caller", Role.ADMIN);
+        Authentication authentication = actor(caller.getId());
+        String expected = "UNAUTHORIZED";
+        switch (state) {
+            case "null" -> authentication = null;
+            case "unauthenticated" -> authentication = new UsernamePasswordAuthenticationToken(caller.getId().toString(), null);
+            case "anonymous" -> authentication = new org.springframework.security.authentication.AnonymousAuthenticationToken(
+                    "test", caller.getId().toString(), List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+            case "malformed" -> authentication = new UsernamePasswordAuthenticationToken("invalid-id", null,
+                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+            case "missing" -> users.deleteById(caller.getId());
+            case "missing-authority" -> {
+                authentication = new UsernamePasswordAuthenticationToken(caller.getId().toString(), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_PATIENT")));
+                expected = "FORBIDDEN";
+            }
+            case "PATIENT", "RECEPTIONIST", "LAB_TECHNICIAN" -> {
+                jdbc.update("UPDATE users SET role=? WHERE id=?", state, caller.getId());
+                authentication = new UsernamePasswordAuthenticationToken(caller.getId().toString(), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + state)));
+                expected = "FORBIDDEN";
+            }
+            case "forged", "demoted" -> {
+                jdbc.update("UPDATE users SET role='PATIENT' WHERE id=?", caller.getId());
+                expected = "FORBIDDEN";
+            }
+            case "blocked" -> jdbc.update("UPDATE users SET enabled=false WHERE id=?", caller.getId());
+            case "unverified" -> jdbc.update("UPDATE users SET email_verified_at=NULL WHERE id=?", caller.getId());
+            case "passwordless" -> jdbc.update("UPDATE users SET password_hash=NULL WHERE id=?", caller.getId());
+            case "unaccepted" -> jdbc.update("UPDATE users SET invitation_accepted_at=NULL WHERE id=?", caller.getId());
+            default -> throw new IllegalArgumentException(state);
+        }
+        var actor = authentication;
+        var usersBefore = jdbc.queryForList("SELECT * FROM users ORDER BY id");
+        var tokensBefore = jdbc.queryForList("SELECT * FROM email_action_tokens ORDER BY id");
+        clearInvocations(email);
+        List<Runnable> operations = List.of(
+                () -> accounts.all(actor),
+                () -> accounts.page(actor, java.util.Map.of()),
+                () -> accounts.get(actor, target.id()),
+                () -> accounts.create(actor, new CreateAccountRequest("Denied Account", "denied@example.invalid", "denied", "000001", Role.ADMIN)),
+                () -> accounts.update(actor, target.id(), new UpdateAccountRequest("Changed Name", target.email(), "changed", "000002")),
+                () -> accounts.sendSetPassword(actor, target.id()),
+                () -> accounts.setBlocked(actor, target.id(), true),
+                () -> accounts.setBlocked(actor, target.id(), false),
+                () -> accounts.setBlockedBulk(actor, List.of(target.id()), true),
+                () -> accounts.setBlockedBulk(actor, List.of(target.id()), false),
+                () -> accounts.changeRole(actor, target.id(), Role.ADMIN),
+                () -> accounts.delete(actor, target.id()));
+        for (Runnable operation : operations) {
+            var failure = assertThrows(AuthRequestException.class, operation::run);
+            assertEquals(expected, failure.getCode());
+            assertEquals(expected.equals("UNAUTHORIZED") ? 401 : 403, failure.getStatus().value());
+            assertEquals(usersBefore, jdbc.queryForList("SELECT * FROM users ORDER BY id"));
+            assertEquals(tokensBefore, jdbc.queryForList("SELECT * FROM email_action_tokens ORDER BY id"));
+            verifyNoInteractions(email);
+        }
+        // A denied caller must not learn whether a target account exists.
+        assertEquals(expected, assertThrows(AuthRequestException.class,
+                () -> accounts.get(actor, UUID.randomUUID())).getCode());
+    }
+
+    @Test
+    void eligibleAdministratorCanUseEveryAccountHttpOperation() throws Exception {
+        active("admin", Role.ADMIN);
+        String jwt = login.login(new LoginRequest("admin", "oldpass1")).accessToken();
+        String body = """
+                {"fullName":"Synthetic Staff","email":"staff@example.invalid","userName":"staff","phoneNumber":"000001","role":"RECEPTIONIST"}
+                """;
+        mvc.perform(get("/api/users").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("RECEPTIONIST"));
+        UUID id = users.findByEmail("staff@example.invalid").orElseThrow().getId();
+        mvc.perform(get("/api/users/" + id).header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/" + id + "/isblocked").header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk()).andExpect(content().string("false"));
+        mvc.perform(put("/api/users/" + id).header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"fullName\":\"Updated Staff\",\"email\":\"staff@example.invalid\",\"userName\":\"staff\",\"phoneNumber\":\"000002\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.fullName").value("Updated Staff"));
+        mvc.perform(post("/api/users/" + id + "/set-password-email").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
+        mvc.perform(put("/api/users/" + id + "/role").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"role\":\"LAB_TECHNICIAN\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("LAB_TECHNICIAN"));
+        mvc.perform(patch("/api/users/" + id + "/block").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
+        mvc.perform(patch("/api/users/" + id + "/unblock").header("Authorization", "Bearer " + jwt)).andExpect(status().isOk());
+        mvc.perform(delete("/api/users/" + id).header("Authorization", "Bearer " + jwt)).andExpect(status().isNoContent());
+        assertFalse(users.existsById(id));
+        assertEquals(0, tokens.count());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"creation", "update"})
+    void databaseUsernameCollisionStillTranslatesAndRollsBackWhenAnExternalWriterWins(String operation) {
+        var administrator = actor(active("admin", Role.ADMIN).getId());
+        var target = active("target", Role.PATIENT);
+        var before = jdbc.queryForMap("SELECT * FROM users WHERE id=?", target.getId());
+        var externalWriter = new TransactionTemplate(transactions.getTransactionManager());
+        externalWriter.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        doAnswer(call -> {
+            // A synthetic external writer bypasses service coordination after the precheck.
+            externalWriter.execute(status -> users.saveAndFlush(UserAccount.invite("Synthetic Competitor",
+                    "competitor@example.invalid", "collision", "000001", Role.PATIENT)));
+            return false;
+        }).when(users).existsByUserNameIgnoreCase("collision");
+        var failure = assertThrows(AuthRequestException.class, () -> {
+            if (operation.equals("creation"))
+                accounts.create(administrator, new CreateAccountRequest("Synthetic Staff", "staff@example.invalid",
+                        "collision", "000001", Role.RECEPTIONIST));
+            else
+                accounts.update(administrator, target.getId(), new UpdateAccountRequest("Changed Account",
+                        target.getEmail(), "collision", "000002"));
+        });
+        assertEquals("USERNAME_IN_USE", failure.getCode());
+        assertEquals(409, failure.getStatus().value());
+        assertEquals(before, jdbc.queryForMap("SELECT * FROM users WHERE id=?", target.getId()));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM users WHERE user_name='collision'", Integer.class));
+        assertEquals(0, tokens.count());
+        verifyNoInteractions(email);
     }
 }

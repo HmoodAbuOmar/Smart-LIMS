@@ -3,6 +3,9 @@ package com.smartlims.auth.service;
 import com.smartlims.auth.dto.AccountResponse;
 import com.smartlims.auth.dto.CreateAccountRequest;
 import com.smartlims.auth.dto.UpdateAccountRequest;
+import com.smartlims.auth.dto.UserPageResponse;
+import com.smartlims.auth.dto.UserQueryRequest;
+import com.smartlims.auth.repository.UserAccountQueries;
 import com.smartlims.auth.email.VerificationEmailSender;
 import com.smartlims.auth.entity.EmailActionPurpose;
 import com.smartlims.auth.entity.EmailActionToken;
@@ -10,6 +13,7 @@ import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.EmailActionTokenRepository;
 import com.smartlims.auth.repository.UserAccountRepository;
+import com.smartlims.auth.security.LoginEligibility;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +22,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Sort;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,11 +39,12 @@ public class AccountManagementService {
     private final PasswordEncoder passwords;
     private final UserNames userNames;
     private final AdministratorCoordination administrators;
+    private final UserAccountQueries queries;
 
     public AccountManagementService(UserAccountRepository users, EmailActionTokenRepository tokens,
                                     VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
                                     PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
-                                    AdministratorCoordination administrators) {
+                                    AdministratorCoordination administrators, UserAccountQueries queries) {
         this.users = users;
         this.tokens = tokens;
         this.values = values;
@@ -47,11 +54,17 @@ public class AccountManagementService {
         this.passwords = passwords;
         this.userNames = userNames;
         this.administrators = administrators;
+        this.queries = queries;
     }
 
     @Transactional
-    public AccountResponse create(CreateAccountRequest request) {
+    public AccountResponse create(Authentication actor, CreateAccountRequest request) {
         administrators.lock();
+        currentAdministrator(actor);
+        return createInvitation(request);
+    }
+
+    private AccountResponse createInvitation(CreateAccountRequest request) {
         String canonical = identities.canonicalize(request.email());
         String name = userNames.normalize(request.userName());
         if (users.existsByEmail(canonical)) {
@@ -79,13 +92,15 @@ public class AccountManagementService {
             throw new AuthRequestException(HttpStatus.CONFLICT, "ADMIN_ALREADY_EXISTS",
                     "An administrator already exists; provisioning refused.", null);
         }
-        AccountResponse created = create(new CreateAccountRequest(request.fullName(), request.email(),
+        AccountResponse created = createInvitation(new CreateAccountRequest(request.fullName(), request.email(),
                 request.userName(), request.phoneNumber(), Role.ADMIN));
         locked(created.id()).markFirstAdministratorInvitation();
     }
 
     @Transactional
-    public void sendSetPassword(UUID id) {
+    public void sendSetPassword(Authentication actor, UUID id) {
+        administrators.lock();
+        currentAdministrator(actor);
         UserAccount user = locked(id);
         if (!user.isEnabled())
             throw new AuthRequestException(HttpStatus.FORBIDDEN,
@@ -117,29 +132,39 @@ public class AccountManagementService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountResponse> all() {
+    public List<AccountResponse> all(Authentication actor) {
+        currentAdministrator(actor);
         return users.findAll(Sort.by("userName")).stream().map(AccountResponse::from).toList();
     }
 
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public UserPageResponse page(Authentication actor, java.util.Map<String, List<String>> parameters) {
+        currentAdministrator(actor);
+        return queries.page(UserQueryRequest.from(parameters));
+    }
+
     @Transactional(readOnly = true)
-    public AccountResponse get(UUID id) {
+    public AccountResponse get(Authentication actor, UUID id) {
+        currentAdministrator(actor);
         return AccountResponse.from(users.findById(id).orElseThrow(this::missing));
     }
 
     @Transactional
-    public AccountResponse update(UUID id, UpdateAccountRequest request) {
+    public AccountResponse update(Authentication actor, UUID id, UpdateAccountRequest request) {
+        administrators.lock();
+        currentAdministrator(actor);
         UserAccount user = locked(id);
         String canonical = identities.canonicalize(request.email());
         if (!canonical.equals(identities.canonicalize(user.getEmail()))) {
             throw new AuthRequestException(HttpStatus.BAD_REQUEST, "EMAIL_CHANGE_NOT_ALLOWED",
                     "Changing the email address is not supported.", "email");
         }
-        String name = userNames.normalize(request.userName());
-        if (!name.equalsIgnoreCase(user.getUserName()) && users.existsByUserNameIgnoreCase(name)) {
+        String name = request.userName() == null ? user.getUserName() : userNames.normalize(request.userName());
+        if (name != null && !name.equalsIgnoreCase(user.getUserName()) && users.existsByUserNameIgnoreCase(name)) {
             throw UserNames.conflict();
         }
         user.setProfile(request.fullName().strip(), canonical, name,
-                request.phoneNumber().strip());
+                request.phoneNumber() == null ? user.getPhoneNumber() : request.phoneNumber().strip());
         try {
             users.flush();
         } catch (DataIntegrityViolationException error) {
@@ -149,10 +174,11 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public AccountResponse setBlocked(UUID actor, UUID id, boolean blocked) {
+    public AccountResponse setBlocked(Authentication actor, UUID id, boolean blocked) {
         administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
-        if (blocked && actor.equals(id))
+        if (blocked && administrator.getId().equals(id))
             throw protectedAdmin();
         guardLastAdmin(user, blocked || user.getRole() != Role.ADMIN);
         user.setEnabled(!blocked);
@@ -160,13 +186,17 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public AccountResponse changeRole(UUID actor, UUID id, Role role) {
+    public AccountResponse changeRole(Authentication actor, UUID id, Role role) {
         administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
-        if (actor.equals(id) && user.getRole() != role)
+        if (administrator.getId().equals(id) && user.getRole() != role)
             throw protectedAdmin();
         if (user.getRole() == role)
             return AccountResponse.from(user);
+        if (user.getRole() == Role.PATIENT && users.hasLinkedPatient(id))
+            throw new AuthRequestException(HttpStatus.CONFLICT, "PATIENT_ACCOUNT_LINKED",
+                    "An account linked to a patient profile must retain the PATIENT role.", "role");
         guardLastAdmin(user, true);
         user.setRole(role);
         email.sendRoleChanged(user.getEmail(), role.name());
@@ -174,13 +204,76 @@ public class AccountManagementService {
     }
 
     @Transactional
-    public void delete(UUID actor, UUID id) {
+    public void delete(Authentication actor, UUID id) {
         administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
-        if (actor.equals(id))
+        if (administrator.getId().equals(id))
             throw protectedAdmin();
         guardLastAdmin(user, true);
-        users.delete(user);
+        try {
+            users.delete(user);
+            users.flush();
+        } catch (DataIntegrityViolationException error) {
+            for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+                if (cause instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState()))
+                    throw new AuthRequestException(HttpStatus.CONFLICT, "USER_HAS_RETAINED_REFERENCES",
+                            "This account is referenced by retained records and cannot be deleted.", null);
+            }
+            throw error;
+        }
+    }
+
+    @Transactional
+    public List<AccountResponse> setBlockedBulk(Authentication actor, List<UUID> ids, boolean blocked) {
+        administrators.lock();
+        UserAccount administrator = currentAdministrator(actor);
+        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(java.util.Objects::isNull)
+                || new java.util.HashSet<>(ids).size() != ids.size())
+            throw UserQueryRequest.invalid("ids");
+        List<UUID> selected = List.copyOf(ids);
+        var targets = new java.util.HashMap<UUID, UserAccount>();
+        selected.stream().sorted(java.util.Comparator.comparing(UUID::toString)).forEach(id -> targets.put(id, locked(id)));
+        long removing = 0;
+        for (UserAccount user : targets.values()) {
+            if (blocked && user.getId().equals(administrator.getId())) throw protectedAdmin();
+            if (blocked && user.isEnabled() && user.getRole() == Role.ADMIN && user.getEmailVerifiedAt() != null)
+                removing++;
+        }
+        if (removing > 0 && users.countByRoleAndEnabledTrueAndEmailVerifiedAtIsNotNull(Role.ADMIN) <= removing)
+            throw protectedAdmin();
+        // Every target and safeguard has been checked before changing any managed entity.
+        targets.values().forEach(user -> {
+            if (user.isEnabled() == blocked) user.setEnabled(!blocked);
+        });
+        return selected.stream().map(id -> AccountResponse.from(targets.get(id))).toList();
+    }
+
+    private UserAccount currentAdministrator(Authentication actor) {
+        if (actor == null || !actor.isAuthenticated() || actor instanceof AnonymousAuthenticationToken)
+            throw unauthorized();
+        if (actor.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN")))
+            throw forbidden();
+        UUID id;
+        try {
+            id = UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw unauthorized();
+        }
+        UserAccount account = users.findById(id).orElseThrow(this::unauthorized);
+        if (!LoginEligibility.eligible(account))
+            throw unauthorized();
+        if (account.getRole() != Role.ADMIN)
+            throw forbidden();
+        return account;
+    }
+
+    private AuthRequestException unauthorized() {
+        return new AuthRequestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
+    }
+
+    private AuthRequestException forbidden() {
+        return new AuthRequestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
     }
 
     private void guardLastAdmin(UserAccount user, boolean removing) {

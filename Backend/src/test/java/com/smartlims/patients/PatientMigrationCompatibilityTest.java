@@ -167,7 +167,7 @@ class PatientMigrationCompatibilityTest {
             Map<String, String> scripts = new LinkedHashMap<>();
             while (rows.next())
                 scripts.put(rows.getString(1), rows.getString(2));
-            assertEquals(java.util.stream.IntStream.rangeClosed(1, 25).mapToObj(Integer::toString).toList(),
+            assertEquals(java.util.stream.IntStream.rangeClosed(1, 26).mapToObj(Integer::toString).toList(),
                     new ArrayList<>(scripts.keySet()));
             assertEquals("V4__patients.sql", scripts.get("4"));
             assertEquals("V5__lab_tests.sql", scripts.get("5"));
@@ -177,6 +177,7 @@ class PatientMigrationCompatibilityTest {
             assertEquals("V9__order_items.sql", scripts.get("9"));
             assertEquals("V24__laboratory_events.sql", scripts.get("24"));
             assertEquals("V25__patient_notifications.sql", scripts.get("25"));
+            assertEquals("V26__user_last_login.sql", scripts.get("26"));
         }
     }
 
@@ -197,9 +198,9 @@ class PatientMigrationCompatibilityTest {
     }
 
     @Test
-    void freshDatabaseAppliesAndValidatesExactlyTwentyFiveCanonicalMigrations() throws SQLException {
+    void freshDatabaseAppliesAndValidatesExactlyTwentySixCanonicalMigrations() throws SQLException {
         Flyway flyway = canonical(null);
-        assertEquals(25, flyway.migrate().migrationsExecuted);
+        assertEquals(26, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertCanonicalHistory();
         assertTrue(tableExists("lab_tests"));
@@ -215,7 +216,7 @@ class PatientMigrationCompatibilityTest {
                     + "('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','SYNTHETIC','Synthetic Catalog Test',1.00,'SYNTHETIC')");
         }
         Flyway flyway = canonical(null);
-        assertEquals(20, flyway.migrate().migrationsExecuted);
+        assertEquals(21, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertCanonicalHistory();
         assertEquals(1, count("patients"));
