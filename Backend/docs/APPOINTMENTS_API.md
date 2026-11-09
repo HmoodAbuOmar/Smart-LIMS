@@ -75,7 +75,7 @@ accepted); reject unknown JSON/query fields and repeated query parameters.
 | PUT /api/appointment-types/{id} | ADMIN | Replace code/name/active; 200. |
 | POST /api/appointment-slots | ADMIN, RECEPTIONIST | Publish slot; 201. |
 | PUT /api/appointment-slots/{id} | ADMIN, RECEPTIONIST | Replace capacity/active only; 200; immutable times. |
-| GET /api/appointment-slots/schedule | ADMIN, RECEPTIONIST | Full published schedule, including inactive/full/past; from/to/page/size. |
+| GET /api/appointment-slots/schedule | ADMIN, RECEPTIONIST | Published schedule, including full/past; from/to/page/size and optional active=true/false. Omitted active includes both open and closed slots. |
 | GET /api/appointment-slots | PATIENT, ADMIN, RECEPTIONIST | Bookable slots for required orderId/typeId/from/to; page/size. |
 | POST /api/appointments | PATIENT, ADMIN, RECEPTIONIST | Book; Idempotency-Key required; 201 new/200 replay. |
 | GET /api/appointments/me | PATIENT | tab=UPCOMING (default) or PAST; page/size. |
@@ -114,6 +114,28 @@ types by code asc/UUID asc, Upcoming by start asc/UUID asc, Past by start desc/U
 Unknown tab/boolean, empty/repeated/unknown params, malformed/overflow inputs: 400.
 No client patient/sort. Page fields: content,page,size,totalElements,totalPages,first,last.
 Large JPA offsets return empty accurate-count pages without integer overflow.
+
+Staff schedule filter (APT-SCHEDULE-01, 2026-11-09): only
+`GET /api/appointment-slots/schedule` additionally accepts optional `active`.
+Omission includes both states; exact `active=true` selects open slots and
+`active=false` selects closed slots, based solely on the stored active flag.
+This does not mean bookable/full/future: those properties do not change the
+staff visibility rules. Blank, padded, differently cased, unknown and repeated
+values (including identical repeats) return 400 VALIDATION_ERROR with
+`fieldErrors.active` in the existing request-ID/no-store envelope.
+The active predicate combines with the existing `[from,to)` start-time bounds
+before pagination AND counting, including empty/large-offset pages. Existing
+31-day range bound, page/size defaults/limits, startsAt/UUID ascending ordering,
+DTOs and ADMIN/RECEPTIONIST-only access are preserved. This is a read without
+side effects or new retry requirements. Patient availability and alternatives
+do not accept this filter and retain their existing active-only rules.
+Examples: append `&active=true` for open slots, `&active=false` for closed slots,
+or omit it for both states on the staff schedule request below.
+
+Task status: IN_PROGRESS; contract, implementation and three focused test cases
+are added. Source/diff review and `git -c core.safecrlf=false diff --check` passed.
+Test compilation/execution and Postman updates are explicitly deferred; no
+historical passing run is evidence for this change.
 
 ## 4. Booking and representation
 

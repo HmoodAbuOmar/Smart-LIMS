@@ -91,7 +91,10 @@ public class AppointmentScheduleService {
     public AppointmentResponses.Page<AppointmentResponses.Slot> schedule(Authentication actor, AppointmentQuery query) {
         access.current(actor, Role.ADMIN, Role.RECEPTIONIST);
         var range = query.range();
-        Specification<AppointmentSlot> filter = (r, q, c) -> c.and(c.greaterThanOrEqualTo(r.get("startsAt"), range[0]), c.lessThan(r.get("startsAt"), range[1]));
+        Boolean active = query.values().containsKey("active") ? query.bool("active") : null;
+        Specification<AppointmentSlot> filter = (r, q, c) -> c.and(
+                c.greaterThanOrEqualTo(r.get("startsAt"), range[0]), c.lessThan(r.get("startsAt"), range[1]),
+                active == null ? c.conjunction() : c.equal(r.get("active"), active));
         return AppointmentMapping.page(AppointmentPages.find(slots, filter, query, Sort.by("startsAt", "id")), s -> AppointmentMapping.slot(s, appointments.countActiveBySlot(s.getId())));
     }
 }
