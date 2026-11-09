@@ -4,6 +4,6 @@ import AdminDashboard from '../admin/AdminDashboard.jsx'
 // This module only renders fictional Admin records; it creates no auth session.
 export default function DevelopmentAdmin({ page = 'overview' }) {
   if (!import.meta.env.DEV) return null
-  const initialPage = ['overview', 'users', 'patients', 'tests', 'parameters', 'referenceRanges'].includes(page) ? page : 'overview'
+  const initialPage = ['overview', 'users', 'patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots'].includes(page) ? page : 'overview'
   return <AdminDashboard initialPage={initialPage} developmentPreview />
 }
