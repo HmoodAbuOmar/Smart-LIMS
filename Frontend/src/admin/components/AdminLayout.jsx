@@ -6,6 +6,7 @@ import AdminUsers from './AdminUsers.jsx'
 import AdminPatients from '../patients/AdminPatients.jsx'
 import AdminTestCatalog from '../catalog/AdminTestCatalog.jsx'
 import AdminBookingSlots from '../bookingSlots/AdminBookingSlots.jsx'
+import AdminAuditLog from '../auditLog/AdminAuditLog.jsx'
 import AdminOperationsPayments from '../operationsPayments/AdminOperationsPayments.jsx'
 import { adminCopy } from '../adminCopy.js'
 
@@ -35,7 +36,7 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
     const previous = { lang: root.lang, dir: root.dir, title: document.title }
     root.lang = language
     root.dir = direction
-    document.title = 'Smart-LIMS | ' + (['patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots', 'operationsPayments'].includes(activeId) ? copy.items[activeId] : copy.title)
+    document.title = 'Smart-LIMS | ' + (['patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots', 'operationsPayments', 'auditLog'].includes(activeId) ? copy.items[activeId] : copy.title)
     return () => {
       root.lang = previous.lang
       root.dir = previous.dir
@@ -73,6 +74,7 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
       <main id="admin-main" className={`admin-main${activeId === 'users' ? ' admin-main-users' : ''}`} aria-label={copy.content} tabIndex={-1}>
         {activeId === 'overview' && <AdminOverview language={language} />}
         {activeId === 'users' && <AdminUsers language={language} />}
+        {activeId === 'auditLog' && <AdminAuditLog language={language} />}
         {activeId === 'operationsPayments' && <AdminOperationsPayments language={language} />}
         {activeId === 'bookingSlots' && <AdminBookingSlots language={language} />}
         {activeId === 'patients' && <AdminPatients language={language} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
