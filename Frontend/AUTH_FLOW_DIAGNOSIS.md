@@ -1,3 +1,6 @@
+
+
+
 # Authentication and navigation diagnosis
 
 ## Root cause
