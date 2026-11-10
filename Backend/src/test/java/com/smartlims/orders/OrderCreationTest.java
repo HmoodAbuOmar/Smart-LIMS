@@ -215,7 +215,7 @@ class OrderCreationTest extends IsolatedPostgresTest {
                 error(mvc.perform(request(role, false, key().getFirst(), staffBody(other, first.getId()))), 403, "FORBIDDEN", null);
             for (String path : List.of("/api/orders", "/api/orders/" + UUID.randomUUID())) {
                 mvc.perform(get(path).header("Authorization", "Bearer " + tokens.get(role)))
-                        .andExpect(status().is(path.equals("/api/orders") && role == Role.ADMIN ? 200 : 403));
+                        .andExpect(status().is(role == Role.ADMIN ? (path.equals("/api/orders") ? 200 : 404) : 403));
             }
             mvc.perform(get("/api/orders/me").header("Authorization", "Bearer " + tokens.get(role)))
                     .andExpect(status().is(role == Role.PATIENT ? 200 : 403));

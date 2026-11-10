@@ -1,5 +1,26 @@
 # Orders API Contract
 
+## Admin Dashboard extension - ADM-DASH-01 (2026-11-10)
+
+Admin Recent Orders reuses GET /api/orders: search/status/date filters and paging
+are unchanged. Optional sort now accepts `(createdAt|updatedAt|orderNumber),(asc|desc)`
+as one field,direction value, default createdAt,desc; UUID descending breaks ties
+before pagination. Example:
+`GET /api/orders?search=synthetic&status=PENDING&sort=orderNumber,asc&page=0&size=8`.
+There is no mapping of Received/Processing/Awaiting review to order statuses.
+
+The View action now uses `GET /api/orders/{id}` for eligible ADMIN only.
+It reuses OrderDetailResponse/mapper and historical item/value snapshots; 200
+no-store, 400 VALIDATION_ERROR for malformed UUID or any query input,
+404 ORDER_NOT_FOUND for unknown order, 401 for unauthenticated/ineligible and
+403 for PATIENT/RECEPTIONIST/LAB_TECHNICIAN. No body or Idempotency-Key.
+GET /api/orders/me/{id} remains owned-PATIENT only; no ownership bypass.
+These Admin reads do not grant clinical reviewer/visit permissions or mutate
+orders. Existing staff creation responses keep their original Location behavior.
+This supersedes historical statements below about the absence of staff detail.
+The full response/metric contract is in
+[Admin Dashboard](ADMIN_ACTIVITY_API.md#admin-dashboard---adm-dash-01-2026-11-10).
+
 NOTIF-38 (2026-10-31): actual order creation/cancellation/processing/completion
 transitions now insert patient in-app notifications in the same transaction.
 Retries/no-ops do not duplicate them; notification persistence failure rolls back

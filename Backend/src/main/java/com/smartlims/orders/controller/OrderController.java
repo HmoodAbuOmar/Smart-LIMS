@@ -38,7 +38,14 @@ public class OrderController {
     public ResponseEntity<com.smartlims.orders.dto.AdminOrderPage> listAdmin(
             @RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(adminReads.list(actor,
-                com.smartlims.laboratory.dto.LaboratoryQuery.of(query, "fromDate", "toDate", "status", "search")));
+                com.smartlims.laboratory.dto.LaboratoryQuery.of(query, "fromDate", "toDate", "status", "search", "sort")));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderDetailResponse> getAdmin(@PathVariable String id,
+            @RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        query.keySet().forEach(k -> { throw com.smartlims.laboratory.exception.LaboratoryException.invalid(k); });
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(adminReads.get(actor, id));
     }
 
     @PostMapping(path = "/{id}/cancel", consumes = MediaType.APPLICATION_JSON_VALUE)

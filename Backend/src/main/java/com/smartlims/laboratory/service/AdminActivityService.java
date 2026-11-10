@@ -5,6 +5,8 @@ import com.smartlims.laboratory.dto.*;
 import com.smartlims.laboratory.dto.AdminActivityResponses.*;
 import com.smartlims.laboratory.exception.LaboratoryException;
 import com.smartlims.laboratory.repository.AdminActivityQueries;
+import com.smartlims.laboratory.repository.AdminDashboardQueries;
+import com.smartlims.laboratory.dto.AdminDashboardResponse.*;
 import java.time.*;
 import java.util.List;
 import org.springframework.security.core.Authentication;
@@ -15,9 +17,38 @@ import org.springframework.transaction.annotation.*;
 public class AdminActivityService {
     private final LaboratoryAccess access;
     private final AdminActivityQueries queries;
+    private final AdminDashboardQueries dashboard;
 
-    public AdminActivityService(LaboratoryAccess access, AdminActivityQueries queries) {
-        this.access = access; this.queries = queries;
+    public AdminActivityService(LaboratoryAccess access, AdminActivityQueries queries, AdminDashboardQueries dashboard) {
+        this.access = access; this.queries = queries; this.dashboard = dashboard;
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public AdminDashboardResponse dashboard(Authentication actor, LaboratoryQuery query) {
+        access.current(actor, Role.ADMIN);
+        String selection = query.get("days", "7");
+        if (!selection.equals("7") && !selection.equals("14")) throw LaboratoryException.invalid("days");
+        int days = Integer.parseInt(selection);
+        var now = Instant.now();
+        var today = now.atZone(HistoryDates.ZONE).toLocalDate();
+        var period = new HistoryDates(today.minusDays(days - 1L), today);
+        var all = new HistoryDates(null, null);
+        var tests = queries.tests(all);
+        long completed = tests.stream().filter(s -> s.status().equals("COMPLETED")).mapToLong(StatusCount::count).sum();
+        long pending = tests.stream().filter(s -> s.status().equals("PENDING") || s.status().equals("IN_PROGRESS")).mapToLong(StatusCount::count).sum();
+        var daily = dashboard.dailyOrders(period);
+        var distribution = dashboard.distribution(period);
+        return new AdminDashboardResponse(HistoryDates.ZONE.getId(), now,
+                new Summary(dashboard.patients(), queries.orders(all).stream().mapToLong(StatusCount::count).sum(),
+                        queries.attendance(all).scheduled(), completed, pending),
+                new Charts(period, days, daily.stream().mapToLong(DailyOrders::count).sum(), daily,
+                        distribution.stream().mapToLong(TestDistribution::count).sum(), distribution),
+                new Alerts(new Alert(true, queries.rejected(all), "Retained rejected specimens, including originals after replacement. Follow-up resolution is not tracked; this is not an unresolved-recollection count."),
+                        new Alert(true, dashboard.awaitingReview(), "DRAFT result versions on noncancelled orders, including correction drafts. Excludes APPROVED/PUBLISHED; draft completeness is not implied."),
+                        new Alert(false, null, "No explicit order attention flag or lifecycle rule is implemented. Result-value flags are not order flags.")),
+                FinancialSummary.unsupported(), List.of(
+                        new SourceDetail("summary", "patients; existing operational report order/test/attendance rules", "All retained records; current slot for appointments", "All-time current state, independent of charts. Unique patient profiles, all orders, noncancelled appointments, published items completed, noncancelled unpublished items pending. No historical sparkline."),
+                        new SourceDetail("charts", "test_orders, order_items", "test_orders.created_at", "Last 7/14 Jerusalem calendar days including today. All order statuses; zero-filled daily order counts. Distribution counts historical item rows grouped by test ID/code/name snapshots, never quantities/result versions/current catalog.")));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)

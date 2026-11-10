@@ -1,5 +1,19 @@
 # Smart-LIMS Database Design
 
+ADM-DASH-01 (2026-11-10): no schema/migration change. The Admin dashboard is a
+repeatable-read aggregate over retained profiles, orders/items, current-slot
+appointments, result versions/current publication markers and rejected specimens.
+Reuse existing operational report status/attendance/rejection grouping for all-time
+cards. Daily order counts and test distribution use the same 7/14-day parent
+created_at cohort at Asia/Jerusalem midnights; zero-fill calendar days in the
+read model. Distribution counts item rows grouped by test ID and retained
+code/name snapshots, never current catalog or quantities/result versions.
+Draft review counts do not assert completeness. Retained rejected samples include
+replaced originals; no follow-up closure field/rule exists. Explicit order flags
+and payments have no data source and remain unsupported/null. No clinical or
+order lifecycle semantics change. New Admin detail reuses existing mapper/snapshots.
+See [dashboard contract](ADMIN_ACTIVITY_API.md#admin-dashboard---adm-dash-01-2026-11-10).
+
 ADM-AUD-02 (2026-11-10): V28 implements the audit_logs concept in section 4.18
 with a narrower safe contract, superseding that section's proposed columns and
 planned status for this slice. Columns: UUID id, actor_id/name snapshot, action,

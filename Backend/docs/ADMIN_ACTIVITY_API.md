@@ -1,5 +1,110 @@
 # Admin activity screens
 
+## Admin Dashboard - ADM-DASH-01 (2026-11-10)
+
+Contract established before implementation after inspecting Dashboard.jpeg,
+Dashboard2.jpeg, existing Admin reads and laboratory lifecycle tests.
+
+`GET /api/admin/dashboard?days=7` is read-only and ADMIN-only (stored account
+eligibility/role rechecked). `days` is exactly `7` (default) or `14`; blank,
+repeated or unknown query inputs, including page/size/dates, return the existing
+400 VALIDATION_ERROR envelope. Responses are no-store JSON, safe to retry, and
+use one repeatable-read snapshot. No patient identifiers or clinical content.
+
+Response: `{timezone,generatedAt,summary,charts,alerts,financial,sourceDetails}`.
+`timezone=Asia/Jerusalem`; `generatedAt` is UTC. `summary` contains integer
+`uniquePatients,orders,scheduledAppointments,completedTests,pendingResults`.
+These cards are all-time current recorded state, independent of the chart selector:
+
+| Card | Counting unit and included states | Window |
+|---|---|---|
+| Unique patients | One patients row, linked or unlinked; never account rows or distinct names | All retained profiles |
+| Orders | One test_orders row, all four statuses including cancelled | All retained orders |
+| Scheduled appointments | Existing report scheduled rule: one appointment in CONFIRMED/CHECKED_IN/COMPLETED/NO_SHOW, excluding CANCELLED; current slot only | All slot dates, past and future |
+| Completed tests | Existing report COMPLETED grouping: one order_items row with noncancelled parent and current published result; correction draft does not remove its publication | All parent order dates |
+| Pending results | Existing report PENDING + IN_PROGRESS item groups: noncancelled parent with no current publication, including no draft and APPROVED awaiting publication | All parent order dates |
+
+No summary sparkline is supplied: current-state lifecycle totals cannot be
+presented as historical as-of trends. No fabricated series or sample data.
+
+`charts` contains `{period:{fromDate,toDate},days,totalOrders,dailyOrders,
+totalTests,testDistribution}`. Both inclusive dates span the last 7/14 Jerusalem
+calendar days including today. Query instants are [first local midnight, next
+midnight after today), including DST. `dailyOrders:[{date,count}]` is ascending
+with exactly days entries, including real zero days. All order statuses count by
+created_at; totalOrders equals the series sum. This is a calendar-day cohort,
+not a rolling days*24-hour interval or a historical status reconstruction.
+
+`testDistribution:[{labTestId,testCode,testName,count,share}]` groups historical
+order_items by lab_test_id + test_code_snapshot + test_name_snapshot in the same
+parent-created_at cohort, including cancelled orders. Each row counts once;
+there is no quantity column. Never use current catalog names/categories or count
+result versions. Renamed historical definitions can produce separate groups for
+one test ID. Sort count descending, then snapshot code/name and UUID ascending.
+`totalTests` equals sum(count), which can exceed totalOrders. Shares are percentage
+of item rows, one decimal HALF_UP; rounding need not sum exactly to 100. Empty
+distribution is [], totalTests=0.
+
+`alerts` contains `{rejectedSamples,resultsAwaitingReview,ordersRequiringAttention}`;
+each alert is `{supported,count,sourceDetails}`. Alerts are all-time current
+state, independent of chart days. Results awaiting review counts DRAFT result
+versions on noncancelled orders, including correction drafts; APPROVED and
+PUBLISHED are excluded. DRAFT does not assert completeness or approval readiness.
+An ordinary Admin can see aggregate counts without being a clinical reviewer;
+existing reviewer authorization for result reads/approval/publication is unchanged.
+
+Rejected Samples counts retained samples.status=REJECTED, including originals
+after replacement, reusing the existing report rejection rule with no date bound.
+The source description explicitly states that follow-up resolution is not tracked;
+this is not an unresolved-recollection count. No replacement/age/clinical closure
+rule is inferred. Orders Requiring Attention has no explicit order-flag source:
+supported=false,count=null with an explanation, never a misleading zero. Clinical
+result-value flags are not order attention flags. Revenue reuses unsupported
+FinancialSummary; payments and Settings remain deferred/out of scope.
+
+Recent Orders reuses `GET /api/orders` with its existing search/status/date/paging
+contract. Add optional `sort=createdAt,desc` (default), or
+`(createdAt|updatedAt|orderNumber),(asc|desc)`; UUID descending breaks ties,
+preserving existing default order. Invalid/repeated sort returns 400. The selected
+sort applies before pagination and does not change filtered totals.
+
+Inspection confirmed only GET /api/orders/me/{id} existed, owned-PATIENT only;
+Admin must not call it. Add `GET /api/orders/{id}` for ADMIN only, reusing the
+existing OrderDetailResponse/mapper (historical items/value, patientId, cancellation
+metadata and visitDetailsAvailable). No query inputs accepted; strict UUID and
+unknown-order errors reuse 400 VALIDATION_ERROR / 404 ORDER_NOT_FOUND. No contact,
+credentials or result values. Existing patient ownership and staff creation access
+remain unchanged; detail access grants no visit/clinical mutation permissions.
+
+Order statuses remain PENDING/IN_PROGRESS/COMPLETED/CANCELLED. Screenshot Received,
+Processing and Awaiting review are not stored order statuses. Specimen RECEIVED
+and result DRAFT/APPROVED are item-level facts, potentially mixed within an order;
+there is no existing precedence mapping. No new order status, label mapping or
+filter is invented. Clients display actual status codes. Settings is out of scope.
+
+Dashboard changed-file manifest (all paths relative to Backend):
+
+Verified 2026-11-10: focused 60/60; final full Maven 563/563 (61 suites);
+local Postman 3 saved requests/35 HTTP calls/57 assertions, zero failures.
+The initial unrelated profile timestamp failure, unchanged passing rerun,
+first harness formatting failure and exact commands/isolation evidence are
+retained in [TESTING.md](TESTING.md#admin-dashboard---adm-dash-01-2026-11-10).
+
+- New source: src/main/java/com/smartlims/laboratory/dto/AdminDashboardResponse.java;
+  src/main/java/com/smartlims/laboratory/repository/AdminDashboardQueries.java.
+- Updated source: laboratory/controller/AdminActivityController.java,
+  laboratory/service/AdminActivityService.java, orders/controller/OrderController.java,
+  orders/service/AdminOrderReadService.java, auth/security/SecurityConfiguration.java
+  under src/main/java/com/smartlims/.
+- Tests: new src/test/java/com/smartlims/laboratory/AdminDashboardTest.java and
+  DashboardPostmanVerification.java; updated src/test/java/com/smartlims/orders/
+  OrderCreationTest.java for the intentional Admin detail authorization.
+- Documentation: ADMIN_ACTIVITY_API.md, ORDERS_API.md, DATABASE_DESIGN.md,
+  TESTING.md and excluded local IMPLEMENTATION_PLAN.md. Existing ignored
+  postman/Smart-LIMS.postman_collection.json, run-admin.cjs and README.md updated
+  in place. Verification logs remain local/ignored. No new collection/environment,
+  schema change, dependency upgrade, frontend, commit or push.
+
 ## Transactional Admin audit extension — ADM-AUD-02 (2026-11-10)
 
 This section supersedes the earlier laboratory-only audit coverage below. Reuse

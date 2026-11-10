@@ -1,5 +1,121 @@
 # Database-backed test setup
 
+## Admin Dashboard - ADM-DASH-01 (2026-11-10)
+
+Entry backend-hmood, clean tree. Read AGENTS.md, Dashboard.jpeg/Dashboard2.jpeg,
+ADMIN_ACTIVITY_API.md and existing Admin reads, order APIs/tests and specimen/
+result lifecycle rules before implementation. Contract/definitions and changed-file
+manifest are in ADMIN_ACTIVITY_API.md. Owner approved retained rejected specimens
+including replaced originals with the explicit absence of follow-up resolution.
+Only confirmed dashboard/sort/Admin-detail gaps implemented; no lifecycle policy,
+schema/dependency/frontend/settings/payment change or fabricated sparkline/flag.
+
+Independent isolation check: saved PG16 directory, postmaster.opts, loopback-only
+55432, test-only HBA and cluster_name matched recovery-20261031. pg_ctl initially
+reported stopped; started that exact cluster. Actual postmaster.pid/process PID
+6224 and -D agree. Explicit psql confirmed smartlims_auth_regression as postgres,
+127.0.0.1:55432, data_directory=C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/
+recovery-20261031/cluster, cluster_name=smartlims-disposable-regression-20261031,
+PG16.15, fsync/full_page_writes on; CHECKPOINT succeeded. Reconfirmed live SQL
+identity before the full suite. Imported saved non-secret SMARTLIMS_TEST_POSTGRES_
+BIN/DATA/DATABASE_URL into Maven processes. Machine-local Maven/Surefire mapping
+and guards unchanged; no development/shared datasource fallback. Synthetic data,
+fake external email. Compatibility cases use only their guarded migration DBs.
+
+Commands executed directly from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=AdminDashboardTest,AdminActivityTest,OrderCreationTest,OrderReadTest,SampleWorkflowTest,ResultWorkflowTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+.\mvnw.cmd '-Dtest=PatientSelfProfileTest#addressOmissionBlankAndNullClearWithoutReducingCompletionAndIdenticalRetryPreservesIdentity' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=DashboardPostmanVerification' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+Focused: 60 tests/5 matched suites, zero failures/errors/skips, exit 0,
+BUILD SUCCESS, 01:48, finished 23:01:32 +02:00. The ResultWorkflowTest selector
+matches no class; actual result draft/publication suites run in the full suite.
+Ten new dashboard cases cover Admin-only routes/read-only/no-store, current
+eligibility and forged-role rechecks, patient ownership, strict unknown/repeated
+inputs/sort/status labels, real empty 7/14-day series/unsupported nulls, all-time
+report-rule consistency, publication/correction/DRAFT/approval/edit invalidation,
+retained rejections after replacement without private reasons, historical renamed
+snapshots/item totals, local interval boundaries, both DST transitions, deterministic
+sort ties/paging and detail snapshots. Existing Admin/order/specimen tests pass.
+
+First full invocation: 563 tests/61 suites, 1 failure, 0 errors/skips, exit 1,
+07:40, finished 23:10:29 +02:00. Independent XML sum before targeted overwrites
+agrees. Failure: unchanged PatientSelfProfileTest line 182 requires updatedAt of
+an identical repeated profile PUT to be strictly later. No dashboard case failed.
+Inspection found the unchanged service uses Instant.now; no profile source/test
+was edited. Unchanged isolated failing-method rerun: 1 test, zero failures/errors/
+skips, exit 0, 57.178 s, finished 23:12:09 +02:00. Non-reproduction suggests a
+timing-sensitive assertion; the precise clock cause was not established. The
+initial red full run is retained, not combined with the rerun as a full pass.
+
+First opt-in DashboardPostmanVerification invocation: 1 test/1 failure, exit 1,
+30.813 s, 23:12:54 +02:00, before any Postman HTTP call. The new harness compared
+inet_server_addr()::text (127.0.0.1/32) to 127.0.0.1. Corrected SQL projection to
+host(inet_server_addr()), keeping the exact loopback/database/port/cluster/path
+assertions; no production change or guard relaxation. Separate rerun follows.
+
+Corrected local Postman rerun: existing collection UID
+50742279-2e703687-f70e-46b1-bcf5-55db0d345512 updated in place, 101 -> 103 unique
+actual method/path requests. Only missing GET /api/admin/dashboard
+(9019194c-67d8-4d3d-ae19-f8fe3d485067) and GET /api/orders/{id}
+(0441f7b7-65a0-45f4-842a-2badebac49f4) added; List Admin Orders
+(3ea9b1a5-dd73-4174-9ee4-24be257effa3) updated for sort Params/View documentation.
+Complete cloud read-back confirms the 100 other requests and collection variables
+unchanged; no environment/auth/visibility changes or saved scenario duplicates.
+The three affected local requests exactly equal cloud read-back. Both literal
+and normalized variable-path endpoint uniqueness checks pass (103/103).
+
+DashboardPostmanVerification rerun passes 1/1, zero failures/errors/skips,
+exit 0, 57.894 s, finished 23:14:19 +02:00. Loopback HTTP target :60738,
+3 exact canonical saved requests plus transient memory-only cases: 35 HTTP
+calls/57 assertions, zero failures, exit 0 (21:14:16.282Z-21:14:19.453Z).
+Database/loopback/port/cluster/path assertions pass. Real fixture counts: three
+profiles/four orders/one scheduled appointment/one published item/three pending
+items, one correction draft and one retained rejected specimen after replacement;
+7-day chart 3 orders/3 items versus 14-day chart 4 orders/5 items. Checks include
+real zero days, snapshot rename retention, unsupported financial/flag nulls,
+literal search/full-filter totals, sorting/status/paging/View and role/input
+denials. Post-run Java checks confirm reads added no order/audit/laboratory
+rows. Tokens remained in memory/stdin, synthetic data/fake email; no bodies or
+credentials exported. Existing runner/mirror/README updated in place, no extra
+Postman JSON backup/read-back artifact. Sanitized evidence stays in ignored logs.
+
+Observed Postman MCP surface: getEnabledTools reports minimal server, 41 current
+tools, including collection read/create-request/update-request operations;
+runCollection is not on the current surface. Actual local execution therefore
+uses the existing Newman installation/runner, with assertions and exit code above;
+no hosted/cloud execution is claimed.
+
+Final complete-suite rerun started after rechecking the same live SQL identity
+and successful CHECKPOINT, using direct .\mvnw.cmd test with unchanged production
+code and profile test. Result: **563 tests/61 suites, 0 failures/errors/skips,
+exit 0, BUILD SUCCESS, 08:34, finished 23:23:37 +02:00**. Independently parsed
+fresh XML for exactly the 61 suites named in this invocation; sum agrees with
+563/0/0/0, including all 16 unchanged PatientSelfProfileTest cases. Opt-in
+Postman reports are excluded from this full-run total. This is one green full
+invocation, not cumulative focused/targeted totals. No subsequent production or
+test code changes. Initial full failure and first harness failure remain above.
+
+Post-run SQL rechecks agree with the exact disposable identity, no other client
+backends and no retained smartlims_migration_* databases; CHECKPOINT succeeded.
+Restored only this initially stopped cluster to stopped; pg_ctl confirms no server
+running. Existing application/local settings, isolation guard, migrations, secrets
+and ignore rules remain unchanged. git diff --check passes. All work remains
+uncommitted/unpushed; no frontend change or deployment readiness claim.
+
+| Dashboard section | Acceptance outcome |
+|---|---|
+| Summary cards | DONE: documented all-time units/states/window, reused matching report rules; real record counts, no fabricated sparkline. |
+| Charts | DONE: 7/14 Jerusalem calendar days, DST boundaries, ascending zero days, historical item-row distribution with consistent totals/shares. |
+| Recent Orders | DONE: existing search/status/date/paging reused, established sort fields added, Admin-only View/detail verified; actual order status semantics preserved. |
+| Laboratory Alerts | DONE for retained rejected specimens (owner-approved scope) and DRAFT review counts. Explicit order-attention flags unsupported/null: no source/rule implemented. Follow-up resolution remains untracked. |
+| Revenue | Deferred with payments, explicit unsupported financial nulls. |
+| Settings | Out of scope. |
+
 ## Transactional Admin Audit Log — ADM-AUD-02 (2026-11-10)
 
 Entry backend-hmood, clean tree, HEAD f2f1fad. Read AGENTS.md, Audit_log.jpeg,

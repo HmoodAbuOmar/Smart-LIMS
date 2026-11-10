@@ -21,9 +21,18 @@ public class AdminOrderReadService {
     private final OrderAccess access;
     private final TestOrderRepository orders;
     private final EntityManager entities;
+    private final com.smartlims.orders.mapper.OrderMapper mapper;
 
-    public AdminOrderReadService(OrderAccess access, TestOrderRepository orders, EntityManager entities) {
-        this.access = access; this.orders = orders; this.entities = entities;
+    public AdminOrderReadService(OrderAccess access, TestOrderRepository orders, EntityManager entities,
+                                 com.smartlims.orders.mapper.OrderMapper mapper) {
+        this.access = access; this.orders = orders; this.entities = entities; this.mapper = mapper;
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public OrderDetailResponse get(Authentication actor, String id) {
+        access.current(actor, Role.ADMIN);
+        return mapper.toDetail(orders.findById(access.orderId(id))
+                .orElseThrow(com.smartlims.orders.exception.OrderException::missingOrder));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -38,7 +47,11 @@ public class AdminOrderReadService {
         }
         final var state = status;
         Specification<TestOrder> filter = (r, q, c) -> filters(r, q, c, dates, state, search);
-        var page = query.find(orders, filter, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+        String sorting = query.get("sort", "createdAt,desc");
+        if (!sorting.matches("(createdAt|updatedAt|orderNumber),(asc|desc)")) throw LaboratoryException.invalid("sort");
+        String[] parts = sorting.split(",");
+        var page = query.find(orders, filter, Sort.by(Sort.Direction.fromString(parts[1]), parts[0])
+                .and(Sort.by(Sort.Direction.DESC, "id")));
         // Aggregate every matched order item once, using the exact same order predicate.
         var c = entities.getCriteriaBuilder();
         var sum = c.createQuery(BigDecimal.class);
