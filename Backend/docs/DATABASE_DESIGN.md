@@ -1074,3 +1074,12 @@ regression database plus fresh/upgrade compatibility databases: full Maven 531
 tests, no failures/errors/skips, and live Postman overlap/concurrency/configuration
 checks passed. Existing V1–V27 migration files are unchanged from entry HEAD.
 No development/production migration or deployment readiness claim is made.
+# Admin activity reads (2026-11-10)
+
+ADM-ACT-01 adds no schema changes. Admin lists/reports read canonical V1–V27:
+test_orders/order_items immutable test names/prices; laboratory_events safe
+projection; appointments/current slots; visit_items; current published results;
+samples.rejected_at. Each multi-query response uses a read-only repeatable-read
+transaction so content/counts/totals/options share one snapshot. See
+[metric/source/coverage rules](ADMIN_ACTIVITY_API.md). Planned payments/audit_logs
+tables below remain unimplemented; financial unsupported/null differs from zero.

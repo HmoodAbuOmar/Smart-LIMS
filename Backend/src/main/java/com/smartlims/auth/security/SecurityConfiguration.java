@@ -68,6 +68,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token",
                                 "/api/auth/confirm-email").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/audit-logs", "/api/reports/operations", "/api/orders").hasRole("ADMIN")
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests/sample-types").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests", "/api/lab-tests/{id}")

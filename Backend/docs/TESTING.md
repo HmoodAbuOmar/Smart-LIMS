@@ -1,5 +1,108 @@
 # Database-backed test setup
 
+## Four Admin activity screens — ADM-ACT-01 (2026-11-10)
+
+Contract/source mapping: [ADMIN_ACTIVITY_API.md](ADMIN_ACTIVITY_API.md).
+Booking schedule/filter/create/capacity/active reused; no booking time edits.
+Added read-only Admin audit/order/report routes and explicit unsupported/null
+financial fields. No payment/refund/general-audit workflow or schema change.
+All four screenshots and current source/contracts/tests reviewed first.
+
+Entry branch backend-hmood, clean tree. Disposable PG16 cluster was stopped;
+verified saved PG_VERSION/postmaster.opts, loopback-only 55432, test-only HBA,
+cluster_name and pg_ctl status before starting that exact existing cluster.
+Live psql current_database=smartlims_auth_regression, server=127.0.0.1:55432,
+data_directory=C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster,
+cluster_name=smartlims-disposable-regression-20261031; postmaster/process PID
+35468 agreed; fsync/full_page_writes=on. Reconfirmed SQL identity before full
+suite. No development/shared datasource fallback, real patient data or email.
+Existing Maven/Surefire mapping and independent isolation guard unchanged.
+
+Before each Maven command, imported the saved non-secret User settings for
+SMARTLIMS_TEST_POSTGRES_BIN, SMARTLIMS_TEST_POSTGRES_DATA and
+SMARTLIMS_TEST_DATABASE_URL into the process; required exact regression URL.
+All commands run directly from Backend using the Maven Wrapper.
+
+```powershell
+.\mvnw.cmd '-Dtest=AdminActivityTest,AppointmentScheduleTest,AppointmentBookingTest,AppointmentConcurrencyTest,OrderReadTest,OrderCreationTest,PersistedServiceAuthorizationTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+```
+
+Initial IDE compile identified an untyped Criteria join; first Maven invocation
+also failed compilation because this JPA API's string join needs two generic
+types. Corrected with an explicitly typed Join<OrderItem,TestOrder>. No tests
+executed on that failed build (31.218 s, finished 20:16:26 +02:00).
+
+Focused rerun: **80 tests, 0 failures/errors/skips, exit 0**, BUILD SUCCESS,
+02:09, finished **20:19:06 +02:00**. Includes 12 new AdminActivityTest cases:
+Admin/read-only/current-account boundaries; strict combined inputs/error envelopes;
+Jerusalem DST fall-back 25-hour day; actor/action/entity/safe-details filtering;
+stable UUID ties/counts/huge pages; actual workflow event coverage and no writes;
+snapshot names/prices and unique whole-filter totals; literal searches; item
+versus result-version grouping/correction publication; attendance/current slot
+dates/stored states; rejection date; real zeros versus unsupported financials;
+occupied-slot deactivation/bookings/immutable times. Existing schedule active
+filter, booking/concurrency, order creation/owned reads and persisted authorization
+regressions pass in this same invocation.
+
+Full direct `.\mvnw.cmd test`: **543 tests/59 suites, 0 failures/errors/skips,
+exit 0**, BUILD SUCCESS, **07:34**, finished **20:28:01 +02:00**. Independently
+summed all 59 fresh Surefire XML reports; totals agree. Explicit opt-in Postman
+harnesses are not part of this count. No subsequent production Java change.
+Final IDE build also succeeds with no problems.
+
+Separate live request execution (after full suite, no fixture races):
+
+```powershell
+.\mvnw.cmd '-Dtest=AdminPostmanVerification' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+Existing Smart-LIMS API collection
+50742279-2e703687-f70e-46b1-bcf5-55db0d345512 updated in place: 99 initial requests,
+three missing GET endpoints added, three slot requests updated, one duplicate
+GET /api/patients/{id} removed (original request retained). Read-back:
+**101 unique method/path requests**; all 95 unaffected requests and collection
+variables unchanged. Filters reside in Params; auth/IDs retained. No shared
+fixture/scenario requests, synthetic setup, environments or secret values added.
+Complete staged read-back validated for JSON/ID/count before replacing ignored
+local mirror. MCP has collection CRUD; local Newman is used for loopback execution.
+
+Opt-in harness reasserts database/port/cluster/data-directory identity, uses
+existing synthetic fixtures/fake email/memory-only signed JWTs, starts a random
+loopback HTTP port, executes six exact saved requests plus in-memory scenarios,
+then verifies retained booking/slot times and unchanged audit row count.
+The runner emits only names/statuses/assertion counts, no tokens/bodies/cookies.
+
+First Postman run finished 20:30:51 +02:00 (Maven 01:01, exit 1): 27 requests,
+53 assertions, two failures from literal-percent search. Postman SDK inspection
+confirmed raw '%' serialized as an invalid escape; local scenario builder now
+URI-encodes query values. Backend semantics and assertions were unchanged.
+Failed evidence retained separately in ignored postman/admin-run-summary-first.json.
+Final rerun: **six exact saved requests, 27 live HTTP calls, 53 assertions,
+0 failures, exit 0**; all 29 scripts pass. Target http://127.0.0.1:64959,
+finished **20:32:56 +02:00**. Separate opt-in JUnit harness **1/1 passes**,
+Maven BUILD SUCCESS, 31.022 s. It confirms the occupied appointment remains
+CONFIRMED in its original slot/time and audit row count is unchanged. Final
+sanitized evidence: ignored postman/admin-run-summary.json. No new shared
+scenario/setup request or collection change was needed for the encoding fix.
+
+After execution, live SQL identity still matched the same guarded test cluster;
+other client backends=0, CHECKPOINT succeeded. App/pools shut down. The cluster
+is returned to its initial stopped state after recording these checks. Logs
+are retained under the existing ignored postman directory. Source/diff whitespace,
+37 collection script syntax checks and literal-JWT scan pass. Existing migration
+files, POM/dependencies, machine-local Maven/Surefire mapping, secrets and ignore
+rules are unchanged. No frontend edits, staging, commit, push or deployment.
+
+Screen outcomes: Booking Slots DONE (existing APIs reused); Audit Log DONE for
+real retained laboratory events, broader configuration/general audit deferred;
+Operations Orders DONE, transactions/payment cards unsupported pending separate
+payment implementation; Reports operational metrics/source details DONE,
+financial amounts unsupported and frontend Reports/Print integration remaining.
+These boundaries are exposed in the contract/responses, never replaced by fake
+events or zero financial totals. No remaining backend work within the requested
+retained-record scope; no deployment-readiness claim.
+
 ## Three Admin Test Catalog tabs (CAT-ADMIN-02, 2026-11-09)
 
 Status: DONE for Tests, Parameters and configuration-only Reference Ranges. Entry tree clean on

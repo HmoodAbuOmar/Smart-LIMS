@@ -232,3 +232,10 @@ full/inactive target, duplicate active order/patient slot, overlapping publicati
 capacity below occupancy→409. First direct change at/after start→409; linked
 PENDING-order cancellation still cascades. Refresh availability/detail after conflict.
 This is a manual handoff, not executed HTTP/Postman evidence or deployment validation.
+# Admin Booking Slots mapping (2026-11-10)
+
+The existing staff schedule active filter is already implemented and covered by
+AppointmentScheduleTest. Reuse schedule/create/update as documented below;
+booked=capacity-remainingCapacity and display status derives from active and
+remainingCapacity. Deactivation preserves existing appointments. Edit changes
+capacity/active only, not times. See [Admin screen mapping](ADMIN_ACTIVITY_API.md).

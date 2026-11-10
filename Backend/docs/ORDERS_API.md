@@ -244,3 +244,11 @@ Follow the existing com.smartlims module structure in a new orders package: cont
 Orders are not visits. No visit table/ID/link, appointment row/slot reservation, payment record/status/balance, sample, processing job, result/report URL, notification delivery, or audit-log subsystem is created by these endpoints. Header created_by/cancelled_by/timestamps supply the required actor metadata without claiming a future general audit workflow. No catalog/cart persistent selection API is needed. Future appointment/payment/result/sample integration must explicitly reconcile retained orders and cancellation under shared transaction/lock rules before it is enabled; older future design paragraphs are not Stage 2 side effects.
 
 Task 6 verification was source/document/image inspection only. Tasks 7-10 have separate focused persistence, creation, read and cancellation evidence, including corrections and concurrency checks, in TESTING.md. Task 11 now records a single green full-suite invocation on the independently verified disposable PostgreSQL cluster: 236 tests, 0 failures/errors/skips. Task 11 and Stage 2 are DONE with all acceptance criteria met. Committing is a separate owner handoff and does not gate completion. No further stage, Postman execution, production migration or deployment was performed. Unexecuted manual HTTP scenarios are documented separately from automated evidence.
+# Admin operational reads (2026-11-10)
+
+GET /api/orders now supports the Admin Orders tab with date/status/search,
+snapshot items/prices, pagination and full-filter order counts/value. This
+supersedes earlier staff-browsing deferrals for ADMIN only. Patient reads,
+creation/cancellation and receptionist permissions remain as documented below.
+Payment status/transaction amounts are unsupported, not zero. Complete additive
+contract and screenshot mapping: [ADMIN_ACTIVITY_API.md](ADMIN_ACTIVITY_API.md).

@@ -21,7 +21,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 @Order(-1)
-@RestControllerAdvice(assignableTypes = {TestParameterController.class, ReferenceRangeController.class, VisitController.class, SampleController.class, ResultController.class, PatientDashboardController.class, NotificationController.class})
+@RestControllerAdvice(assignableTypes = {com.smartlims.laboratory.controller.AdminActivityController.class, TestParameterController.class, ReferenceRangeController.class, VisitController.class, SampleController.class, ResultController.class, PatientDashboardController.class, NotificationController.class})
 public class LaboratoryErrorHandler {
     @ExceptionHandler(LaboratoryException.class)
     ResponseEntity<ApiError> request(LaboratoryException e, HttpServletResponse r) {
