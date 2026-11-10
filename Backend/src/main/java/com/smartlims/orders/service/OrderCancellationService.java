@@ -1,5 +1,8 @@
 package com.smartlims.orders.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.entity.Role;
 import com.smartlims.appointments.service.AppointmentOrderCancellation;
 import com.smartlims.orders.dto.CancelOrderRequest;
@@ -23,6 +26,7 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class OrderCancellationService {
+    private final AuditPublisher audit;
     private final OrderAccess access;
     private final TestOrderRepository orders;
     private final OrderMapper mapper;
@@ -31,7 +35,8 @@ public class OrderCancellationService {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities, AppointmentOrderCancellation appointments,
-                                    com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                    com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit) {
+        this.audit = audit;
         this.access = access;
         this.orders = orders;
         this.mapper = mapper;
@@ -66,6 +71,7 @@ public class OrderCancellationService {
         orders.flush();
         entities.refresh(order);
         notifications.order(order);
+        audit.record(account, ORDER_CANCEL, order.getId());
         return mapper.toDetail(order);
     }
 }

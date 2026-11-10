@@ -28,7 +28,9 @@ public class AdminActivityService {
         var action = query.get("action", null);
         if (action != null && !java.util.Set.of("REGISTER", "RECEIVE", "ATTEST", "REJECT", "CREATE", "EDIT",
                 "APPROVAL_INVALIDATED", "APPROVE", "PUBLISH", "CORRECTION", "ARRIVAL", "COMPLETE",
-                "CHECK_IN", "VISIT_COMPLETE", "NO_SHOW").contains(action) && !queries.actions().contains(action))
+                "CHECK_IN", "VISIT_COMPLETE", "NO_SHOW").contains(action)
+                && java.util.Arrays.stream(AuditOperation.values()).noneMatch(o -> o.action.equals(action))
+                && !queries.actions().contains(action))
             throw LaboratoryException.invalid("action");
         return queries.audit(query, dates, actorId, action, HistoryDates.search(query));
     }

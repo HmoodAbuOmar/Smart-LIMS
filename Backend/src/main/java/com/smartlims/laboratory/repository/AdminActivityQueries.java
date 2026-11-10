@@ -30,13 +30,16 @@ public class AdminActivityQueries {
             """;
     private static final String ENTITY = "CASE WHEN e.result_id IS NOT NULL THEN 'result' WHEN e.sample_id IS NOT NULL THEN 'sample' WHEN e.visit_id IS NOT NULL THEN 'visit' ELSE 'appointment' END";
     private static final String ENTITY_ID = "coalesce(e.result_id,e.sample_id,e.visit_id,e.appointment_id)";
+    private static final String AUDIT = "(SELECT e.id,e.recorded_at,e.occurred_at,e.actor_id,e.actor_name_snapshot,e.kind,"
+            + ENTITY + " AS entity_name," + ENTITY_ID + " AS entity_id," + DETAILS + " AS details,0 AS source FROM laboratory_events e"
+            + " UNION ALL SELECT id,recorded_at,occurred_at,actor_id,actor_name_snapshot,action AS kind,entity_type AS entity_name,entity_id,summary AS details,1 AS source FROM audit_logs) e";
 
     public List<String> actions() {
-        return jdbc.queryForList("SELECT DISTINCT kind FROM laboratory_events ORDER BY kind", String.class);
+        return jdbc.queryForList("SELECT DISTINCT kind FROM " + AUDIT + " ORDER BY kind", String.class);
     }
 
     public List<Actor> actors() {
-        return jdbc.query("SELECT DISTINCT ON (actor_id) actor_id,actor_name_snapshot FROM laboratory_events ORDER BY actor_id,recorded_at DESC,id DESC",
+        return jdbc.query("SELECT DISTINCT ON (actor_id) actor_id,actor_name_snapshot FROM " + AUDIT + " ORDER BY actor_id,recorded_at DESC,id DESC,source DESC",
                 (r, n) -> new Actor(r.getObject(1, UUID.class), r.getString(2)));
     }
 
@@ -46,20 +49,20 @@ public class AdminActivityQueries {
         if (actor != null) { filter += " AND e.actor_id=?"; args.add(actor); }
         if (action != null) { filter += " AND e.kind=?"; args.add(action); }
         if (!search.isEmpty()) {
-            filter += " AND (strpos(lower(" + ENTITY + "),?)>0 OR strpos(lower(" + ENTITY_ID + "::text),?)>0 OR strpos(lower(" + DETAILS + "),?)>0)";
+            filter += " AND (strpos(lower(e.entity_name),?)>0 OR strpos(lower(e.entity_id::text),?)>0 OR strpos(lower(e.details),?)>0)";
             args.addAll(Collections.nCopies(3, search.toLowerCase(Locale.ROOT)));
         }
-        long total = jdbc.queryForObject("SELECT count(*) FROM laboratory_events e WHERE " + filter, Long.class, args.toArray());
+        long total = jdbc.queryForObject("SELECT count(*) FROM " + AUDIT + " WHERE " + filter, Long.class, args.toArray());
         List<AuditEvent> content = List.of();
         if ((long) query.page() * query.size() < total) {
             args.add(query.size()); args.add((long) query.page() * query.size());
-            content = jdbc.query("SELECT e.id,e.recorded_at,e.occurred_at,e.actor_id,e.actor_name_snapshot,e.kind," + ENTITY + " AS entity_name," + ENTITY_ID + " AS entity_id," + DETAILS + " AS details FROM laboratory_events e WHERE " + filter + " ORDER BY e.recorded_at DESC,e.id DESC LIMIT ? OFFSET ?",
+            content = jdbc.query("SELECT e.id,e.recorded_at,e.occurred_at,e.actor_id,e.actor_name_snapshot,e.kind,e.entity_name,e.entity_id,e.details FROM " + AUDIT + " WHERE " + filter + " ORDER BY e.recorded_at DESC,e.id DESC,e.source DESC LIMIT ? OFFSET ?",
                     (r, n) -> new AuditEvent(r.getObject("id", UUID.class), r.getTimestamp("recorded_at").toInstant(), r.getTimestamp("occurred_at").toInstant(), new Actor(r.getObject("actor_id", UUID.class), r.getString("actor_name_snapshot")), r.getString("kind"), r.getString("entity_name"), r.getObject("entity_id", UUID.class), r.getString("details")), args.toArray());
         }
         int pages = (int) Math.min(Integer.MAX_VALUE, (total + query.size() - 1) / query.size());
         return new AuditPage(content, query.page(), query.size(), total, pages, query.page() == 0,
                 (long) query.page() + 1 >= pages, HistoryDates.ZONE.getId(), actors(), actions(),
-                "Retained laboratory workflow events only; configuration and general account/order actions are not recorded.");
+                "Retained laboratory events and transactional staff configuration/account/profile/order/appointment changes. Public self-service, security access and unimplemented settings/template actions are not recorded.");
     }
 
     public List<StatusCount> orders(HistoryDates dates) {

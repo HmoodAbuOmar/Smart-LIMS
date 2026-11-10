@@ -34,7 +34,7 @@ class TestParameterServiceTest {
     private final LabTestRepository tests = mock(LabTestRepository.class);
     private final TestParameterRepository parameters = mock(TestParameterRepository.class);
     private final ResultValueRepository values = mock(ResultValueRepository.class);
-    private final TestParameterService service = new TestParameterService(access, tests, parameters, values, mock(ReferenceRangeRepository.class), mock(EntityManager.class));
+    private final TestParameterService service = new TestParameterService(access, tests, parameters, values, mock(ReferenceRangeRepository.class), mock(EntityManager.class), mock(com.smartlims.laboratory.service.AuditPublisher.class));
     private final Authentication actor = mock(Authentication.class);
     private final UUID testId = UUID.randomUUID();
 

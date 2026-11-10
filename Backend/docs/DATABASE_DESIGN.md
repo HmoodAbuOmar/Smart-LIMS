@@ -1,5 +1,18 @@
 # Smart-LIMS Database Design
 
+ADM-AUD-02 (2026-11-10): V28 implements the audit_logs concept in section 4.18
+with a narrower safe contract, superseding that section's proposed columns and
+planned status for this slice. Columns: UUID id, actor_id/name snapshot, action,
+entity_type/entity_id, occurred_at/recorded_at, fixed summary. Actor and entity
+IDs are logical historical references with no new deletion-blocking FK. No JSON
+payload, request body, tokens, contact/clinical data or historical backfill.
+Indexes support chronology, actor/action and entity lookups; UPDATE/DELETE trigger
+enforces append-only history. A MANDATORY synchronous publisher writes on the
+source transaction; failures roll back audit and business state together.
+Existing clinical laboratory_events remains immutable and unchanged; the Admin
+read model unions both safe projections before filtering/counting/paging. See
+[coverage and no-op rules](ADMIN_ACTIVITY_API.md#transactional-admin-audit-extension--adm-aud-02-2026-11-10).
+
 ## Patient notifications design (NOTIF-38, 2026-10-31)
 
 Additive V25 creates patient_notifications only; V1-V24 are immutable. Rows have
@@ -237,7 +250,7 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 15 | `result_specimens` | Implemented V9 | Retained exact specimens per result version. |
 | 16 | `result_values` | Implemented V9 | Values and historical manual-reference/definition snapshots. |
 | 17 | `patient_notifications` | V25; NOTIF-38 | Patient-profile in-app workflow events and read state; external delivery deferred. |
-| 18 | `audit_logs` | Planned; T-AUD-02/03 | Append-only records of important business actions. |
+| 18 | `audit_logs` | V28; ADM-AUD-02 | Append-only safe Admin/staff command metadata; combined with existing laboratory events for Admin reads. |
 | 19 | `symptom_assessments` | Deferred AI; T-AI-01 | Patient symptom-analysis sessions for the later test-suggestion feature. |
 | 20 | `suggested_tests` | Deferred AI; T-AI-01 | Laboratory tests suggested by a symptom assessment. |
 | 21 | `patient_link_tokens` | Implemented V5 | Short-lived, single-use capabilities for verified patient account/profile linking. |
@@ -486,7 +499,7 @@ target is not implemented or authorized by this stage.
 
 Approved numeric or textual reference ranges by parameter, age, sex, and validity period.
 
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Implementation status: V28, ADM-AUD-02. The earlier proposed JSON/correlation/system-actor fields are not part of this safe command-metadata slice. Existing laboratory_events is retained separately.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -794,21 +807,21 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
 | `id` | `UUID` | No | PK | Record identifier |
-| `user_id` | `UUID` | Yes | FK users.id | Linked account or event actor/recipient |
-| `action` | `VARCHAR(60)` | No | - | Audit event code |
+| `actor_id` | `UUID` | No | Logical retained identity | Authenticated staff actor |
+| `actor_name_snapshot` | `VARCHAR(120)` | No | Nonblank | Retained staff display name |
+| `action` | `VARCHAR(40)` | No | Closed publisher operation vocabulary | Audit action code |
 | `entity_type` | `VARCHAR(50)` | No | - | Affected entity type |
-| `entity_id` | `UUID` | Yes | - | Affected entity identifier |
-| `request_id` | `VARCHAR(100)` | Yes | - | Request correlation identifier |
-| `details` | `JSONB` | No | DEFAULT {} | Minimal structured event details |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
+| `entity_id` | `UUID` | No | Logical retained identity | Affected entity identifier |
+| `occurred_at` | `TIMESTAMPTZ` | No | Source command server instant | Effective timestamp |
+| `recorded_at` | `TIMESTAMPTZ` | No | Source command server instant | Audit chronology timestamp |
+| `summary` | `VARCHAR(250)` | No | Fixed operation summary | No user-supplied payload or clinical/contact data |
 
 **Rules and relationships**
 
-- user_id is nullable for system actions. entity_type and entity_id identify a business record logically; entity_id is not a foreign key to every table.
-- details defaults to an empty JSON object. Record profile creation/linking, orders, payments, sample events, validation, publication, corrections, and rescheduling.
-- Use append-only access; revoke ordinary UPDATE and DELETE rights on this table from the application database role.
-- Never record passwords, JWTs, email tokens, database connection secrets, or unnecessary health data. [S6]
-- Index (entity_type, entity_id, created_at), (user_id, created_at), and (action, created_at).
+- Actor and entity references survive permitted deletion without changing existing account/clinical deletion guards. No fabricated system actor or historical backfill.
+- A MANDATORY synchronous publisher accepts only actor, closed operation enum and entity UUID. No passwords, proof, contact/clinical values or arbitrary details. Existing laboratory history is projected safely, not duplicated.
+- An append-only database trigger rejects UPDATE/DELETE; no HTTP mutation route. Audit failures abort the business transaction, and business rollback removes the audit insert.
+- Chronological, actor, action and entity indexes include recorded_at DESC,id DESC. Combined read filtering/counting/pagination is documented in ADMIN_ACTIVITY_API.md. Payments remain outside this audit slice.
 
 ### 4.19. `symptom_assessments`
 
@@ -1081,5 +1094,5 @@ test_orders/order_items immutable test names/prices; laboratory_events safe
 projection; appointments/current slots; visit_items; current published results;
 samples.rejected_at. Each multi-query response uses a read-only repeatable-read
 transaction so content/counts/totals/options share one snapshot. See
-[metric/source/coverage rules](ADMIN_ACTIVITY_API.md). Planned payments/audit_logs
-tables below remain unimplemented; financial unsupported/null differs from zero.
+[metric/source/coverage rules](ADMIN_ACTIVITY_API.md). This earlier slice preceded
+V28 audit_logs; payments remain unimplemented and financial unsupported/null differs from zero.

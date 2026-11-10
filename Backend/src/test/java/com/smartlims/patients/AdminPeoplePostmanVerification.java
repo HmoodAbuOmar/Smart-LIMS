@@ -49,7 +49,7 @@ class AdminPeoplePostmanVerification extends IsolatedPostgresTest {
         assertEquals("smartlims-disposable-regression-20261031", jdbc.queryForObject("SELECT current_setting('cluster_name')", String.class));
         assertEquals(System.getenv("SMARTLIMS_TEST_POSTGRES_DATA").replace('\\', '/').toLowerCase(Locale.ROOT),
                 jdbc.queryForObject("SELECT current_setting('data_directory')", String.class).replace('\\', '/').toLowerCase(Locale.ROOT));
-        jdbc.execute("TRUNCATE TABLE reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         var runtime = new LinkedHashMap<String, String>();
         runtime.put("baseUrl", "http://127.0.0.1:" + port); runtime.put("disposableConfirmed", "true");
         String suffix = UUID.randomUUID().toString().substring(0, 8);

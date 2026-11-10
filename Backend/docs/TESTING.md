@@ -1,5 +1,127 @@
 # Database-backed test setup
 
+## Transactional Admin Audit Log — ADM-AUD-02 (2026-11-10)
+
+Entry backend-hmood, clean tree, HEAD f2f1fad. Read AGENTS.md, Audit_log.jpeg,
+ADMIN_ACTIVITY_API.md, current services/events/tests and canonical migrations.
+Only existing laboratory workflow events were recorded. New V28 audit_logs and
+fixed-operation MANDATORY publisher cover real staff configuration/account/
+patient/order/appointment changes; existing laboratory history and Admin-only
+GET /api/audit-logs response/query/security contracts are preserved. Coverage
+matrix, exclusions/privacy/no-op rules are in ADMIN_ACTIVITY_API.md.
+
+Independent isolation check: PG16 saved data directory/postmaster.opts,
+loopback-only 55432, test-only HBA and cluster_name matched the documented
+recovery-20261031 cluster. pg_ctl initially reported stopped; started that exact
+existing cluster. Live psql confirmed smartlims_auth_regression, 127.0.0.1:55432,
+data_directory=C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster,
+cluster_name=smartlims-disposable-regression-20261031, fsync/full_page_writes=on.
+Actual postmaster.pid/process PID 31104 and -D agree. Reconfirmed SQL identity
+before full suite. No development/shared datasource fallback. Existing explicit
+Maven/Surefire mapping and isolation guard unchanged. Synthetic data/fake email.
+
+Imported saved non-secret User SMARTLIMS_TEST_POSTGRES_BIN/DATA/DATABASE_URL
+settings into each Maven process and checked the exact regression URL. Commands
+run directly from Backend with the wrapper:
+
+```powershell
+.\mvnw.cmd '-Dtest=AdminAuditWorkflowTest,AdminActivityTest,LabTestServiceTest,TestParameterServiceTest,LabTestManagementTest,ReferenceRangeTest,AppointmentScheduleTest,UserActionsTest,PatientManagementTest,OrderCreationTest,OrderCancellationTest,AppointmentBookingTest,AppointmentCancellationTest,AppointmentRescheduleTest,MigrationLineageTest#adminAuditUpgradeAddsOneEmptyAppendOnlyTableWithoutChangingRetainedHistory' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=AdminAuditWorkflowTest,AdminActivityTest,PatientManagementTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+```
+
+Initial focused: **196 tests, 1 failure, 3 errors, 0 skips, exit 1**; 03:07,
+finished 22:33:05 +02:00. Three new slot fixtures used nanosecond instants, rejected
+by the existing maximum-six-fractional-digit contract; corrected to microseconds.
+One patient test expected V1–V27 history; updated the expected full set to V1–V28.
+No production validation or assertion was weakened. Corrected rerun: **61 tests,
+0 failures/errors/skips, exit 0**, BUILD SUCCESS, 01:33, finished **22:36:00
++02:00**. The other 135 focused cases passed in the initial invocation; no single
+green 196-test invocation is claimed. IDE builds passed.
+
+Nine new AdminAuditWorkflowTest cases verify catalog/full/Details/status,
+parameters/ranges, type/slot capacity/activity and semantic no-ops; account
+invitation/edit/role/block/unblock/reissue/delete and patient create/edit/link
+issuance with no target contact/clinical/free-text payload; whole bulk block/
+unblock and no-op counts; order/book/move/cancel/cascade idempotent replays;
+patient self-service exclusion; actor retention after permitted account deletion;
+no transaction-free publisher call; denied/conflicting/read requests add none.
+Critically, tests observe an audit row inside the source transaction and then
+roll it back, including a deferred database commit failure after the audit insert.
+An audit insert failure also rolls back slot creation and bulk account mutations.
+Combined-source dates/actions/actors/search/count/options/paging use Jerusalem
+boundaries and deterministic ties, including a deliberate cross-store UUID tie.
+
+MigrationLineageTest adds a V27->V28 preservation test: exactly one CREATE TABLE,
+no backfill; all prior data (including published clinical snapshots) and Flyway
+history retained, new empty table, repeat migration no-op, UPDATE/DELETE blocked
+by append-only trigger. Existing current-version assertions and 14 explicit
+current-schema fixture resets include V28; guards and historical targets remain.
+
+Full direct `.\mvnw.cmd test`: **553 tests/60 suites, 0 failures/errors/skips,
+exit 0**, BUILD SUCCESS, **07:51**, finished **22:44:25 +02:00**. Fresh Surefire
+XML totals are independently checked before the separate live harness. Includes
+all nine new audit workflow cases, V27->V28 preservation, prior migration lineages,
+authorization/clinical/snapshot/notification/concurrency and account regressions.
+No subsequent production code change; no deployment/shared migration claim.
+
+Separate local request verification (after full suite):
+
+```powershell
+.\mvnw.cmd '-Dtest=AuditPostmanVerification' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+Existing Smart-LIMS collection 50742279-2e703687-f70e-46b1-bcf5-55db0d345512:
+only List Audit Logs (cc714be5-78b4-4cca-bd39-5b9fd1dd386d) updated in place for
+new coverage/action documentation and safe-projection assertions. Still 101
+unique actual method/path requests; all 100 unrelated requests/collection
+variables preserved. No new saved endpoint, shared scenario, environment, auth
+or visibility change. All filters remain under Params. One-request exact
+read-back used locally; local mirror updated at that ID with a preserved backup.
+
+AuditPostmanVerification independently checks actual database/port/data directory/
+cluster, starts random-port loopback HTTP, uses synthetic catalog/slot commands,
+observes a configuration audit insert then explicitly rolls it back with its
+business row, and creates existing laboratory workflow history. Email is fake;
+signed JWTs stay in memory/stdin. run-audit.cjs executes the canonical saved GET,
+then transient in-memory scenarios; only sanitized statuses/assertion counts are
+written. Final live run: **one exact saved request, 20 HTTP calls, 38 assertions,
+0 failures, exit 0**; all 20 scripts pass. Target http://127.0.0.1:58437,
+finished **22:46:23.611 +02:00**. Separate opt-in JUnit harness **1/1 passes**,
+Maven BUILD SUCCESS, **31.978 s**, finished **22:46:23 +02:00**. Evidence:
+ignored postman/audit-run-summary.json. Verifies committed catalog/slot rows,
+absence of rolled-back metadata, both sources/options/CREATE counts, safe/literal
+search, combined date/actor/action filters, stable pages/huge page, valid but
+unrecorded action, invalid inputs and all non-Admin role denials. Java confirms
+the read request adds no event and the rolled-back business row is absent.
+
+Post-run psql reconfirmed guarded database/port/data directory/cluster, no other
+client backends, CHECKPOINT success. App/pools shut down; test-only cluster
+restored to its initial stopped state, confirmed by pg_ctl. Shared collection
+read-back is unchanged after local execution. Source/diff whitespace and runner/
+collection scripts/identity checks pass; V1–V27, POM/dependencies, local Maven/
+Surefire mapping and ignore rules unchanged. No commit, push or deployment.
+
+Status: DONE for implemented Admin/staff commands. No remaining confirmed gap
+in that scope. No fabricated notification-template/settings actions or historical
+backfill; public/self-service/security-access/first-admin CLI logging is outside
+this authenticated staff-command slice. Existing laboratory history is retained.
+Payments and frontend untouched.
+
+Changed-file scope: new AuditOperation.java, AuditLogWriter.java, AuditPublisher.java
+under laboratory dto/repository/service; V28__admin_audit_logs.sql; new
+AdminAuditWorkflowTest.java and AuditPostmanVerification.java. Existing
+AdminActivityQueries/Service combine safe sources; 11 existing mutation services
+receive explicit publisher calls (catalog, parameter, range, schedule, accounts,
+patients, order creation/cancellation, appointment booking/action/cascade).
+Existing AdminActivityTest expectations reflect expanded coverage; unit service
+constructors gain a mocked publisher. Fourteen disposable fixture reset lists
+include audit_logs; current-version migration assertions advance to V28, with
+historical targets/checksums unchanged. Existing ADMIN_ACTIVITY_API.md,
+DATABASE_DESIGN.md, TESTING.md and excluded IMPLEMENTATION_PLAN.md updated;
+ignored Postman read-back/runner/logs/backup remain local. No frontend/payment,
+dependency, security-strategy, applied-migration, local-config or ignore change.
+
 ## Admin Patients then Users — ADM-PEOPLE-01 (2026-11-10)
 
 Entry branch backend-hmood, clean working tree, HEAD c0573d4. Read AGENTS.md,

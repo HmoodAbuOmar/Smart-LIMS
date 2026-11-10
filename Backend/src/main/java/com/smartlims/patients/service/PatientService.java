@@ -1,5 +1,8 @@
 package com.smartlims.patients.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
@@ -41,6 +44,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class PatientService {
     private static final ZoneId LAB_ZONE = ZoneId.of("Asia/Jerusalem");
+    private final AuditPublisher audit;
     private final PatientRepository patients;
     private final UserAccountRepository users;
     private final PatientMapper mapper;
@@ -48,7 +52,8 @@ public class PatientService {
     private final VerificationTokens tokenValues;
 
     public PatientService(PatientRepository patients, UserAccountRepository users, PatientMapper mapper,
-                          PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues) {
+                          PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues, AuditPublisher audit) {
+        this.audit = audit;
         this.patients = patients;
         this.users = users;
         this.mapper = mapper;
@@ -110,6 +115,7 @@ public class PatientService {
         String rawToken = tokenValues.create();
         PatientLinkToken token = linkTokens.saveAndFlush(new PatientLinkToken(
                 tokenValues.hash(rawToken), patient, issuer, now.plusSeconds(600)));
+        audit.record(issuer, PATIENT_LINK_ISSUE, patient.getId());
         return new PatientLinkTokenResponse(rawToken, token.getExpiresAt());
     }
 
@@ -155,7 +161,9 @@ public class PatientService {
         String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
         Patient patient = new Patient(number, account, request.fullName(),
                 request.dateOfBirth(), request.gender(), request.phoneNumber(), request.address());
-        return mapper.toResponse(patients.saveAndFlush(patient));
+        var saved = patients.saveAndFlush(patient);
+        audit.record(account, PATIENT_CREATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -188,10 +196,15 @@ public class PatientService {
 
     @Transactional
     public PatientResponse update(Authentication actor, String id, @Valid UpdatePatientRequest request) {
-        currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
+        var account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
         UUID patientId = profileId(id);
         validateBirthDate(request.dateOfBirth());
         Patient patient = patients.findWithLockById(patientId).orElseThrow(PatientNotFoundException::new);
+        boolean changed = !java.util.Objects.equals(patient.getFullName(), request.fullName())
+                || !java.util.Objects.equals(patient.getDateOfBirth(), request.dateOfBirth())
+                || patient.getGender() != request.gender()
+                || !java.util.Objects.equals(patient.getPhoneNumber(), request.phoneNumber())
+                || !java.util.Objects.equals(patient.getAddress(), request.address());
         patient.setFullName(request.fullName());
         patient.setDateOfBirth(request.dateOfBirth());
         patient.setGender(request.gender());
@@ -199,6 +212,7 @@ public class PatientService {
         patient.setAddress(request.address());
         patient.setUpdatedAt(Instant.now());
         patients.flush();
+        if (changed) audit.record(account, PATIENT_UPDATE, patient.getId());
         return mapper.toResponse(patient);
     }
 

@@ -44,7 +44,7 @@ class AppointmentMigrationTest {
     @Test
     void freshMigrationAndConstraintsWithoutSeeds() throws Exception {
         var f = migrations(null);
-        assertEquals(27, f.migrate().migrationsExecuted);
+        assertEquals(28, f.migrate().migrationsExecuted);
         f.validate();
         assertEquals(0, f.migrate().migrationsExecuted);
         try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement()) {
@@ -73,7 +73,7 @@ class AppointmentMigrationTest {
             }
         }
         var f = migrations(null);
-        assertEquals(15, f.migrate().migrationsExecuted);
+        assertEquals(16, f.migrate().migrationsExecuted);
         f.validate();
         try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement()) {
             List<String> after = new ArrayList<>();

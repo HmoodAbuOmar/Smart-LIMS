@@ -1,5 +1,8 @@
 package com.smartlims.labtests.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.entity.Role;
 import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.entity.ReferenceRange;
@@ -22,13 +25,15 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class ReferenceRangeService {
+    private final AuditPublisher audit;
     private final LaboratoryAccess access;
     private final LabTestRepository tests;
     private final TestParameterRepository parameters;
     private final ReferenceRangeRepository ranges;
 
     public ReferenceRangeService(LaboratoryAccess access, LabTestRepository tests,
-                                 TestParameterRepository parameters, ReferenceRangeRepository ranges) {
+                                 TestParameterRepository parameters, ReferenceRangeRepository ranges, AuditPublisher audit) {
+        this.audit = audit;
         this.access = access;
         this.tests = tests;
         this.parameters = parameters;
@@ -38,7 +43,7 @@ public class ReferenceRangeService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReferenceRangeResponse create(Authentication actor, String testId, String parameterId,
                                          @NotNull @Valid ReferenceRangeRequest body) {
-        access.current(actor, Role.ADMIN);
+        var account = access.current(actor, Role.ADMIN);
         var testKey = LaboratoryInput.uuid(testId, "testId");
         var parameterKey = LaboratoryInput.uuid(parameterId, "parameterId");
         body.validateBounds();
@@ -64,7 +69,9 @@ public class ReferenceRangeService {
             throw LaboratoryException.conflict("REFERENCE_RANGE_OVERLAP");
         var range = new ReferenceRange(parameter, applicability, body.minAgeDays(), body.maxAgeDays(),
                 body.lowerLimit(), body.upperLimit(), body.fromDate(), body.toDate());
-        return ReferenceRangeResponse.from(ranges.saveAndFlush(range), today);
+        var saved = ranges.saveAndFlush(range);
+        audit.record(account, RANGE_CREATE, saved.getId());
+        return ReferenceRangeResponse.from(saved, today);
     }
 
     @Transactional(readOnly = true)

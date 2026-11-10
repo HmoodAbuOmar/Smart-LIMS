@@ -1,5 +1,8 @@
 package com.smartlims.appointments.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.appointments.dto.*;
 import com.smartlims.appointments.entity.*;
 import com.smartlims.appointments.exception.AppointmentException;
@@ -23,6 +26,7 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class AppointmentActionService {
+    private final AuditPublisher audit;
     private final AppointmentAccess access;
     private final TestOrderRepository orders;
     private final AppointmentRepository appointments;
@@ -33,7 +37,8 @@ public class AppointmentActionService {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public AppointmentActionService(AppointmentAccess access, TestOrderRepository orders, AppointmentRepository appointments, AppointmentSlotRepository slots, AppointmentRescheduleRepository history, AppointmentAvailability availability, EntityManager entities,
-                                    com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                    com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit) {
+        this.audit = audit;
         this.access = access;
         this.orders = orders;
         this.appointments = appointments;
@@ -81,6 +86,7 @@ public class AppointmentActionService {
         appointments.flush();
         entities.refresh(a);
         notifications.appointment(a, true);
+        audit.record(account, APPOINTMENT_MOVE, a.getId());
         return AppointmentMapping.detail(a, now);
     }
 
@@ -103,6 +109,7 @@ public class AppointmentActionService {
         appointments.flush();
         entities.refresh(a);
         notifications.appointment(a, false);
+        audit.record(account, APPOINTMENT_CANCEL, a.getId());
         return AppointmentMapping.detail(a, now);
     }
 

@@ -68,7 +68,7 @@ class AdminActivityTest extends LaboratoryTestSupport {
         }
         error(mvc.perform(bearer(get("/api/orders").param("status", "New"), Role.ADMIN)), 400, "VALIDATION_ERROR", "status");
         error(mvc.perform(bearer(get("/api/audit-logs").param("actorId", "1"), Role.ADMIN)), 400, "VALIDATION_ERROR", "actorId");
-        error(mvc.perform(bearer(get("/api/audit-logs").param("action", "DELETE"), Role.ADMIN)), 400, "VALIDATION_ERROR", "action");
+        error(mvc.perform(bearer(get("/api/audit-logs").param("action", "ERASE"), Role.ADMIN)), 400, "VALIDATION_ERROR", "action");
         error(mvc.perform(bearer(get("/api/reports/operations").param("page", "0"), Role.ADMIN)), 400, "VALIDATION_ERROR", "page");
     }
 
@@ -108,12 +108,14 @@ class AdminActivityTest extends LaboratoryTestSupport {
     void realWorkflowEventsAreReusedAndListAddsNothing() {
         var p = prepared(create(own, first));
         publish(p.result());
-        long before = events.count();
+        long laboratoryBefore = events.count();
+        long before = laboratoryBefore + jdbc.queryForObject("SELECT count(*) FROM audit_logs", Long.class);
         var page = activity.audit(actor(Role.ADMIN), query());
         assertEquals(before, page.totalElements());
         assertTrue(page.actions().containsAll(List.of("ARRIVAL", "REGISTER", "RECEIVE", "ATTEST", "CREATE", "EDIT", "APPROVE", "PUBLISH")));
-        assertEquals(before, events.count());
-        assertTrue(page.coverage().contains("not recorded"));
+        assertEquals(laboratoryBefore, events.count());
+        assertEquals(before, activity.audit(actor(Role.ADMIN), query()).totalElements());
+        assertTrue(page.coverage().contains("transactional staff"));
     }
 
     @Test

@@ -30,7 +30,8 @@ import static org.mockito.Mockito.*;
 class LabTestServiceTest {
     private final LabTestRepository repository = mock(LabTestRepository.class);
     private final UserAccountRepository users = mock(UserAccountRepository.class);
-    private final LabTestService service = new LabTestService(repository, new LabTestMapper(), users);
+    private final LabTestService service = new LabTestService(repository, new LabTestMapper(), users,
+            mock(com.smartlims.laboratory.service.AuditPublisher.class));
     private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null, List.of());
 
     private Authentication actor(String role) {
@@ -143,7 +144,8 @@ class LabTestServiceTest {
         test.setActive(false);
         when(repository.findById(id)).thenReturn(Optional.of(test));
         LabTestMapper protectedMapper = mock(LabTestMapper.class);
-        var protectedService = new LabTestService(repository, protectedMapper, users);
+        var protectedService = new LabTestService(repository, protectedMapper, users,
+                mock(com.smartlims.laboratory.service.AuditPublisher.class));
         var hidden = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), id.toString()));
         var missing = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), UUID.randomUUID().toString()));
         assertEquals(HttpStatus.NOT_FOUND, hidden.getStatus());

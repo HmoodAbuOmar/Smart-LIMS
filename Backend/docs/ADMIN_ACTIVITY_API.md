@@ -1,5 +1,57 @@
 # Admin activity screens
 
+## Transactional Admin audit extension — ADM-AUD-02 (2026-11-10)
+
+This section supersedes the earlier laboratory-only audit coverage below. Reuse
+GET /api/audit-logs with unchanged Admin-only access, response fields, date/actor/
+action/search/paging inputs, Jerusalem date semantics and newest-first order.
+The source becomes UNION ALL of existing laboratory_events safe projections and
+new audit_logs. Filters, total counts, actor/action options and pagination operate
+on that combined source in the existing repeatable-read transaction. A source
+tie-breaker after recordedAt DESC,id DESC disambiguates equal IDs across stores.
+
+| Existing command | New fixed action/entity coverage |
+|---|---|
+| Catalog POST/PUT/Details PATCH/status PATCH | CREATE/UPDATE/ACTIVATE/DEACTIVATE; catalog definition |
+| Parameter create/update/activity; configured range create | CREATE/UPDATE; test parameter or reference range |
+| Appointment type create/edit; slot create/capacity/activity edit | CREATE/UPDATE; appointment type or booking slot |
+| Admin account invitation, profile edit, role change, individual/bulk block/unblock, deletion, invitation reissue | INVITE/UPDATE/ROLE_CHANGE/BLOCK/UNBLOCK/DELETE/INVITATION_SENT; user account |
+| Staff patient create/edit/link issuance | CREATE/UPDATE/LINK_ISSUED; patient profile |
+| Staff order create/cancel | CREATE/CANCEL; order |
+| Staff appointment book/reschedule/cancel, including order-cancellation cascade | BOOK/RESCHEDULE/CANCEL; appointment |
+
+New shared-flow records cover eligible ADMIN and RECEPTIONIST mutations; the
+existing laboratory events continue to expose their real actors/actions. Public
+registration, patient self-service, login/password changes and notification read
+markers do not become general security/access logs. First-admin CLI bootstrap has
+no authenticated actor and is not fabricated as an Admin event. No historical
+configuration events are backfilled. Notification-template deletion and general
+settings have no implemented command and remain absent; no feature is added for
+the screenshot's demo rows. Payments remain out of scope.
+
+Every new event stores a server UTC recordedAt/occurredAt, authenticated staff
+actor ID/name snapshot, fixed action/entity type, entity UUID and fixed summary.
+The publisher accepts only a closed operation enum plus actor and entity ID;
+there is no arbitrary details/body argument. Never store target patient names,
+contact information, account emails/passwords, credentials, tokens/link proof,
+catalog/result free text, clinical values, cancellation/rejection reasons or raw
+requests. Searches cover only entity type/ID and the same fixed safe summary.
+Target IDs and actor snapshots survive permitted target/account deletion; generic
+audit IDs are logical references, with no new FK that changes deletion policy.
+
+V28 adds one append-only audit_logs table, no changes to V1–V27 or clinical event
+history. UPDATE/DELETE are rejected by a database trigger; no audit mutation API.
+Writes join the existing business transaction (MANDATORY), never independent/
+asynchronous/after-commit transactions. Business failure removes the event; an
+audit insert failure aborts the business change. No-op semantic updates and
+idempotent workflow replays add no event; existing business timestamp/version
+behavior is preserved. Bulk changes add one row per changed target and roll back
+as one unit. Existing mail/notification rollback rules remain in force.
+
+New action filters accept the codes above even before their first record, while
+options list only recorded codes as before. Existing laboratory codes, records
+and safe details remain unchanged. No endpoint or response-field addition.
+
 Contract established 2026-11-10 (ADM-ACT-01). All new routes below are read-only,
 ADMIN-only, require an eligible current stored account, and return no-store JSON.
 Existing JWT/cookie authentication and error envelope apply. No new payment,
@@ -89,9 +141,10 @@ not transaction evidence. The current frontend router/Admin pages contain no
 Reports page or Print handler. Printing and integration with these new read
 responses remain frontend work; no frontend file was changed for this task.
 
-No schema change is needed. Existing immutable event/snapshot records and
-booking locks/overlap/capacity rules remain authoritative. General audit event
-expansion and all payment/refund work remain deferred.
+For the initial ADM-ACT-01 reads no schema change was needed. The ADM-AUD-02
+extension above now adds V28 and the documented transactional Admin coverage.
+Existing immutable event/snapshot records and booking locks/overlap/capacity
+rules remain authoritative; payment/refund work remains deferred.
 
 ## Changed-file manifest
 

@@ -167,7 +167,7 @@ class PatientMigrationCompatibilityTest {
             Map<String, String> scripts = new LinkedHashMap<>();
             while (rows.next())
                 scripts.put(rows.getString(1), rows.getString(2));
-            assertEquals(java.util.stream.IntStream.rangeClosed(1, 27).mapToObj(Integer::toString).toList(),
+            assertEquals(java.util.stream.IntStream.rangeClosed(1, 28).mapToObj(Integer::toString).toList(),
                     new ArrayList<>(scripts.keySet()));
             assertEquals("V4__patients.sql", scripts.get("4"));
             assertEquals("V5__lab_tests.sql", scripts.get("5"));
@@ -200,7 +200,7 @@ class PatientMigrationCompatibilityTest {
     @Test
     void freshDatabaseAppliesAndValidatesExactlyTwentySevenCanonicalMigrations() throws SQLException {
         Flyway flyway = canonical(null);
-        assertEquals(27, flyway.migrate().migrationsExecuted);
+        assertEquals(28, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertCanonicalHistory();
         assertTrue(tableExists("lab_tests"));
@@ -216,7 +216,7 @@ class PatientMigrationCompatibilityTest {
                     + "('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','SYNTHETIC','Synthetic Catalog Test',1.00,'SYNTHETIC')");
         }
         Flyway flyway = canonical(null);
-        assertEquals(22, flyway.migrate().migrationsExecuted);
+        assertEquals(23, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertCanonicalHistory();
         assertEquals(1, count("patients"));
