@@ -5,6 +5,8 @@ import com.smartlims.labtests.service.LabTestService;
 import jakarta.validation.Valid;
 
 import java.net.URI;
+import java.util.List;
+import com.smartlims.labtests.exception.LabTestException;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +37,18 @@ public class LabTestController {
     @GetMapping("/{id}")
     public LabTestResponse get(@PathVariable String id, JwtAuthenticationToken actor) {
         return tests.get(actor, id);
+    }
+
+    @GetMapping("/sample-types")
+    public ResponseEntity<List<String>> sampleTypes(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        if (!query.isEmpty())
+            throw LabTestException.invalid(query.keySet().iterator().next());
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(tests.sampleTypes(actor));
+    }
+
+    @PatchMapping(path = "/{id}/details", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public LabTestResponse details(@PathVariable String id, @Valid @RequestBody LabTestDetailsRequest request, JwtAuthenticationToken actor) {
+        return tests.updateDetails(actor, id, request);
     }
 
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)

@@ -223,14 +223,16 @@ class ReferenceRangeTest extends LaboratoryTestSupport {
     @Test
     void configurationNeverPopulatesManualDraftReferencesOrRewritesPublishedSnapshots() {
         var prepared = prepared(create(own, first));
+        var draftBefore = draftService.get(actor(Role.LAB_TECHNICIAN), prepared.result().id().toString());
         var draftNumeric = prepared.result().values().stream().filter(v -> v.resultType().name().equals("NUMERIC")).findFirst().orElseThrow();
         add(draftNumeric.parameterId(), body("FEMALE", null, null, null, null));
-        assertEquals(prepared.result(), draftService.get(actor(Role.LAB_TECHNICIAN), prepared.result().id().toString()));
+        assertEquals(draftBefore, draftService.get(actor(Role.LAB_TECHNICIAN), prepared.result().id().toString()));
         var published = publish(prepared.result());
+        var publishedBefore = draftService.get(actor(Role.LAB_TECHNICIAN), published.id().toString());
         var numeric = published.values().stream().filter(v -> v.resultType().name().equals("NUMERIC")).findFirst().orElseThrow();
         add(numeric.parameterId(), body("ANY", null, null, null, null));
         var retained = draftService.get(actor(Role.LAB_TECHNICIAN), published.id().toString());
-        assertEquals(published, retained);
+        assertEquals(publishedBefore, retained);
         var correction = publicationService.correct(actor(Role.LAB_TECHNICIAN), published.id().toString(),
                 new ResultRequests.Correction("Synthetic correction"), List.of(UUID.randomUUID().toString())).result();
         assertEquals(published.values(), correction.values());

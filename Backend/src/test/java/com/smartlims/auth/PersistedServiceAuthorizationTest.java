@@ -119,8 +119,10 @@ class PersistedServiceAuthorizationTest extends IsolatedPostgresTest {
         List<Runnable> catalogOperations = List.of(
                 () -> catalog.list(actor, catalogQuery()),
                 () -> catalog.get(actor, activeTest.toString()),
+                () -> catalog.sampleTypes(actor),
                 () -> catalog.create(actor, testRequest),
                 () -> catalog.update(actor, activeTest.toString(), testRequest),
+                () -> catalog.updateDetails(actor, activeTest.toString(), new LabTestDetailsRequest(testRequest.code(), testRequest.name(), testRequest.description(), testRequest.price(), testRequest.currency(), testRequest.sampleType(), testRequest.preparationInstructions())),
                 () -> catalog.changeStatus(actor, activeTest.toString(), new LabTestStatusRequest(false)));
         for (Runnable operation : catalogOperations) {
             var denied = assertThrows(LabTestException.class, operation::run);
@@ -149,6 +151,7 @@ class PersistedServiceAuthorizationTest extends IsolatedPostgresTest {
         for (Runnable operation : List.<Runnable>of(
                 () -> catalog.create(forged, testRequest),
                 () -> catalog.update(forged, activeTest.toString(), testRequest),
+                () -> catalog.updateDetails(forged, activeTest.toString(), new LabTestDetailsRequest(testRequest.code(), testRequest.name(), testRequest.description(), testRequest.price(), testRequest.currency(), testRequest.sampleType(), testRequest.preparationInstructions())),
                 () -> catalog.changeStatus(forged, activeTest.toString(), new LabTestStatusRequest(false)))) {
             assertEquals("FORBIDDEN", assertThrows(LabTestException.class, operation::run).getCode());
             assertEquals(before, snapshot());

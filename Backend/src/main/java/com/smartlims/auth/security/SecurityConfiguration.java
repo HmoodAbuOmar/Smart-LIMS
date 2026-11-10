@@ -69,6 +69,7 @@ public class SecurityConfiguration {
                                 "/api/auth/confirm-email").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/lab-tests/sample-types").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests", "/api/lab-tests/{id}")
                         .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests/{testId}/parameters").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
@@ -79,6 +80,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/details").hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/appointment-types").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/appointment-types").hasRole("ADMIN")

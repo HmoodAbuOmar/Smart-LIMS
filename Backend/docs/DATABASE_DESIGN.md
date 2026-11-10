@@ -1069,4 +1069,8 @@ API/date classification: [LAB_TESTS_API.md](LAB_TESTS_API.md#configured-referenc
 Only storage/create/list are enabled; older “automatic reference_ranges deferred”
 statements continue to apply to matching/flags/population. Existing manual
 result_values references and immutable published snapshots remain authoritative.
-Migration/test execution and deployment are unverified for this slice.
+CAT-ADMIN-02 verification (2026-11-09) exercised V27 on the guarded disposable
+regression database plus fresh/upgrade compatibility databases: full Maven 531
+tests, no failures/errors/skips, and live Postman overlap/concurrency/configuration
+checks passed. Existing V1–V27 migration files are unchanged from entry HEAD.
+No development/production migration or deployment readiness claim is made.

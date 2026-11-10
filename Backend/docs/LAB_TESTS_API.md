@@ -1,5 +1,53 @@
 # Lab Tests API
 
+## Admin three-tab completion (CAT-ADMIN-02, 2026-11-09)
+
+Reviewed Test-Catlog.jpeg, Test_Catlog2.jpeg and Test_Catlog3.jpeg against the
+existing contract and code. Retain existing catalog CRUD/status/search/filter/
+paging, parameter inUse/expectedVersion/usage guards, and V27 range create/list.
+The earlier execution/Postman deferrals are superseded for this task; actual
+verification is recorded separately in TESTING.md and the local plan.
+
+Status: DONE for all three pictured backend tabs. Full Maven: 531 tests/58 suites,
+zero failures/errors/skips. Exact workspace-read-back Postman flow: 78 saved
+requests, 80 HTTP calls, 159 assertions, zero failures; live collection/environment
+updated in place. See [current execution evidence](TESTING.md#three-admin-test-catalog-tabs-cat-admin-02-2026-11-09).
+Deployment remains separate. No automatic clinical matching or flags introduced.
+
+### Category-safe Details save
+
+ADMIN may `PATCH /api/lab-tests/{id}/details` with code, name, description, price,
+currency, sampleType and preparationInstructions, using the same validation,
+normalization and required fields as catalog POST/PUT. This replaces those seven
+Details fields only; omitted optional description/preparation text clears that
+text. Categories and active state are always preserved under the existing test
+row lock. `categories`, `active`, IDs and timestamps are not accepted as input
+(400 INVALID_JSON). Success is 200 with the complete existing LabTestResponse.
+Missing/invalid identity, duplicate code, validation and CSRF errors use existing
+catalog conventions. Repeating the same desired Details save is safe; timestamps
+may advance. No new event, order/result side effect or idempotency key.
+
+Use this route for the shown form, which has no category controls. Existing
+PUT /api/lab-tests/{id} is unchanged: it replaces categories, and omission/null/[]
+clears them. Existing clients using PUT must resend the categories from detail
+when preserving them. PATCH /{id}/status continues to manage availability.
+
+### Sample Type dropdown suggestions
+
+`GET /api/lab-tests/sample-types` is available to eligible ADMIN, RECEPTIONIST and
+LAB_TECHNICIAN accounts (PATIENT forbidden), returning a JSON array of distinct
+stored sampleType strings from active AND inactive catalog tests, sorted ascending
+by stored value using database collation. Empty catalog returns []. No query
+parameters are supported; unknown/repeated keys return 400 VALIDATION_ERROR.
+This read is side-effect-free; responses/errors use existing no-store conventions.
+There are no seeded choices or inferred clinical compatibility rules. Inspection
+of source/test fixtures and the disposable regression database found descriptive
+free text (including SYNTHETIC), not an authoritative specimen vocabulary.
+These are suggestions, never an allowlist: POST/PUT/Details PATCH continue to
+accept any validated nonblank sampleType up to 40 characters, including legacy
+values. Clients must retain the selected stored value and allow a new free-text
+value; renaming one test's sampleType does not rewrite other records/snapshots.
+
 ## Configured Reference Ranges — CAT-RANGE-01 (2026-11-09)
 
 This additive configuration contract supersedes earlier deferral of range
@@ -35,7 +83,9 @@ applicability is not trimmed. Invalid numeric precision, negative ages, missing
 limits or reversed/empty intervals return 400 VALIDATION_ERROR. Cross-field errors
 use upperLimit, maxAgeDays or validTo; absent limits use lowerLimit.
 Numeric limits are stored references, not an interval used for overlap matching;
-this slice does not decide interpretation of measured values.
+each supplied numeric limit is inclusive (lowerLimit <= value <= upperLimit,
+with a missing side unbounded). Equal limits are allowed. This defines configured
+limit semantics only; manual measurement interpretation and flags remain unchanged.
 
 Create returns 201 with no-store and a DTO containing id, labTestId, parameterId,
 applicability, minAgeDays, maxAgeDays, lowerLimit, upperLimit, validFrom, validTo,
@@ -83,7 +133,8 @@ Synthetic storage example (not clinical guidance):
 {"applicability":"ANY","minAgeDays":0,"maxAgeDays":100,"lowerLimit":1.25,"upperLimit":9.5,"validFrom":"2030-01-01","validTo":"2031-01-01"}
 ```
 
-Task status: IN_PROGRESS; execution and Postman updates deferred by owner.
+Task status: DONE for configuration create/list, verified by CAT-ADMIN-02 below
+and TESTING.md. The former execution/Postman deferral ended with that task.
 
 Security remediation F2: every catalog service operation also requires a
 currently eligible persisted account and an allowed stored role. Missing or
@@ -148,18 +199,16 @@ include it. Used-definition restrictions, active-state changes, stable identitie
 expectedVersion checks and all result workflows remain unchanged. No schema or
 Reference Ranges change is included.
 
-Task status: IN_PROGRESS (implementation and focused coverage added; execution
-and Postman updates explicitly deferred by the owner). IMPLEMENTATION_PLAN.md is
-absent in this checkout; this section records the scoped task under R-CAT-01/
-R-CAT-02 and R-NFR-01. Execution evidence will not be inferred from older runs.
-Added TestParameterServiceTest for page-scoped bulk fetching, used/unused mapping
-and the empty-page fast path; LaboratoryFoundationTest adds persisted unreported
-draft usage, inactive usage, staff permissions, paging and response/input
-compatibility coverage. These tests have not been compiled or executed for this
-task. Source/diff review and `git -c core.safecrlf=false diff --check` passed;
-no application startup, database access, schema or Postman operations occurred.
-Deferred focused command (NOT RUN; database isolation must first be independently
-verified as documented in TESTING.md):
+Task status: DONE, verified in CAT-ADMIN-02; R-CAT-01/R-CAT-02 and R-NFR-01.
+Reused the existing TestParameterListResponse.inUse and LaboratoryFoundationTest
+implementation. TestParameterServiceTest covers page-scoped bulk fetching,
+used/unused mapping and the empty-page fast path; LaboratoryFoundationTest covers
+persisted unreported draft/inactive usage, staff permissions, paging and response/
+input compatibility. These passed in the current focused/full runs, and Postman
+verifies draft usage, inactive definitions, expectedVersion and PARAMETER_IN_USE.
+The earlier deferral is historical; current commands/results are in TESTING.md.
+The originally deferred focused command remains available after independently
+verifying database isolation as documented there:
 
 ```powershell
 .\mvnw.cmd '-Dtest=TestParameterServiceTest,LaboratoryFoundationTest' test '-Dspring.test.mockmvc.print=NONE'
@@ -181,6 +230,8 @@ All endpoints require an eligible authenticated account using the existing beare
 | POST | `/api/lab-tests` | Create an active test | 201 with Location |
 | PUT | `/api/lab-tests/{id}` | Replace catalog fields, preserving availability | 200 |
 | PATCH | `/api/lab-tests/{id}/status` | Set availability | 200 |
+| PATCH | `/api/lab-tests/{id}/details` | Save seven Details fields while retaining categories/availability (ADMIN) | 200 |
+| GET | `/api/lab-tests/sample-types` | Staff suggestions from stored free text | 200 |
 
 ## Create and replace
 

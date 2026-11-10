@@ -1,6 +1,144 @@
 # Database-backed test setup
 
+## Three Admin Test Catalog tabs (CAT-ADMIN-02, 2026-11-09)
+
+Status: DONE for Tests, Parameters and configuration-only Reference Ranges. Entry tree clean on
+backend-hmood, HEAD 06547da; two local commits ahead of origin: 689591d (ranges)
+and 06547da (staff schedule filter). Neither was rewritten. Existing parameter
+inUse and LaboratoryFoundationTest implementation were reused. Contract changes
+preceded source changes. No dependency upgrade, new schema migration, real
+patient data, production configuration, commit or push.
+
+Independent isolation evidence: saved PG_VERSION=16, postmaster.opts exact
+recovery-20261031 data directory, loopback-only 55432 and cluster_name settings,
+test-only trust HBA; existing postmaster.pid PID 5588 matched the postgres.exe
+process and command line. Explicit psql confirmed database
+smartlims_auth_regression, server 127.0.0.1:55432, actual data directory
+`C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster`,
+listen_addresses=127.0.0.1, cluster_name=smartlims-disposable-regression-20261031,
+fsync/full_page_writes=on. Rechecked SQL identity and CHECKPOINT before full Maven.
+No smart_lims_db/application datasource fallback or Windows production service.
+Cluster was already running; no cluster startup was needed. All fixtures synthetic,
+email mocked. Compatibility tests own only guarded smartlims_migration_* databases.
+
+Commands executed directly from Backend, importing the existing saved non-secret
+settings before each Maven process (unchanged .mvn/maven.config/Surefire mapping):
+
+```powershell
+foreach ($testName in @('SMARTLIMS_TEST_POSTGRES_BIN','SMARTLIMS_TEST_POSTGRES_DATA','SMARTLIMS_TEST_DATABASE_URL')) {
+    [Environment]::SetEnvironmentVariable($testName,[Environment]::GetEnvironmentVariable($testName,'User'),'Process')
+}
+if ($env:SMARTLIMS_TEST_DATABASE_URL -ne 'jdbc:postgresql://127.0.0.1:55432/smartlims_auth_regression') {
+    throw 'Unexpected test database'
+}
+.\mvnw.cmd '-Dtest=LabTestRequestTest,LabTestServiceTest,LabTestErrorHandlerTest,LabTestManagementTest,LabTestCategoryPersistenceTest,LabTestCategoryMigrationTest,TestParameterServiceTest,LaboratoryFoundationTest,ReferenceRangeRequestTest,ReferenceRangeTest,ResultDraftTest,ResultPublicationTest,MigrationLineageTest,PersistedServiceAuthorizationTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=LabTestManagementTest,ReferenceRangeTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+```
+
+Initial focused invocation: exit 1, 107 tests, 3 failures, 0 errors/skips;
+02:31, finished 23:20:49 +02:00. Two new assertions incorrectly used the generic
+JSON-path List overload and expected anonymous writes to precede CSRF validation.
+Corrected to the existing Hamcrest collection convention and preserved 403 CSRF
+precedence. The committed range test compared an immediate BigDecimal DTO to its
+NUMERIC(38,12) persistence roundtrip; changed the check to compare complete persisted
+draft/publication snapshots before versus after configuration, retaining every
+value/event/metadata assertion. No production rule or isolation guard was weakened.
+
+Corrected focused rerun: exit 0, BUILD SUCCESS, 29 tests/2 suites, 0 failures,
+errors or skips; 53.787 s, finished 23:22:43 +02:00. Other original focused suites
+passed in the initial invocation; this is not represented as a single all-pass
+107-test run.
+
+Full direct `.\mvnw.cmd test`: exit 0, BUILD SUCCESS, **531 tests/58 suites,
+0 failures/errors/skips**, finished **23:34:00 +02:00**, Maven duration **06:38**.
+Independently parsed all 58 XML reports: totals match Maven. Coverage includes
+catalog validation/roles/search/categories/status; category-safe Details/legacy
+PUT compatibility/free-text suggestions; persisted account eligibility; parameter
+draft/inactive inUse and snapshot/expectedVersion guards; reference range scalar/
+interval validation, history/classification, overlap/concurrency, migration/data/
+history preservation and unchanged manual draft/publication snapshots. The later
+explicit Postman harness is separate, not part of that 531 count.
+
+Postman artifacts mirror the existing live Smart-LIMS API collection and
+Smart-LIMS Local environment. Existing noncatalog folders, all prior request IDs/
+auth objects and existing environment values were compared and preserved.
+The existing /Backend/postman/ ignore rule is retained; files remain local.
+Newman 6.2.3 installed only under the temporary tools directory with:
+
+```powershell
+npm.cmd install --prefix "$env:TEMP/smartlims-catalog-runner" newman --no-audit --no-fund
+```
+
+JSON parse, collection-ID uniqueness, initial 124/final 191 event-script syntax checks and
+credential/token-value checks passed before live execution. Importable artifacts
+contain no JWT literals or populated credential/token environment values. The
+78-request Admin Test Catalog Flow is selected explicitly; run-catalog.cjs writes
+only sanitized names/statuses/assertion counts, never bodies/tokens/cookies.
+CatalogPostmanVerification uses the existing database guard and additionally
+asserts actual database/port/cluster/data directory, starts a real random-port
+loopback app, fakes email and supplies synthetic random credentials via stdin.
+It runs separately after the full suite so fixtures never race.
+
+Separate live-flow command executed with the same guarded settings:
+
+```powershell
+.\mvnw.cmd '-Dtest=CatalogPostmanVerification' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+That command was run five times while completing the runner/workspace roundtrip:
+
+- 23:35:33 +02:00, exit 1: sandbox globals/Intl prevented assertion execution.
+- 23:37:53 +02:00, exit 1: corrected scope/date setup exposed a wrong login
+  response capture (`accessToken` versus the existing `token`) and CSRF capture.
+- 23:40:49 +02:00, exit 1: 157/158 assertions passed; only logout cleanup failed
+  with stale CSRF. Added explicit CSRF refresh before logout, retaining its 200
+  assertion and the negative missing-CSRF write assertion.
+- 23:43:09 +02:00, exit 0: 78 saved requests/80 HTTP calls (two parallel range
+  POSTs), **159 assertions, 0 failures**; all scripts/transport passed. The separate
+  JUnit harness passed 1/1, Maven duration 33.980 s.
+- **23:56:51 +02:00**, exit **0**, BUILD SUCCESS, after live workspace sync and
+  exporting its exact read-back: **78 saved requests, 80 HTTP calls, 159 assertions,
+  zero failures**; all 156 request scripts passed. JUnit harness 1/1,
+  Maven duration 34.258 s. App target `http://127.0.0.1:51973`; database identity was
+  reasserted by the harness. This is final Postman evidence, independent of earlier
+  failed attempts. Sanitized details: postman/catalog-run-summary.json.
+
+Runner compatibility corrections changed no backend authentication or clinical
+rule. Credentials were generated in memory, passed via stdin, and not exported.
+CSRF was obtained through existing endpoints/cookies and response-captured
+run-local values. Four role logins used the existing token endpoint. Draft
+usage fixtures were created via patient/order/visit/result HTTP contracts only;
+no publication permission was invented for Postman. Published snapshot preservation
+is covered by the passing database-backed Maven tests.
+
+Live workspace: existing Smart-LIMS API collection
+50742279-2e703687-f70e-46b1-bcf5-55db0d345512 and Smart-LIMS Local environment
+c977915f-e635-4fa6-9707-411c3bfe1f12 updated in place. Bulk MCP PUT hit HTTP 413;
+no replacement occurred. Used 96 targeted operations (6 existing-request updates,
+90 additions) and two new folders instead. First environment PUT rejected three
+API-omitted blank secret values; explicitly empty shared values were accepted.
+Read-back verified original request IDs/auth, unrelated folders, nonempty
+environment values and all updated/new bodies/scripts. Final collection:
+185 requests/18 folders; environment 65 keys, credential/token values blank.
+The folder tool cannot store scripts, so the equivalent tested flow guard is
+retained in each request prerequest script; final read-back replay passed.
+Local importable files mirror that read-back under the existing ignore rule.
+No workspace visibility/auth changes or public publication.
+
+Post-run psql reconfirmed database/port/data directory/cluster, successful V27,
+no other client backends and CHECKPOINT success. The initially running disposable
+cluster remains running; the harness app/pool shut down. Source/diff whitespace
+checks passed; migration sources are unchanged. No staging, commit, push,
+frontend, dependency/POM, isolation-guard, local Maven configuration, development/
+shared database or deployment change. Current evidence supersedes the former
+catalog/parameter/range deferrals. See postman/README.md for replay setup;
+automatic clinical selection/ANY precedence/flags remain deferred.
+
 ## Configured Reference Ranges — CAT-RANGE-01 (2026-11-09)
+
+Historical initial deferral record below; superseded by the completed
+CAT-ADMIN-02 verification above. Current configuration slice status: DONE.
 
 Status: IN_PROGRESS. Contract, implementation and focused coverage are added;
 test compilation/execution, Postman updates and deployment verification are

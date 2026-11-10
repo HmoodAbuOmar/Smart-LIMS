@@ -77,6 +77,12 @@ public class LabTestService {
     }
 
     @Transactional(readOnly = true)
+    public List<String> sampleTypes(Authentication actor) {
+        currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
+        return tests.findSampleTypes();
+    }
+
+    @Transactional(readOnly = true)
     public LabTestResponse get(Authentication actor, String id) {
         UserAccount account = currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         LabTest test = tests.findById(identifier(id)).orElseThrow(LabTestException::missing);
@@ -87,6 +93,15 @@ public class LabTestService {
 
     @Transactional
     public LabTestResponse update(Authentication actor, String id, @NotNull @Valid LabTestRequest request) {
+        return updateFields(actor, id, request, true);
+    }
+
+    @Transactional
+    public LabTestResponse updateDetails(Authentication actor, String id, @NotNull @Valid LabTestDetailsRequest request) {
+        return updateFields(actor, id, request.asCatalogRequest(), false);
+    }
+
+    private LabTestResponse updateFields(Authentication actor, String id, LabTestRequest request, boolean replaceCategories) {
         currentAccount(actor, "ADMIN");
         UUID testId = identifier(id);
         LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
@@ -98,8 +113,10 @@ public class LabTestService {
         test.setPrice(request.price().setScale(2, RoundingMode.UNNECESSARY));
         test.setSampleType(request.sampleType());
         test.setPreparationInstructions(request.preparationInstructions());
-        test.getCategories().clear();
-        request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
+        if (replaceCategories) {
+            test.getCategories().clear();
+            request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
+        }
         test.setUpdatedAt(Instant.now());
         return mapper.toResponse(save(test));
     }
