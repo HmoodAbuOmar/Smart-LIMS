@@ -1,5 +1,23 @@
 # Administrative users API
 
+## Admin Users screenshot review — ADM-PEOPLE-01 (2026-11-10)
+
+| Visible field/action | Existing API/source |
+|---|---|
+| Invite User | POST /api/users; existing ADMIN invitation lifecycle and email, no password input; acceptance remains separate |
+| User name/email, avatar initials | GET /api/users/page fullName/email; initials are a client display of fullName |
+| Name/email search, role/status selectors | GET /api/users/page search/role/status, combined before counting/pagination |
+| Last 30 Days selector | Existing documented account creation filter: createdFrom inclusive, createdTo exclusive; one captured now minus 30 rolling 24-hour days through that same now, not last login |
+| User/Role/Status/Last Login sort controls | sort=fullName/role/status/lastLoginAt,asc or desc; existing nulls-last and id ASC ties |
+| Last Login | Nullable lastLoginAt, persisted only by successful bearer/cookie login; never fabricated for invited/never-login accounts |
+| Showing count, rows/page, navigation | Page envelope totalElements/page/size/totalPages/first/last; legacy GET /api/users remains separate |
+
+The date meaning is documented below and implemented/tested, so no unresolved
+date decision or new preset endpoint is introduced. Closed actions menus and
+selection checkboxes add no new operation; existing lifecycle/permissions remain.
+Current verification belongs in TESTING.md. No new Users implementation gap has
+been identified by source review.
+
 Contract established 2026-11-06 for the ADMIN Users Management screen.
 Login accounts are independent of patient profiles. No operation here creates,
 merges, reassigns or deletes a patient profile. Closed screenshot menus do not

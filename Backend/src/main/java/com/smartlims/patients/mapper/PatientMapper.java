@@ -51,7 +51,7 @@ public class PatientMapper {
     public PatientPageResponse toPageResponse(Page<Patient> page) {
         return new PatientPageResponse(page.getContent().stream().map(this::toStaffResponse).toList(),
                 page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages(),
-                page.isFirst(), page.isLast());
+                page.isFirst(), (long) page.getNumber() + 1 >= page.getTotalPages());
     }
 
     public StaffPatientResponse toStaffResponse(Patient patient) {

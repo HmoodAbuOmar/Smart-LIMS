@@ -230,7 +230,8 @@ class PatientManagementTest extends IsolatedPostgresTest {
                 .andExpect(jsonPath("$.content").isEmpty()).andExpect(jsonPath("$.totalElements").value(3));
         mvc.perform(bearer(get("/api/patients").param("page", "2147483647"), Role.ADMIN))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty())
-                .andExpect(jsonPath("$.totalElements").value(3));
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.first").value(false)).andExpect(jsonPath("$.last").value(true));
         jdbc.update("UPDATE patients SET created_at = TIMESTAMPTZ '2020-01-01 00:00:00Z'");
         List<UUID> expected = jdbc.query("SELECT id FROM patients ORDER BY id ASC", (rs, row) -> rs.getObject(1, UUID.class));
         for (int page = 0; page < 3; page++) {

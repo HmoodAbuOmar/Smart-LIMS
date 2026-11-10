@@ -1,5 +1,108 @@
 # Database-backed test setup
 
+## Admin Patients then Users — ADM-PEOPLE-01 (2026-11-10)
+
+Entry branch backend-hmood, clean working tree, HEAD c0573d4. Read AGENTS.md,
+admin-patients.jpeg/admin-users.jpeg, current API contracts, controllers,
+services/DTOs/mappers/query/login code, V4 patients/V26 last-login and existing
+tests. Screenshot mapping is in PATIENTS_API.md and USERS_API.md.
+
+Patients already exposes read-only staff linkStatus from patients.user_id;
+existing tests cover both states, token issuance versus actual relationship,
+blocked linked accounts, no account IDs/tokens, roles and patient/write response
+compatibility. No new field, endpoint, migration or linking behavior was added.
+Confirmed gap: maximum supported page overflowed Spring Page.isLast(), returning
+last=false for an empty final page. PatientMapper now uses long arithmetic;
+existing pagination regression was strengthened, preserving all prior assertions.
+
+Users already supports invitation, name/email search, role/status filtering,
+all documented sorts, paging and successful-login-only lastLoginAt. The date
+meaning is explicitly documented: account creation [createdFrom,createdTo),
+offset timestamps; Last 30 Days is 30 rolling 24-hour days through one captured
+now. No unresolved date decision, new lifecycle rule or Users source change.
+
+Disposable test instance independently verified before tests: saved PG16 data
+directory/postmaster.opts, loopback-only 55432, cluster_name and test-only HBA;
+pg_ctl initially reported stopped. Started that exact existing cluster; live
+psql database=smartlims_auth_regression, address=127.0.0.1, port=55432,
+data_directory=C:/Users/hmood/AppData/Local/Smart-LIMS/PostgresTests/recovery-20261031/cluster,
+cluster_name=smartlims-disposable-regression-20261031, fsync/full_page_writes=on.
+postmaster/process PID 26920 and -D path agree. No development/shared database
+fallback; existing Maven/Surefire mapping and independent guard unchanged.
+All fixtures synthetic, external email mocked. Imported saved non-secret User
+SMARTLIMS_TEST_POSTGRES_BIN/DATA/DATABASE_URL settings before each command and
+required the exact regression URL. Commands executed directly from Backend:
+
+```powershell
+.\mvnw.cmd '-Dtest=PatientManagementTest#literalSearchPagingAndDeterministicSorting' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=PatientManagementTest,PatientRequestTest,PatientProfileLinkingTest,UserListingTest,UserActionsTest,AuthenticationRegressionTest,PersistedServiceAuthorizationTest' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+Reproduction: **1 test, 1 failure, 0 errors/skips, exit 1**, 53.463 s, finished
+20:59:26 +02:00; $.last expected true, actual false at page 2147483647.
+After the one-line mapper correction, focused verification: **179 tests/7 suites,
+0 failures/errors/skips, exit 0**, BUILD SUCCESS, 02:07, finished **21:06:21
++02:00**. Covers patient CRUD/validation/literal name-file-phone search/counts/
+link filtering/status/privacy/ownership/concurrency, maximum-page metadata;
+Users invitation/rollback/acceptance and account safeguards, combined filters,
+explicit creation boundaries, all eight sorts/nulls-last/UUID ties/large pages,
+both login modes and failed/ineligible/read timestamp preservation. IDE build
+also passed. Full suite was not rerun; this task requested affected tests.
+
+Existing Postman collection 50742279-2e703687-f70e-46b1-bcf5-55db0d345512:
+six canonical requests updated in place, no missing actual endpoint found and
+none added. Still **101 unique method/path requests**. All 95 unrelated requests
+and collection variables preserved; no shared environment, auth or visibility
+change. Patients Params now document existing linkStatus/search/paging/sorts;
+staff GET details document ten-field response, write requests retain nine fields.
+User invitation uses local input placeholders with no saved real recipient.
+Users page documents existing creation-date semantics and nullable last login.
+Contract assertions added to the same six request IDs; no shared fixture/scenario
+requests. Six-request local read-back exactly matches current saved requests;
+local full mirror updated only at those IDs with a preserved pre-task backup.
+
+Separate opt-in local execution after focused suite (no fixture races):
+
+```powershell
+.\mvnw.cmd '-Dtest=AdminPeoplePostmanVerification' test '-Dspring.test.mockmvc.print=NONE'
+```
+
+The harness checks actual database/port/cluster/data-directory identity, starts
+a random loopback HTTP app, fakes email, generates signed JWTs and one synthetic
+patient login password only in memory, and passes runtime values via stdin.
+Runner postman/run-people.cjs executes Patients before Users, using six exact
+saved requests and transient in-memory scenarios. Logs include only request
+names/statuses/assertion counts, never bodies/tokens/passwords/invitation proof.
+Final live result: **six exact saved requests, 54 HTTP calls, 110 assertions,
+0 failures, exit 0**; all 54 scripts pass. Target http://127.0.0.1:57309,
+finished **21:09:10.737 +02:00**. Separate opt-in JUnit harness **1/1 passes**,
+Maven BUILD SUCCESS, **54.189 s**, finished **21:09:11 +02:00**. Evidence:
+ignored postman/people-run-summary.json. Positive/negative scenarios cover patient
+create/list/view/edit, full filtered counts, both relationship states, literal
+name/medical-number/phone searches, maximum page, invalid status and role denial;
+invitation/duplicate/role denial, all roles/lifecycle states, name/email search,
+all eight sorts/null placement/UUID ties, explicit-offset inclusive/exclusive
+creation bounds, paging, invalid dates, failed versus successful login and
+unchanged lastLoginAt on subsequent reads. Final Java assertions confirm the
+linked account and medical number remain, invitation sent through fake email
+exactly once, last login persisted and invitation created no patient profile.
+
+Post-run SQL identity still matches the verified disposable cluster, other
+client backends=0, CHECKPOINT succeeds; app/pools have shut down. Cluster was
+restored to its initial stopped state (pg_ctl confirms no server running).
+Final diff whitespace, collection/runner syntax, same-ID/unique-method-path and
+unaffected-request checks pass. Patients DONE and Users DONE with no remaining
+confirmed backend gap. No endpoint or DTO field added; only Patients final-page
+metadata corrected.
+
+Changed files: src/main/java/com/smartlims/patients/mapper/PatientMapper.java;
+src/test/java/com/smartlims/patients/PatientManagementTest.java and new
+AdminPeoplePostmanVerification.java; docs/PATIENTS_API.md, docs/USERS_API.md,
+docs/TESTING.md; excluded IMPLEMENTATION_PLAN.md; ignored Postman local mirror,
+people-requests-readback.json, run-people.cjs, sanitized summaries/logs/backup.
+No frontend, payments, audit, dependency, migration, authentication strategy,
+permission, commit or push change.
+
 ## Four Admin activity screens — ADM-ACT-01 (2026-11-10)
 
 Contract/source mapping: [ADMIN_ACTIVITY_API.md](ADMIN_ACTIVITY_API.md).
