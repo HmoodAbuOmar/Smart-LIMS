@@ -133,7 +133,7 @@ try {
   await waitFor("location.hash.includes('/appointments')")
   await click('.ws-logout');await waitFor("location.hash==='#/login'")
   await send('Page.navigate',{url:`${base}/#/__receptionist/today`});await waitFor("document.querySelector('.r01-sidebar')")
-  assert.equal(await evaluate("document.querySelectorAll('.r01-sidebar .ws-nav button:disabled').length"),4)
+  assert.equal(await evaluate("document.querySelectorAll('.r01-sidebar .ws-nav button:disabled').length"),3)
   await click('.ws-logout');await waitFor("document.querySelector('.r01-logout-error')")
   assert.equal(await evaluate('location.hash'),'#/__receptionist/today')
   writeFileSync(join(temporary,'role-measurements.json'),JSON.stringify(all,null,2))

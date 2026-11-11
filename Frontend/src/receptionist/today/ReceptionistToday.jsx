@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CalendarDays, Plus, Menu, X, RotateCcw, Clock, Info, Ellipsis } from 'lucide-react'
+import { CalendarDays, Plus, X, RotateCcw, Clock, Info, Ellipsis } from 'lucide-react'
 import { Button } from '../../portal/components/PortalUi.jsx'
-import ReceptionistSidebar from '../components/ReceptionistSidebar.jsx'
 import { todayCopy } from './todayCopy.js'
 import { todayService } from './todayService.js'
 import { arrivalCounts, canCheckIn, canMarkNoShow, dayAppointments, filterArrivals, formatTime, localName, SCHEDULING_TIME_ZONE, todayDate } from './todayModel.js'
@@ -42,8 +41,6 @@ export default function ReceptionistToday({ service = todayService }) {
   const [pending, setPending] = useState(null)
   const [toast, setToast] = useState(null)
   const [dialog, setDialog] = useState(null)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuButton = useRef(null)
   const writing = useRef(false)
   const mounted = useRef(false)
   const date = todayDate(now)
@@ -57,11 +54,6 @@ export default function ReceptionistToday({ service = todayService }) {
     service.load().then(records => { if (live) { setAppointments(records); setStatus('ready') } }, error => { if (live) setStatus(error.code === 'RECEPTIONIST_UNAVAILABLE' ? 'unavailable' : 'error') })
     return () => { live = false }
   }, [service, attempt, date])
-  useEffect(() => {
-    const title = document.title
-    document.title = `Smart-LIMS | ${copy.workspace} — ${copy.today}`
-    return () => { document.title = title }
-  }, [copy])
   const all = dayAppointments(appointments, date)
   const counts = arrivalCounts(all)
   const rows = filterArrivals(all, tab)
@@ -90,11 +82,7 @@ export default function ReceptionistToday({ service = todayService }) {
   }
   function open(kind, opener, appointment) { opener.closest('details')?.removeAttribute('open'); setDialog({ kind, opener, appointment }) }
   function refresh() { if (writing.current) return; setStatus('loading'); setAttempt(value => value + 1) }
-  return <div className="reception-today-layout" dir={language === 'ar' ? 'rtl' : 'ltr'} lang={language} onKeyDown={event => { if (event.key === 'Escape' && menuOpen) { setMenuOpen(false); menuButton.current?.focus() } }}>
-    <a className="r01-skip" href="#r01-content">{copy.skip}</a>
-    <header className="r01-header"><button type="button" ref={menuButton} className="r01-menu-button" aria-expanded={menuOpen} aria-controls="r01-navigation" aria-label={menuOpen ? copy.closeMenu : copy.openMenu} onClick={() => setMenuOpen(current => !current)}>{menuOpen ? <X size={20} /> : <Menu size={20} />}</button><strong>{copy.workspace}</strong></header>
-    <ReceptionistSidebar copy={copy} menuOpen={menuOpen} onSelect={() => { setMenuOpen(false); menuButton.current?.focus() }} />
-    <main className="r01-main" id="r01-content" tabIndex={-1} aria-label={copy.content}>
+  return <>
       <div className="r01-heading"><div><h1>{copy.today}</h1><p>{new Intl.DateTimeFormat(language === 'ar' ? 'ar-PS' : 'en-GB', { timeZone: SCHEDULING_TIME_ZONE, weekday: 'long', dateStyle: undefined, year: 'numeric', month: 'long', day: 'numeric' }).format(now)} <small>({copy.timezone})</small></p></div><Button className="portal-button r01-primary r01-walk-in" onClick={event => open('walkIn', event.currentTarget)}><Plus size={16} aria-hidden="true" />{copy.walkIn}</Button></div>
       {toast && <div className={`r01-toast${toast.error ? ' r01-toast-error' : ''}`} role={toast.error ? 'alert' : 'status'}>{copy[toast.key]} — {localName(toast.patient, language)}<button type="button" aria-label={copy.close} onClick={() => setToast(null)}><X size={16} /></button></div>}
       <section className="r01-panel" aria-busy={status === 'loading'}>
@@ -119,7 +107,6 @@ export default function ReceptionistToday({ service = todayService }) {
         </div>
         {status === 'ready' && <footer className="r01-footer">{rows.length.toLocaleString(language)} {copy.resultCount}</footer>}
       </section>
-    </main>
     {dialog && <ActionDialog state={dialog} copy={copy} language={language} pending={!!pending} onClose={() => setDialog(null)} onConfirm={appointment => void act(appointment, 'markNoShow')} />}
-  </div>
+  </>
 }

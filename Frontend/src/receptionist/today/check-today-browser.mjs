@@ -63,7 +63,7 @@ try {
   await waitFor("document.querySelectorAll('.r01-table-container tbody tr').length===7")
   assert.equal(await evaluate("document.querySelector('.r01-heading h1').textContent"), 'Today')
   assert.ok(await evaluate("document.querySelector('.r01-sidebar [aria-current=page]').textContent.includes('Today')"))
-  assert.equal(await evaluate("document.querySelectorAll('.r01-sidebar nav button:disabled').length"), 4)
+  assert.equal(await evaluate("document.querySelectorAll('.r01-sidebar nav button:disabled').length"), 3)
   assert.equal(await evaluate("document.querySelector('.r01-role-label').textContent"), 'Receptionist')
   assert.equal(await evaluate("document.querySelectorAll('.r01-language-control .language-switcher').length"), 1)
   assert.equal(await evaluate("document.querySelectorAll('.r01-header .language-switcher').length"), 0)
