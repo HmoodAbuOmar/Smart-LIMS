@@ -39,4 +39,10 @@ node scripts/check-preview-build.mjs
 
 Browser checks use installed Chrome (or `CHROME_PATH`) and temporary Vite/preview servers. Profiles and screenshots are written outside the repository. Servers and browser close when the script finishes.
 
-Commit scope: this folder, `src/dev/DevelopmentReceptionist.jsx`, and only the receptionist lazy imports and route conditions in `src/App.jsx`. No Admin, Portal, authentication or backend edits are required.
+## Shared role sidebar and Today sizing
+
+The shared role sidebar now uses the exact Admin Patients design via components/WorkspaceSidebar.jsx and WorkspaceSidebar.css. Admin, Patient and Receptionist supply their existing menus, icons, active state, navigation, language and Logout callbacks. Receptionist links and check-in permissions are unchanged. The former Patient-sized Receptionist sidebar rules have been removed from receptionistLayout.css.
+
+Shared width is 256px, logo 158x64px and navigation text 14px. At 900px and below the sidebar follows the Admin inline/scrollable layout. Today title, table and control sizing still follows the previously measured Patient Portal reference; check-in controls remain 96px wide and 30px high in all states.
+
+Run node src/components/check-role-sidebars-browser.mjs from Frontend for the Admin-reference sidebar comparison. The optional check-today-sizing-browser.mjs compares Patient and Receptionist content/control sizes; both now consume the same shared sidebar. Lab Technician is not implemented in this checkout and is not claimed as verified.

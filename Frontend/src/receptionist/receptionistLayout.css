@@ -1,0 +1,63 @@
+/* Shell sizing follows PatientPortal/Portal.css, measured at 100% zoom.
+   Keep these rules role-scoped; no Patient Portal or authentication styles change. */
+.reception-today-layout {
+  --r01-deep: var(--medical-deep);
+  --r01-teal: var(--medical-green);
+  --r01-mint: var(--medical-mint);
+  --r01-border: var(--medical-border-light);
+  --reception-sidebar-size: 256px;
+  --reception-topbar-padding: 18px;
+  /* Portal search control: 12px × 1.6 line height + 14px padding + 2px border. */
+  --reception-topbar-control-size: 35.2px;
+  display: grid;
+  grid-template-columns: var(--reception-sidebar-size) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-block-size: 100svh;
+  color: var(--r01-deep);
+  background: var(--medical-off-white);
+  font: 13px/1.6 var(--font-ui);
+}
+body:has(.reception-today-layout) { margin: 0; }
+.reception-today-layout, .reception-today-layout * { box-sizing: border-box; }
+.reception-today-layout button { font-family: inherit; cursor: pointer; }
+.reception-today-layout button:disabled { cursor: not-allowed; }
+.reception-today-layout :focus-visible { outline: 2px solid var(--medical-fresh); outline-offset: 3px; }
+.reception-today-layout .r01-header {
+  grid-column: 2; grid-row: 1;
+  display: flex; align-items: center; gap: 18px;
+  min-block-size: calc(var(--reception-topbar-control-size) + var(--reception-topbar-padding) * 2 + 1px);
+  padding: var(--reception-topbar-padding) 32px;
+  background: var(--medical-off-white); border-block-end: 1px solid var(--r01-border);
+}
+.reception-today-layout .r01-header > strong { font-size: 20px; }
+.reception-today-layout .r01-main { grid-column: 2; grid-row: 2; inline-size: 100%; max-inline-size: 1500px; margin-inline: auto; min-inline-size: 0; padding: 22px 32px 44px; }
+.reception-today-layout .r01-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-block-end: 24px; }
+.reception-today-layout h1 { font: 700 clamp(24px, 2.5vw, 32px)/1.4 var(--font-ui); letter-spacing: -.02em; margin: 0; }
+.reception-today-layout .r01-heading p { font-size: 13px; line-height: 1.8; color: var(--medical-secondary); margin-block: 8px; }
+.reception-today-layout .r01-heading small { font-size: 11px; }
+.reception-today-layout .r01-menu-button { display: none; }
+.reception-today-layout .r01-skip { position: fixed; inset-inline-start: 16px; inset-block-start: -100px; padding: 10px; background: white; color: var(--r01-teal); z-index: 30; }
+.reception-today-layout .r01-skip:focus { inset-block-start: 10px; }
+.reception-today-layout .r01-sr-only { position: absolute; inline-size: 1px; block-size: 1px; padding: 0!important; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Keep RTL edge alignment stable when today's short list needs no scrollbar. */
+@media(min-width:901px) {
+  html:has(.reception-today-layout) { scrollbar-gutter: stable; }
+}
+@media(max-width:1200px) {
+  .reception-today-layout { --reception-topbar-padding: 16px; }
+  .reception-today-layout .r01-main { padding: 22px; }
+  .reception-today-layout .r01-header { padding-inline: 22px; }
+}
+@media(max-width:900px) {
+  .reception-today-layout { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto 1fr; }
+  .reception-today-layout .r01-main { grid-column:1; grid-row:3; }
+  .reception-today-layout .r01-header { grid-column: 1; grid-row: 1; gap: 12px; }
+  .reception-today-layout .r01-menu-button { display: inline-flex; align-items: center; padding: 6px; color: var(--r01-teal); background: white; border: 1px solid var(--r01-border); border-radius: 7px; }
+  .reception-today-layout .r01-header > strong { margin-inline-end: auto; }
+}
+@media(max-width:540px) {
+  .reception-today-layout { --reception-topbar-padding: 14px; }
+  .reception-today-layout .r01-main { padding: 18px 14px 30px; }
+  .reception-today-layout .r01-header { padding-inline: 14px; gap: 10px; }
+  .reception-today-layout .r01-heading { align-items: start; flex-direction: column; gap: 12px; }
+}
