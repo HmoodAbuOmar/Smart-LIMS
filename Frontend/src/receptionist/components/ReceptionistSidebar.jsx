@@ -1,33 +1,15 @@
-import { useRef, useState } from 'react'
-import { CalendarCheck, Users, ClipboardList, CalendarDays, CreditCard, LogOut } from 'lucide-react'
-import BrandLogo from '../../components/BrandLogo.jsx'
-import LanguageSwitcher from '../../components/LanguageSwitcher.jsx'
+import { useTranslation } from 'react-i18next'
+import { CalendarCheck, Users, ClipboardList, CalendarDays, CreditCard } from 'lucide-react'
+import WorkspaceSidebar from '../../components/WorkspaceSidebar.jsx'
 import { receptionistSession } from '../receptionistSession.js'
 
-const navigation = [{ key: 'today', Icon: CalendarCheck }, { key: 'patients', Icon: Users }, { key: 'orders', Icon: ClipboardList }, { key: 'appointments', Icon: CalendarDays }, { key: 'payments', Icon: CreditCard }]
-
+const navigation = [{id:'today',Icon:CalendarCheck},{id:'patients',Icon:Users},{id:'orders',Icon:ClipboardList},{id:'appointments',Icon:CalendarDays},{id:'payments',Icon:CreditCard}]
+const classes = {sidebar:'r01-sidebar',brand:'r01-brand',logo:'r01-logo',footer:'r01-sidebar-footer',logout:'r01-logout',error:'r01-logout-error',language:'r01-language-control'}
 export default function ReceptionistSidebar({ copy, menuOpen, onSelect }) {
-  const [signingOut, setSigningOut] = useState(false)
-  const [error, setError] = useState(false)
-  const busy = useRef(false)
-  async function signOut() {
-    if (busy.current) return
-    busy.current = true
-    setSigningOut(true); setError(false)
-    try {
-      await receptionistSession.signOut()
-      window.location.hash = '/login'
-    } catch (failure) { setError(failure.code === 'SERVICE_UNAVAILABLE' ? 'logoutUnavailable' : 'logoutError') }
-    finally { busy.current = false; setSigningOut(false) }
-  }
-  return <aside className="r01-sidebar" data-open={menuOpen} id="r01-navigation">
-    <div className="r01-brand"><BrandLogo className="r01-logo" /><span className="r01-role-label">{copy.workspace}</span></div>
-    <nav aria-label={copy.navigation}>{navigation.map(({ key, Icon }) => <button type="button" key={key} aria-current={key === 'today' ? 'page' : undefined} aria-describedby={key !== 'today' ? 'r01-navigation-unavailable' : undefined} disabled={key !== 'today'} onClick={onSelect}><Icon size={18} aria-hidden="true" />{copy[key]}</button>)}</nav>
-    <p id="r01-navigation-unavailable" className="r01-sr-only">{copy.navigationUnavailable}</p>
-    <div className="r01-sidebar-footer">
-      <button type="button" className="r01-logout" disabled={signingOut} aria-busy={signingOut} onClick={() => void signOut()}><LogOut size={19} strokeWidth={1.7} aria-hidden="true" /><span>{signingOut ? copy.signingOut : copy.logout}</span></button>
-      {error && <p className="r01-logout-error" role="alert">{copy[error]}</p>}
-      <div className="r01-language-control"><LanguageSwitcher /></div>
-    </div>
-  </aside>
+  const { i18n } = useTranslation()
+  const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
+  const items = navigation.map(item=>({...item,label:copy[item.id],disabled:item.id!=='today',describedBy:item.id!=='today'?'r01-navigation-unavailable':undefined}))
+  return <WorkspaceSidebar id="r01-navigation" prefix="r01" classes={classes} items={items} activeId="today" onNavigate={onSelect} mobileOpen={menuOpen} language={language} onLanguageChange={next=>void i18n.changeLanguage(next)} navigationLabel={copy.navigation} logoutLabel={copy.logout} signingOutLabel={copy.signingOut} logoutError={copy.logoutError} logoutUnavailable={copy.logoutUnavailable} onLogoClick={onSelect} onLogout={async()=>{await receptionistSession.signOut();window.location.hash='/login'}}>
+    <span className="r01-role-label r01-sr-only">{copy.workspace}</span><p id="r01-navigation-unavailable" className="r01-sr-only">{copy.navigationUnavailable}</p>
+  </WorkspaceSidebar>
 }

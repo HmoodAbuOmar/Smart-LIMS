@@ -1,8 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Bell, CalendarDays, ChevronDown, ClipboardList, FileText, FlaskConical, History, LayoutDashboard, LogOut, Menu, Search, UserRound, X } from 'lucide-react'
-import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
-import BrandLogo from '../components/BrandLogo.jsx'
+import WorkspaceSidebar from '../components/WorkspaceSidebar.jsx'
 import MedicalHistory from './history/MedicalHistory.jsx'
 import { portalReducer, todayValue, totalPrice } from './portalModel.js'
 import { formatCurrency } from '../utils/currency.js'
@@ -131,16 +130,10 @@ export default function PatientPortal({ initialData, development = false, route 
   function submitSearch(event) { event.preventDefault(); navigate(`tests?q=${encodeURIComponent(globalSearch.trim())}`) }
   return <Portal.Provider value={value}><div className="patient-portal" dir={language === 'ar' ? 'rtl' : 'ltr'}>
     <a href="#portal-content" className="portal-skip" onClick={e => { e.preventDefault(); document.querySelector('.portal-page-title')?.focus() }}>{t('skip')}</a>
-    {mobileOpen && <button type="button" className="portal-scrim" aria-label={t('close')} onClick={() => setMobileOpen(false)} />}
-    <aside className={`portal-sidebar ${mobileOpen ? 'is-open' : ''}`} aria-label={t('menu')}>
-      <button className="portal-logo" onClick={() => navigate('dashboard')} aria-label="Smart-LIMS"><BrandLogo /></button>
-      <button type="button" className="portal-mobile-close" onClick={() => setMobileOpen(false)} aria-label={t('close')}><X size={20} /></button>
-      <nav>{navItems.map(([key, Icon]) => <button key={key} data-page={key} aria-current={rootPage === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon size={18} /><span>{t(key)}</span>{key === 'notifications' && unread > 0 && <small>{number(unread)}</small>}</button>)}</nav>
-      <div className="portal-sidebar-bottom"><LanguageSwitcher /></div>
-    </aside>
+    <WorkspaceSidebar id="portal-navigation" prefix="portal" classes={{sidebar:'portal-sidebar',brand:'portal-logo',logo:'portal-logo-image',footer:'portal-sidebar-bottom',logout:'portal-sidebar-logout',language:'portal-sidebar-language'}} items={navItems.map(([key,Icon])=>({id:key,label:t(key),Icon,dataPage:key,...(key==='notifications'&&unread>0?{badge:number(unread)}:{})}))} activeId={rootPage} onNavigate={navigate} mobileOpen={mobileOpen} language={language} onLanguageChange={next=>void i18n.changeLanguage(next)} navigationLabel={t('menu')} logoutLabel={t('logout')} onLogout={onExit} onLogoClick={()=>navigate('dashboard')} />
     <div className="portal-workspace">
       <header className="portal-topbar">
-        <button type="button" className="portal-menu" aria-label={t('menu')} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}><Menu /></button>
+        <button type="button" className="portal-menu" aria-controls="portal-navigation" aria-label={t('menu')} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}><Menu /></button>
         <form role="search" className="portal-search" onSubmit={submitSearch}><Search size={16} aria-hidden="true" /><input name="portal-search" aria-label={t('search')} placeholder={t('search')} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} /><button type="submit" aria-label={t('search')}><ArrowRight size={17} /></button></form>
         <button className="portal-bell" onClick={() => navigate('notifications')} aria-label={`${t('notifications')}: ${number(unread)}`}><Bell size={20} />{unread > 0 && <span>{number(unread)}</span>}</button>
         <div className="portal-account" ref={accountRef}><button type="button" aria-label={t('account')} aria-expanded={accountOpen} onClick={() => setAccountOpen(!accountOpen)}><span className="portal-avatar"><UserRound size={18} /></span><span className="portal-account-name">{name}</span><ChevronDown size={14} /></button>
