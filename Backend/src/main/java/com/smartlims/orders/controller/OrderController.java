@@ -24,11 +24,28 @@ public class OrderController {
     private final OrderService orders;
     private final OrderReadService reads;
     private final OrderCancellationService cancellations;
+    private final com.smartlims.orders.service.AdminOrderReadService adminReads;
 
-    public OrderController(OrderService orders, OrderReadService reads, OrderCancellationService cancellations) {
+    public OrderController(OrderService orders, OrderReadService reads, OrderCancellationService cancellations,
+                           com.smartlims.orders.service.AdminOrderReadService adminReads) {
         this.orders = orders;
         this.reads = reads;
         this.cancellations = cancellations;
+        this.adminReads = adminReads;
+    }
+
+    @GetMapping
+    public ResponseEntity<com.smartlims.orders.dto.AdminOrderPage> listAdmin(
+            @RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(adminReads.list(actor,
+                com.smartlims.laboratory.dto.LaboratoryQuery.of(query, "fromDate", "toDate", "status", "search", "sort")));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderDetailResponse> getAdmin(@PathVariable String id,
+            @RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        query.keySet().forEach(k -> { throw com.smartlims.laboratory.exception.LaboratoryException.invalid(k); });
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(adminReads.get(actor, id));
     }
 
     @PostMapping(path = "/{id}/cancel", consumes = MediaType.APPLICATION_JSON_VALUE)

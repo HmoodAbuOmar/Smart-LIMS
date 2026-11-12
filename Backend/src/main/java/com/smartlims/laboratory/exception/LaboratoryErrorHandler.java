@@ -2,6 +2,7 @@ package com.smartlims.laboratory.exception;
 
 import com.smartlims.auth.controller.AuthErrorHandler.ApiError;
 import com.smartlims.labtests.controller.TestParameterController;
+import com.smartlims.labtests.controller.ReferenceRangeController;
 import com.smartlims.visits.controller.VisitController;
 import com.smartlims.samples.controller.SampleController;
 import com.smartlims.results.controller.ResultController;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 @Order(-1)
-@RestControllerAdvice(assignableTypes = {TestParameterController.class, VisitController.class, SampleController.class, ResultController.class, PatientDashboardController.class, NotificationController.class})
+@RestControllerAdvice(assignableTypes = {com.smartlims.laboratory.controller.AdminActivityController.class, TestParameterController.class, ReferenceRangeController.class, VisitController.class, SampleController.class, ResultController.class, PatientDashboardController.class, NotificationController.class})
 public class LaboratoryErrorHandler {
     @ExceptionHandler(LaboratoryException.class)
     ResponseEntity<ApiError> request(LaboratoryException e, HttpServletResponse r) {

@@ -89,7 +89,7 @@ class OrderCreationTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             UserAccount actor = UserAccount.invite("Synthetic order actor", role.name().toLowerCase(Locale.ROOT)
                     + "@example.invalid", null, null, role);
@@ -214,7 +214,8 @@ class OrderCreationTest extends IsolatedPostgresTest {
             if (role == Role.PATIENT || role == Role.LAB_TECHNICIAN)
                 error(mvc.perform(request(role, false, key().getFirst(), staffBody(other, first.getId()))), 403, "FORBIDDEN", null);
             for (String path : List.of("/api/orders", "/api/orders/" + UUID.randomUUID())) {
-                mvc.perform(get(path).header("Authorization", "Bearer " + tokens.get(role))).andExpect(status().isForbidden());
+                mvc.perform(get(path).header("Authorization", "Bearer " + tokens.get(role)))
+                        .andExpect(status().is(role == Role.ADMIN ? (path.equals("/api/orders") ? 200 : 404) : 403));
             }
             mvc.perform(get("/api/orders/me").header("Authorization", "Bearer " + tokens.get(role)))
                     .andExpect(status().is(role == Role.PATIENT ? 200 : 403));

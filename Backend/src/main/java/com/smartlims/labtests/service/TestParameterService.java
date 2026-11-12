@@ -1,5 +1,8 @@
 package com.smartlims.labtests.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.entity.Role;
 import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.entity.TestParameter;
@@ -24,23 +27,27 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class TestParameterService {
+    private final AuditPublisher audit;
     private final LaboratoryAccess access;
     private final LabTestRepository tests;
     private final TestParameterRepository parameters;
     private final ResultValueRepository values;
+    private final ReferenceRangeRepository ranges;
     private final EntityManager entities;
 
-    public TestParameterService(LaboratoryAccess access, LabTestRepository tests, TestParameterRepository parameters, ResultValueRepository values, EntityManager entities) {
+    public TestParameterService(LaboratoryAccess access, LabTestRepository tests, TestParameterRepository parameters, ResultValueRepository values, ReferenceRangeRepository ranges, EntityManager entities, AuditPublisher audit) {
+        this.audit = audit;
         this.access = access;
         this.tests = tests;
         this.parameters = parameters;
         this.values = values;
+        this.ranges = ranges;
         this.entities = entities;
     }
 
     @Transactional
     public TestParameterResponse save(Authentication actor, String testId, String id, @NotNull @Valid TestParameterRequest body) {
-        access.current(actor, Role.ADMIN);
+        var account = access.current(actor, Role.ADMIN);
         var testKey = LaboratoryInput.uuid(testId, "testId");
         var key = id == null ? null : LaboratoryInput.uuid(id, "id");
         if ((key == null && body.expectedVersion() != null) || (key != null && body.expectedVersion() == null))
@@ -59,6 +66,11 @@ public class TestParameterService {
         var type = TestParameter.ValueType.valueOf(body.resultType());
         if (key != null && values.existsByParameter_Id(key) && (!Objects.equals(p.getName(), body.name()) || p.getResultType() != type || !Objects.equals(p.getUnit(), body.unit()) || !Objects.equals(p.getMethod(), body.method()) || p.getDisplayOrder() != body.displayOrder() || p.isRequired() != body.required()))
             throw LaboratoryException.conflict("PARAMETER_IN_USE");
+        if (key != null && type != TestParameter.ValueType.NUMERIC && ranges.existsByParameter_Id(key))
+            throw LaboratoryException.conflict("PARAMETER_HAS_REFERENCE_RANGES");
+        boolean changed = key == null || !Objects.equals(p.getName(), body.name()) || p.getResultType() != type
+                || !Objects.equals(p.getUnit(), body.unit()) || !Objects.equals(p.getMethod(), body.method())
+                || p.getDisplayOrder() != body.displayOrder() || p.isRequired() != body.required() || p.isActive() != body.active();
         p.setName(body.name());
         p.setResultType(type);
         p.setUnit(body.unit());
@@ -68,6 +80,7 @@ public class TestParameterService {
         p.setActive(body.active());
         parameters.saveAndFlush(p);
         entities.refresh(p);
+        if (changed) audit.record(account, key == null ? PARAMETER_CREATE : PARAMETER_UPDATE, p.getId());
         return TestParameterResponse.from(p);
     }
 

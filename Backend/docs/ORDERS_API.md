@@ -1,5 +1,26 @@
 # Orders API Contract
 
+## Admin Dashboard extension - ADM-DASH-01 (2026-11-10)
+
+Admin Recent Orders reuses GET /api/orders: search/status/date filters and paging
+are unchanged. Optional sort now accepts `(createdAt|updatedAt|orderNumber),(asc|desc)`
+as one field,direction value, default createdAt,desc; UUID descending breaks ties
+before pagination. Example:
+`GET /api/orders?search=synthetic&status=PENDING&sort=orderNumber,asc&page=0&size=8`.
+There is no mapping of Received/Processing/Awaiting review to order statuses.
+
+The View action now uses `GET /api/orders/{id}` for eligible ADMIN only.
+It reuses OrderDetailResponse/mapper and historical item/value snapshots; 200
+no-store, 400 VALIDATION_ERROR for malformed UUID or any query input,
+404 ORDER_NOT_FOUND for unknown order, 401 for unauthenticated/ineligible and
+403 for PATIENT/RECEPTIONIST/LAB_TECHNICIAN. No body or Idempotency-Key.
+GET /api/orders/me/{id} remains owned-PATIENT only; no ownership bypass.
+These Admin reads do not grant clinical reviewer/visit permissions or mutate
+orders. Existing staff creation responses keep their original Location behavior.
+This supersedes historical statements below about the absence of staff detail.
+The full response/metric contract is in
+[Admin Dashboard](ADMIN_ACTIVITY_API.md#admin-dashboard---adm-dash-01-2026-11-10).
+
 NOTIF-38 (2026-10-31): actual order creation/cancellation/processing/completion
 transitions now insert patient in-app notifications in the same transaction.
 Retries/no-ops do not duplicate them; notification persistence failure rolls back
@@ -244,3 +265,11 @@ Follow the existing com.smartlims module structure in a new orders package: cont
 Orders are not visits. No visit table/ID/link, appointment row/slot reservation, payment record/status/balance, sample, processing job, result/report URL, notification delivery, or audit-log subsystem is created by these endpoints. Header created_by/cancelled_by/timestamps supply the required actor metadata without claiming a future general audit workflow. No catalog/cart persistent selection API is needed. Future appointment/payment/result/sample integration must explicitly reconcile retained orders and cancellation under shared transaction/lock rules before it is enabled; older future design paragraphs are not Stage 2 side effects.
 
 Task 6 verification was source/document/image inspection only. Tasks 7-10 have separate focused persistence, creation, read and cancellation evidence, including corrections and concurrency checks, in TESTING.md. Task 11 now records a single green full-suite invocation on the independently verified disposable PostgreSQL cluster: 236 tests, 0 failures/errors/skips. Task 11 and Stage 2 are DONE with all acceptance criteria met. Committing is a separate owner handoff and does not gate completion. No further stage, Postman execution, production migration or deployment was performed. Unexecuted manual HTTP scenarios are documented separately from automated evidence.
+# Admin operational reads (2026-11-10)
+
+GET /api/orders now supports the Admin Orders tab with date/status/search,
+snapshot items/prices, pagination and full-filter order counts/value. This
+supersedes earlier staff-browsing deferrals for ADMIN only. Patient reads,
+creation/cancellation and receptionist permissions remain as documented below.
+Payment status/transaction amounts are unsupported, not zero. Complete additive
+contract and screenshot mapping: [ADMIN_ACTIVITY_API.md](ADMIN_ACTIVITY_API.md).

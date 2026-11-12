@@ -1,5 +1,8 @@
 package com.smartlims.auth.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.dto.AccountResponse;
 import com.smartlims.auth.dto.CreateAccountRequest;
 import com.smartlims.auth.dto.UpdateAccountRequest;
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountManagementService {
+    private final AuditPublisher audit;
     private final UserAccountRepository users;
     private final EmailActionTokenRepository tokens;
     private final VerificationTokens values;
@@ -44,7 +48,8 @@ public class AccountManagementService {
     public AccountManagementService(UserAccountRepository users, EmailActionTokenRepository tokens,
                                     VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
                                     PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
-                                    AdministratorCoordination administrators, UserAccountQueries queries) {
+                                    AdministratorCoordination administrators, UserAccountQueries queries, AuditPublisher audit) {
+        this.audit = audit;
         this.users = users;
         this.tokens = tokens;
         this.values = values;
@@ -60,8 +65,10 @@ public class AccountManagementService {
     @Transactional
     public AccountResponse create(Authentication actor, CreateAccountRequest request) {
         administrators.lock();
-        currentAdministrator(actor);
-        return createInvitation(request);
+        var administrator = currentAdministrator(actor);
+        var created = createInvitation(request);
+        audit.record(administrator, USER_INVITE, created.id());
+        return created;
     }
 
     private AccountResponse createInvitation(CreateAccountRequest request) {
@@ -100,7 +107,7 @@ public class AccountManagementService {
     @Transactional
     public void sendSetPassword(Authentication actor, UUID id) {
         administrators.lock();
-        currentAdministrator(actor);
+        var administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
         if (!user.isEnabled())
             throw new AuthRequestException(HttpStatus.FORBIDDEN,
@@ -109,6 +116,7 @@ public class AccountManagementService {
         String token = values.create();
         tokens.saveAndFlush(EmailActionToken.invitation(user, values.hash(token), Instant.now().plusSeconds(86400)));
         email.sendSetPassword(user.getEmail(), user.getId(), token);
+        audit.record(administrator, USER_REISSUE, user.getId());
     }
 
     @Transactional
@@ -152,8 +160,9 @@ public class AccountManagementService {
     @Transactional
     public AccountResponse update(Authentication actor, UUID id, UpdateAccountRequest request) {
         administrators.lock();
-        currentAdministrator(actor);
+        var administrator = currentAdministrator(actor);
         UserAccount user = locked(id);
+        var before = AccountResponse.from(user);
         String canonical = identities.canonicalize(request.email());
         if (!canonical.equals(identities.canonicalize(user.getEmail()))) {
             throw new AuthRequestException(HttpStatus.BAD_REQUEST, "EMAIL_CHANGE_NOT_ALLOWED",
@@ -170,7 +179,9 @@ public class AccountManagementService {
         } catch (DataIntegrityViolationException error) {
             throw AccountConstraintErrors.translate(error);
         }
-        return AccountResponse.from(user);
+        var response = AccountResponse.from(user);
+        if (!before.equals(response)) audit.record(administrator, USER_UPDATE, id);
+        return response;
     }
 
     @Transactional
@@ -181,7 +192,9 @@ public class AccountManagementService {
         if (blocked && administrator.getId().equals(id))
             throw protectedAdmin();
         guardLastAdmin(user, blocked || user.getRole() != Role.ADMIN);
+        boolean changed = user.isEnabled() == blocked;
         user.setEnabled(!blocked);
+        if (changed) audit.record(administrator, blocked ? USER_BLOCK : USER_UNBLOCK, id);
         return AccountResponse.from(user);
     }
 
@@ -200,6 +213,7 @@ public class AccountManagementService {
         guardLastAdmin(user, true);
         user.setRole(role);
         email.sendRoleChanged(user.getEmail(), role.name());
+        audit.record(administrator, USER_ROLE, id);
         return AccountResponse.from(user);
     }
 
@@ -222,6 +236,7 @@ public class AccountManagementService {
             }
             throw error;
         }
+        audit.record(administrator, USER_DELETE, id);
     }
 
     @Transactional
@@ -244,7 +259,10 @@ public class AccountManagementService {
             throw protectedAdmin();
         // Every target and safeguard has been checked before changing any managed entity.
         targets.values().forEach(user -> {
-            if (user.isEnabled() == blocked) user.setEnabled(!blocked);
+            if (user.isEnabled() == blocked) {
+                user.setEnabled(!blocked);
+                audit.record(administrator, blocked ? USER_BLOCK : USER_UNBLOCK, user.getId());
+            }
         });
         return selected.stream().map(id -> AccountResponse.from(targets.get(id))).toList();
     }

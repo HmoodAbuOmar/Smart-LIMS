@@ -1,5 +1,32 @@
 # Smart-LIMS Database Design
 
+ADM-DASH-01 (2026-11-10): no schema/migration change. The Admin dashboard is a
+repeatable-read aggregate over retained profiles, orders/items, current-slot
+appointments, result versions/current publication markers and rejected specimens.
+Reuse existing operational report status/attendance/rejection grouping for all-time
+cards. Daily order counts and test distribution use the same 7/14-day parent
+created_at cohort at Asia/Jerusalem midnights; zero-fill calendar days in the
+read model. Distribution counts item rows grouped by test ID and retained
+code/name snapshots, never current catalog or quantities/result versions.
+Draft review counts do not assert completeness. Retained rejected samples include
+replaced originals; no follow-up closure field/rule exists. Explicit order flags
+and payments have no data source and remain unsupported/null. No clinical or
+order lifecycle semantics change. New Admin detail reuses existing mapper/snapshots.
+See [dashboard contract](ADMIN_ACTIVITY_API.md#admin-dashboard---adm-dash-01-2026-11-10).
+
+ADM-AUD-02 (2026-11-10): V28 implements the audit_logs concept in section 4.18
+with a narrower safe contract, superseding that section's proposed columns and
+planned status for this slice. Columns: UUID id, actor_id/name snapshot, action,
+entity_type/entity_id, occurred_at/recorded_at, fixed summary. Actor and entity
+IDs are logical historical references with no new deletion-blocking FK. No JSON
+payload, request body, tokens, contact/clinical data or historical backfill.
+Indexes support chronology, actor/action and entity lookups; UPDATE/DELETE trigger
+enforces append-only history. A MANDATORY synchronous publisher writes on the
+source transaction; failures roll back audit and business state together.
+Existing clinical laboratory_events remains immutable and unchanged; the Admin
+read model unions both safe projections before filtering/counting/paging. See
+[coverage and no-op rules](ADMIN_ACTIVITY_API.md#transactional-admin-audit-extension--adm-aud-02-2026-11-10).
+
 ## Patient notifications design (NOTIF-38, 2026-10-31)
 
 Additive V25 creates patient_notifications only; V1-V24 are immutable. Rows have
@@ -237,7 +264,7 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 15 | `result_specimens` | Implemented V9 | Retained exact specimens per result version. |
 | 16 | `result_values` | Implemented V9 | Values and historical manual-reference/definition snapshots. |
 | 17 | `patient_notifications` | V25; NOTIF-38 | Patient-profile in-app workflow events and read state; external delivery deferred. |
-| 18 | `audit_logs` | Planned; T-AUD-02/03 | Append-only records of important business actions. |
+| 18 | `audit_logs` | V28; ADM-AUD-02 | Append-only safe Admin/staff command metadata; combined with existing laboratory events for Admin reads. |
 | 19 | `symptom_assessments` | Deferred AI; T-AI-01 | Patient symptom-analysis sessions for the later test-suggestion feature. |
 | 20 | `suggested_tests` | Deferred AI; T-AI-01 | Laboratory tests suggested by a symptom assessment. |
 | 21 | `patient_link_tokens` | Implemented V5 | Short-lived, single-use capabilities for verified patient account/profile linking. |
@@ -486,7 +513,7 @@ target is not implemented or authorized by this stage.
 
 Approved numeric or textual reference ranges by parameter, age, sex, and validity period.
 
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Implementation status: V28, ADM-AUD-02. The earlier proposed JSON/correlation/system-actor fields are not part of this safe command-metadata slice. Existing laboratory_events is retained separately.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -794,21 +821,21 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
 | `id` | `UUID` | No | PK | Record identifier |
-| `user_id` | `UUID` | Yes | FK users.id | Linked account or event actor/recipient |
-| `action` | `VARCHAR(60)` | No | - | Audit event code |
+| `actor_id` | `UUID` | No | Logical retained identity | Authenticated staff actor |
+| `actor_name_snapshot` | `VARCHAR(120)` | No | Nonblank | Retained staff display name |
+| `action` | `VARCHAR(40)` | No | Closed publisher operation vocabulary | Audit action code |
 | `entity_type` | `VARCHAR(50)` | No | - | Affected entity type |
-| `entity_id` | `UUID` | Yes | - | Affected entity identifier |
-| `request_id` | `VARCHAR(100)` | Yes | - | Request correlation identifier |
-| `details` | `JSONB` | No | DEFAULT {} | Minimal structured event details |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
+| `entity_id` | `UUID` | No | Logical retained identity | Affected entity identifier |
+| `occurred_at` | `TIMESTAMPTZ` | No | Source command server instant | Effective timestamp |
+| `recorded_at` | `TIMESTAMPTZ` | No | Source command server instant | Audit chronology timestamp |
+| `summary` | `VARCHAR(250)` | No | Fixed operation summary | No user-supplied payload or clinical/contact data |
 
 **Rules and relationships**
 
-- user_id is nullable for system actions. entity_type and entity_id identify a business record logically; entity_id is not a foreign key to every table.
-- details defaults to an empty JSON object. Record profile creation/linking, orders, payments, sample events, validation, publication, corrections, and rescheduling.
-- Use append-only access; revoke ordinary UPDATE and DELETE rights on this table from the application database role.
-- Never record passwords, JWTs, email tokens, database connection secrets, or unnecessary health data. [S6]
-- Index (entity_type, entity_id, created_at), (user_id, created_at), and (action, created_at).
+- Actor and entity references survive permitted deletion without changing existing account/clinical deletion guards. No fabricated system actor or historical backfill.
+- A MANDATORY synchronous publisher accepts only actor, closed operation enum and entity UUID. No passwords, proof, contact/clinical values or arbitrary details. Existing laboratory history is projected safely, not duplicated.
+- An append-only database trigger rejects UPDATE/DELETE; no HTTP mutation route. Audit failures abort the business transaction, and business rollback removes the audit insert.
+- Chronological, actor, action and entity indexes include recorded_at DESC,id DESC. Combined read filtering/counting/pagination is documented in ADMIN_ACTIVITY_API.md. Payments remain outside this audit slice.
 
 ### 4.19. `symptom_assessments`
 
@@ -1039,3 +1066,47 @@ original chartValue/comparator semantics. Existing trend grouping loads the owne
 numeric history before limiting; large-history performance remains unbenchmarked.
 Existing FK/current-result indexes are reused. No writers, locks, lifecycle
 changes, popularity tracking or notifications storage are introduced.
+
+## Configured reference range slice (CAT-RANGE-01, 2026-11-09)
+
+Additive V27__reference_ranges.sql creates exactly one table, reference_ranges,
+with UUID identity, retained parameter_id FK to test_parameters, exact
+MALE/FEMALE/ANY applicability, nullable integer min_age_days/max_age_days,
+NUMERIC(38,12) lower_limit/upper_limit, nullable DATE valid_from/valid_to and
+UTC created_at. Checks enforce nonnegative ages, nonempty bounded half-open
+age/date intervals, supported applicability, finite numeric limits, at least
+one numeric limit and lower <= upper. Index (parameter_id,applicability) supports
+overlap lookup and (parameter_id,created_at,id) supports stable paging. No seeds,
+extension requirement, result FK, snapshot backfill or change to V1–V26.
+
+Both nested IDs and NUMERIC type are verified in the service. Creates take the
+existing LabTestRepository.findForUpdate parent lock BEFORE parameter lookup,
+overlap query and insert; explicit READ_COMMITTED isolation ensures a waiting
+create's overlap query sees its predecessor's committed insert. All configuration
+writers use this path, including when there are no existing ranges. Parameter
+updates use the same parent lock and reject NUMERIC→TEXT while ranges exist.
+No order lock is acquired, preserving existing order→catalog lock ordering.
+Overlap is an intersection in both half-open age and date dimensions, scoped
+to parameter and exact applicability, including expired configurations.
+The scalar checks/FK are database constraints; overlap/type checks are service
+invariants coordinated by the shared row lock (direct SQL bypass is not an API).
+No database extension or speculative patient matching rule is introduced.
+
+API/date classification: [LAB_TESTS_API.md](LAB_TESTS_API.md#configured-reference-ranges--cat-range-01-2026-11-09).
+Only storage/create/list are enabled; older “automatic reference_ranges deferred”
+statements continue to apply to matching/flags/population. Existing manual
+result_values references and immutable published snapshots remain authoritative.
+CAT-ADMIN-02 verification (2026-11-09) exercised V27 on the guarded disposable
+regression database plus fresh/upgrade compatibility databases: full Maven 531
+tests, no failures/errors/skips, and live Postman overlap/concurrency/configuration
+checks passed. Existing V1–V27 migration files are unchanged from entry HEAD.
+No development/production migration or deployment readiness claim is made.
+# Admin activity reads (2026-11-10)
+
+ADM-ACT-01 adds no schema changes. Admin lists/reports read canonical V1–V27:
+test_orders/order_items immutable test names/prices; laboratory_events safe
+projection; appointments/current slots; visit_items; current published results;
+samples.rejected_at. Each multi-query response uses a read-only repeatable-read
+transaction so content/counts/totals/options share one snapshot. See
+[metric/source/coverage rules](ADMIN_ACTIVITY_API.md). This earlier slice preceded
+V28 audit_logs; payments remain unimplemented and financial unsupported/null differs from zero.

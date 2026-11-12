@@ -1,5 +1,8 @@
 package com.smartlims.appointments.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.appointments.dto.*;
 import com.smartlims.appointments.entity.*;
 import com.smartlims.appointments.exception.AppointmentException;
@@ -21,12 +24,14 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class AppointmentScheduleService {
+    private final AuditPublisher audit;
     private final AppointmentAccess access;
     private final AppointmentTypeRepository types;
     private final AppointmentSlotRepository slots;
     private final AppointmentRepository appointments;
 
-    public AppointmentScheduleService(AppointmentAccess access, AppointmentTypeRepository types, AppointmentSlotRepository slots, AppointmentRepository appointments) {
+    public AppointmentScheduleService(AppointmentAccess access, AppointmentTypeRepository types, AppointmentSlotRepository slots, AppointmentRepository appointments, AuditPublisher audit) {
+        this.audit = audit;
         this.access = access;
         this.types = types;
         this.slots = slots;
@@ -35,16 +40,20 @@ public class AppointmentScheduleService {
 
     @Transactional
     public AppointmentResponses.Type saveType(Authentication actor, String id, @NotNull @Valid AppointmentRequests.Type body) {
-        access.current(actor, Role.ADMIN);
+        var account = access.current(actor, Role.ADMIN);
         UUID key = id == null ? null : AppointmentQuery.uuid(id, "id");
         slots.lockSchedule();
         if (types.existsByCodeAndIdNot(body.code(), key == null ? new UUID(0, 0) : key))
             throw AppointmentException.conflict("APPOINTMENT_SCHEDULE_CONFLICT");
         var type = key == null ? new AppointmentType(body.code(), body.name(), body.active()) : types.findById(key).orElseThrow(() -> AppointmentException.missing("APPOINTMENT_TYPE"));
+        boolean changed = key == null || !java.util.Objects.equals(type.getCode(), body.code())
+                || !java.util.Objects.equals(type.getName(), body.name()) || type.isActive() != body.active();
         type.setCode(body.code());
         type.setName(body.name());
         type.setActive(body.active());
-        return AppointmentMapping.type(types.saveAndFlush(type));
+        var saved = types.saveAndFlush(type);
+        if (changed) audit.record(account, key == null ? TYPE_CREATE : TYPE_UPDATE, saved.getId());
+        return AppointmentMapping.type(saved);
     }
 
     @Transactional(readOnly = true)
@@ -59,7 +68,7 @@ public class AppointmentScheduleService {
 
     @Transactional
     public AppointmentResponses.Slot createSlot(Authentication actor, @NotNull @Valid AppointmentRequests.SlotCreate body) {
-        access.current(actor, Role.ADMIN, Role.RECEPTIONIST);
+        var account = access.current(actor, Role.ADMIN, Role.RECEPTIONIST);
         var start = AppointmentQuery.instant(body.startsAt(), "startsAt");
         var end = AppointmentQuery.instant(body.endsAt(), "endsAt");
         if (!end.isAfter(start))
@@ -69,21 +78,25 @@ public class AppointmentScheduleService {
             throw AppointmentException.invalid("startsAt");
         if (slots.overlaps(start, end))
             throw AppointmentException.conflict("APPOINTMENT_SCHEDULE_CONFLICT");
-        return AppointmentMapping.slot(slots.saveAndFlush(new AppointmentSlot(start, end, body.capacity(), body.active())), 0);
+        var saved = slots.saveAndFlush(new AppointmentSlot(start, end, body.capacity(), body.active()));
+        audit.record(account, SLOT_CREATE, saved.getId());
+        return AppointmentMapping.slot(saved, 0);
     }
 
     @Transactional
     public AppointmentResponses.Slot updateSlot(Authentication actor, String id, @NotNull @Valid AppointmentRequests.SlotUpdate body) {
-        access.current(actor, Role.ADMIN, Role.RECEPTIONIST);
+        var account = access.current(actor, Role.ADMIN, Role.RECEPTIONIST);
         var key = AppointmentQuery.uuid(id, "id");
         slots.lockSchedule();
         var slot = slots.findForUpdate(key).orElseThrow(() -> AppointmentException.missing("APPOINTMENT_SLOT"));
         long count = appointments.countActiveBySlot(key);
         if (body.capacity() < count)
             throw AppointmentException.conflict("APPOINTMENT_SCHEDULE_CONFLICT");
+        boolean changed = slot.getCapacity() != body.capacity() || slot.isActive() != body.active();
         slot.setCapacity(body.capacity());
         slot.setActive(body.active());
         slots.flush();
+        if (changed) audit.record(account, SLOT_UPDATE, slot.getId());
         return AppointmentMapping.slot(slot, count);
     }
 
@@ -91,7 +104,10 @@ public class AppointmentScheduleService {
     public AppointmentResponses.Page<AppointmentResponses.Slot> schedule(Authentication actor, AppointmentQuery query) {
         access.current(actor, Role.ADMIN, Role.RECEPTIONIST);
         var range = query.range();
-        Specification<AppointmentSlot> filter = (r, q, c) -> c.and(c.greaterThanOrEqualTo(r.get("startsAt"), range[0]), c.lessThan(r.get("startsAt"), range[1]));
+        Boolean active = query.values().containsKey("active") ? query.bool("active") : null;
+        Specification<AppointmentSlot> filter = (r, q, c) -> c.and(
+                c.greaterThanOrEqualTo(r.get("startsAt"), range[0]), c.lessThan(r.get("startsAt"), range[1]),
+                active == null ? c.conjunction() : c.equal(r.get("active"), active));
         return AppointmentMapping.page(AppointmentPages.find(slots, filter, query, Sort.by("startsAt", "id")), s -> AppointmentMapping.slot(s, appointments.countActiveBySlot(s.getId())));
     }
 }

@@ -44,7 +44,7 @@ public class AppointmentScheduleController {
 
     @GetMapping("/api/appointment-slots/schedule")
     public ResponseEntity<?> slots(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
-        return response(schedule.schedule(actor, AppointmentQuery.of(query, "from", "to")), 200);
+        return response(schedule.schedule(actor, AppointmentQuery.of(query, "from", "to", "active")), 200);
     }
 
     private ResponseEntity<?> response(Object body, int status) {

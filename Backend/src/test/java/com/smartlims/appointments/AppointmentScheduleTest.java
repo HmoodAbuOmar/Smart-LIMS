@@ -100,6 +100,94 @@ class AppointmentScheduleTest extends AppointmentTestSupport {
     }
 
     @Test
+    void staffActiveFilterCombinesWithDateBoundsBeforePagingAndCounting() throws Exception {
+        Map<Integer, AppointmentResponses.Slot> slots = new HashMap<>();
+        // Reverse creation order to verify start-time ordering rather than insertion order.
+        for (int index = 6; index >= 0; index--) {
+            var slot = slot(index, 2);
+            if (index % 2 == 1 || index == 6)
+                slot = schedule.updateSlot(actor(Role.ADMIN), slot.id().toString(), new AppointmentRequests.SlotUpdate(2, false));
+            slots.put(index, slot);
+        }
+        String from = future.plusSeconds(3600).toString(), to = future.plusSeconds(21600).toString();
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST)) {
+            for (String active : new String[]{null, "true", "false"}) {
+                List<Integer> indices = active == null ? List.of(1, 2, 3, 4, 5)
+                        : active.equals("true") ? List.of(2, 4) : List.of(1, 3, 5);
+                var expectedIds = indices.stream().map(i -> slots.get(i).id().toString()).toList();
+                int totalPages = (expectedIds.size() + 1) / 2;
+                for (int page = 0; page <= totalPages; page++) {
+                    var request = bearer(get("/api/appointment-slots/schedule").param("from", from).param("to", to)
+                            .param("size", "2").param("page", Integer.toString(page)), role);
+                    if (active != null)
+                        request.param("active", active);
+                    int start = Math.min(page * 2, expectedIds.size()), end = Math.min(start + 2, expectedIds.size());
+                    var expectedPage = expectedIds.subList(start, end);
+                    var body = json.readTree(mvc.perform(request).andExpect(status().isOk())
+                            .andExpect(header().string("Cache-Control", "no-store"))
+                            .andExpect(jsonPath("$.page").value(page)).andExpect(jsonPath("$.size").value(2))
+                            .andExpect(jsonPath("$.totalElements").value(expectedIds.size()))
+                            .andExpect(jsonPath("$.totalPages").value(totalPages))
+                            .andExpect(jsonPath("$.first").value(page == 0)).andExpect(jsonPath("$.last").value(page + 1 >= totalPages))
+                            .andExpect(jsonPath("$.content.length()").value(expectedPage.size()))
+                            .andReturn().getResponse().getContentAsString());
+                    for (int i = 0; i < expectedPage.size(); i++) {
+                        assertEquals(expectedPage.get(i), body.get("content").get(i).get("id").asString());
+                        if (active != null)
+                            assertEquals(Boolean.parseBoolean(active), body.get("content").get(i).get("active").asBoolean());
+                    }
+                }
+            }
+            mvc.perform(bearer(get("/api/appointment-slots/schedule").param("from", from).param("to", to)
+                            .param("active", "false").param("page", "2147483647").param("size", "100"), role))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3))
+                    .andExpect(jsonPath("$.totalPages").value(1)).andExpect(jsonPath("$.content").isEmpty());
+            mvc.perform(bearer(get("/api/appointment-slots/schedule").param("from", future.toString())
+                            .param("to", from).param("active", "false"), role))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0))
+                    .andExpect(jsonPath("$.totalPages").value(0)).andExpect(jsonPath("$.content").isEmpty());
+        }
+    }
+
+    @Test
+    void staffScheduleRejectsInvalidAndRepeatedActiveValues() throws Exception {
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST)) {
+            for (String active : List.of("", "TRUE", "False", "1", "0", "null", "true,false", " true", "false "))
+                error(mvc.perform(bearer(get("/api/appointment-slots/schedule").param("from", future.toString())
+                        .param("to", future.plusSeconds(86400).toString()).param("active", active), role)), 400, "VALIDATION_ERROR", "active");
+            for (String[] active : List.of(new String[]{"true", "true"}, new String[]{"false", "false"}, new String[]{"true", "false"}))
+                error(mvc.perform(bearer(get("/api/appointment-slots/schedule").param("from", future.toString())
+                        .param("to", future.plusSeconds(86400).toString()).param("active", active), role)), 400, "VALIDATION_ERROR", "active");
+        }
+    }
+
+    @Test
+    void activeFilterPreservesStaffAccessAndIsNotAcceptedByPatientAvailability() throws Exception {
+        String from = future.minusSeconds(1).toString(), to = future.plusSeconds(86400).toString();
+        for (Role role : List.of(Role.PATIENT, Role.LAB_TECHNICIAN))
+            error(mvc.perform(bearer(get("/api/appointment-slots/schedule").param("from", from).param("to", to)
+                    .param("active", "false"), role)), 403, "FORBIDDEN", null);
+        error(mvc.perform(get("/api/appointment-slots/schedule").param("from", from).param("to", to)
+                .param("active", "true")), 401, "UNAUTHORIZED", null);
+
+        var type = type();
+        var open = slot(0, 2);
+        var closed = slot(1, 2);
+        schedule.updateSlot(actor(Role.ADMIN), closed.id().toString(), new AppointmentRequests.SlotUpdate(2, false));
+        var order = create(own, first);
+        for (Role role : List.of(Role.PATIENT, Role.ADMIN, Role.RECEPTIONIST)) {
+            mvc.perform(bearer(get("/api/appointment-slots").param("orderId", order.id().toString()).param("typeId", type.id().toString())
+                            .param("from", from).param("to", to), role))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].id").value(open.id().toString()));
+            for (String active : List.of("true", "false"))
+                error(mvc.perform(bearer(get("/api/appointment-slots").param("orderId", order.id().toString())
+                        .param("typeId", type.id().toString()).param("from", from).param("to", to)
+                        .param("active", active), role)), 400, "VALIDATION_ERROR", "active");
+        }
+    }
+
+    @Test
     void persistedAppointmentsRetainRelationshipsSnapshotsAndGuardOccupiedCapacity() {
         var type = schedule.saveType(actor(Role.ADMIN), null, new AppointmentRequests.Type("SYNTH", "Original synthetic type", true));
         var start = Instant.now().truncatedTo(MICROS).plusSeconds(86400);

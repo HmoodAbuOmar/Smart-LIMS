@@ -1,5 +1,8 @@
 package com.smartlims.labtests.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.UserAccountRepository;
@@ -33,11 +36,13 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class LabTestService {
+    private final AuditPublisher audit;
     private final LabTestRepository tests;
     private final LabTestMapper mapper;
     private final UserAccountRepository users;
 
-    public LabTestService(LabTestRepository tests, LabTestMapper mapper, UserAccountRepository users) {
+    public LabTestService(LabTestRepository tests, LabTestMapper mapper, UserAccountRepository users, AuditPublisher audit) {
+        this.audit = audit;
         this.tests = tests;
         this.mapper = mapper;
         this.users = users;
@@ -45,13 +50,15 @@ public class LabTestService {
 
     @Transactional
     public LabTestResponse create(Authentication actor, @NotNull @Valid LabTestRequest request) {
-        currentAccount(actor, "ADMIN");
+        var account = currentAccount(actor, "ADMIN");
         if (tests.existsByCode(request.code()))
             throw LabTestException.duplicate();
         LabTest test = new LabTest(request.code(), request.name(), request.description(),
                 request.price().setScale(2, RoundingMode.UNNECESSARY), request.sampleType(), request.preparationInstructions());
         request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
-        return mapper.toResponse(save(test));
+        var saved = save(test);
+        audit.record(account, CATALOG_CREATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -77,6 +84,12 @@ public class LabTestService {
     }
 
     @Transactional(readOnly = true)
+    public List<String> sampleTypes(Authentication actor) {
+        currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
+        return tests.findSampleTypes();
+    }
+
+    @Transactional(readOnly = true)
     public LabTestResponse get(Authentication actor, String id) {
         UserAccount account = currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         LabTest test = tests.findById(identifier(id)).orElseThrow(LabTestException::missing);
@@ -87,30 +100,54 @@ public class LabTestService {
 
     @Transactional
     public LabTestResponse update(Authentication actor, String id, @NotNull @Valid LabTestRequest request) {
-        currentAccount(actor, "ADMIN");
+        return updateFields(actor, id, request, true);
+    }
+
+    @Transactional
+    public LabTestResponse updateDetails(Authentication actor, String id, @NotNull @Valid LabTestDetailsRequest request) {
+        return updateFields(actor, id, request.asCatalogRequest(), false);
+    }
+
+    private LabTestResponse updateFields(Authentication actor, String id, LabTestRequest request, boolean replaceCategories) {
+        var account = currentAccount(actor, "ADMIN");
         UUID testId = identifier(id);
         LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
         if (tests.existsByCodeAndIdNot(request.code(), testId))
             throw LabTestException.duplicate();
+        boolean changed = !java.util.Objects.equals(test.getCode(), request.code())
+                || !java.util.Objects.equals(test.getName(), request.name())
+                || !java.util.Objects.equals(test.getDescription(), request.description())
+                || test.getPrice().compareTo(request.price()) != 0
+                || !java.util.Objects.equals(test.getSampleType(), request.sampleType())
+                || !java.util.Objects.equals(test.getPreparationInstructions(), request.preparationInstructions())
+                || replaceCategories && !test.getCategories().equals(request.categories().stream()
+                .map(LabTestCategory::valueOf).collect(java.util.stream.Collectors.toSet()));
         test.setCode(request.code());
         test.setName(request.name());
         test.setDescription(request.description());
         test.setPrice(request.price().setScale(2, RoundingMode.UNNECESSARY));
         test.setSampleType(request.sampleType());
         test.setPreparationInstructions(request.preparationInstructions());
-        test.getCategories().clear();
-        request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
+        if (replaceCategories) {
+            test.getCategories().clear();
+            request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
+        }
         test.setUpdatedAt(Instant.now());
-        return mapper.toResponse(save(test));
+        var saved = save(test);
+        if (changed) audit.record(account, CATALOG_UPDATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional
     public LabTestResponse changeStatus(Authentication actor, String id, @NotNull @Valid LabTestStatusRequest request) {
-        currentAccount(actor, "ADMIN");
+        var account = currentAccount(actor, "ADMIN");
         LabTest test = tests.findForUpdate(identifier(id)).orElseThrow(LabTestException::missing);
+        boolean changed = test.isActive() != request.active();
         test.setActive(request.active());
         test.setUpdatedAt(Instant.now());
-        return mapper.toResponse(save(test));
+        var saved = save(test);
+        if (changed) audit.record(account, request.active() ? CATALOG_ACTIVATE : CATALOG_DEACTIVATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     private LabTest save(LabTest test) {

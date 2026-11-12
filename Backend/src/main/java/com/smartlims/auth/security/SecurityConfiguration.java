@@ -68,15 +68,20 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token",
                                 "/api/auth/confirm-email").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/audit-logs", "/api/reports/operations", "/api/orders", "/api/admin/dashboard").hasRole("ADMIN")
                         .requestMatchers("/api/users/**", "/api/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/lab-tests/sample-types").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests", "/api/lab-tests/{id}")
                         .hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT")
                         .requestMatchers(HttpMethod.GET, "/api/lab-tests/{testId}/parameters").hasAnyRole("ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests/{testId}/parameters").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{testId}/parameters/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/lab-tests/{testId}/parameters/{parameterId}/reference-ranges").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/lab-tests/{testId}/parameters/{parameterId}/reference-ranges").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/details").hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/appointment-types").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/appointment-types").hasRole("ADMIN")
@@ -105,6 +110,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/orders/me").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/orders/me", "/api/orders/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/orders/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/orders/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
 
                         .requestMatchers(HttpMethod.GET, "/api/notifications/me", "/api/notifications/me/unread-count").hasRole("PATIENT")

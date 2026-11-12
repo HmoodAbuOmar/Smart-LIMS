@@ -64,7 +64,7 @@ class LabTestManagementTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, lab_test_categories, lab_tests, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items, test_orders, lab_test_categories, lab_tests, patient_link_tokens, patients, email_action_tokens, users");
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Catalog Test Account", role.name().toLowerCase(Locale.ROOT)
                     + "@example.invalid", null, "000001", role);
@@ -109,6 +109,62 @@ class LabTestManagementTest extends IsolatedPostgresTest {
                             .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                     .andExpect(status().isOk());
         return id;
+    }
+
+    @Test
+    void detailsFormSavePreservesCategoriesAndAvailabilityWithoutChangingLegacyPut() throws Exception {
+        String id = catalogTest("DETAILS", "Original synthetic", false, "THYROID", "BLOOD_TESTS");
+        String details = "{\"code\":\" details \",\"name\":\" Edited synthetic \",\"price\":1.25,\"sampleType\":\" Legacy free text \"}";
+        mvc.perform(bearer(patch("/api/lab-tests/" + id + "/details"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(details))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("DETAILS"))
+                .andExpect(jsonPath("$.name").value("Edited synthetic")).andExpect(jsonPath("$.sampleType").value("Legacy free text"))
+                .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(List.of("BLOOD_TESTS", "THYROID"))));
+        assertEquals(List.of("BLOOD_TESTS", "THYROID"), persistedCategories(id));
+        mvc.perform(bearer(patch("/api/lab-tests/" + id + "/details"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(details))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.categories.length()").value(2));
+        mvc.perform(bearer(put("/api/lab-tests/" + id), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(details))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.categories").isEmpty()).andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void detailsFormEnforcesStrictInputRolesMissingTargetsAndCookieCsrf() throws Exception {
+        String id = catalogTest("DETAILS", "Synthetic", true, "THYROID");
+        String path = "/api/lab-tests/" + id + "/details";
+        for (Role role : List.of(Role.PATIENT, Role.RECEPTIONIST, Role.LAB_TECHNICIAN))
+            mvc.perform(bearer(patch(path), role).contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isForbidden());
+        mvc.perform(patch(path).contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isForbidden());
+        mvc.perform(patch(path).cookie(new Cookie("access_token", tokens.get(Role.ADMIN))).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isForbidden());
+        Cookie csrf = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
+        assertNotNull(csrf);
+        mvc.perform(patch(path).cookie(new Cookie("access_token", tokens.get(Role.ADMIN)), csrf)
+                        .header("X-XSRF-TOKEN", csrf.getValue()).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.categories").value(org.hamcrest.Matchers.is(List.of("THYROID"))));
+        for (String invalid : List.of(withCategories(BODY, "[]"), BODY.replace("25.50", "\"25.50\"")))
+            mvc.perform(bearer(patch(path), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(invalid))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_JSON"));
+        mvc.perform(bearer(patch(path), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(BODY.replace("25.50", "-1")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors.price").exists());
+        mvc.perform(bearer(patch("/api/lab-tests/" + UUID.randomUUID() + "/details"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LAB_TEST_NOT_FOUND"));
+    }
+
+    @Test
+    void sampleTypeSuggestionsReuseDistinctStoredFreeTextIncludingInactiveTestsForStaff() throws Exception {
+        mvc.perform(bearer(get("/api/lab-tests/sample-types"), Role.ADMIN)).andExpect(status().isOk()).andExpect(content().json("[]"));
+        create(BODY.replace("cbc", "ONE").replace(" Blood ", " Legacy descriptive sample "));
+        String inactive = create(BODY.replace("cbc", "TWO").replace(" Blood ", " Another custom sample "));
+        create(BODY.replace("cbc", "THREE").replace(" Blood ", " Legacy descriptive sample "));
+        mvc.perform(bearer(patch("/api/lab-tests/" + inactive + "/status"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isOk());
+        for (Role role : List.of(Role.ADMIN, Role.RECEPTIONIST, Role.LAB_TECHNICIAN))
+            mvc.perform(bearer(get("/api/lab-tests/sample-types"), role)).andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(content().json("[\"Another custom sample\",\"Legacy descriptive sample\"]"));
+        mvc.perform(bearer(get("/api/lab-tests/sample-types"), Role.PATIENT)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/lab-tests/sample-types")).andExpect(status().isUnauthorized());
+        mvc.perform(bearer(get("/api/lab-tests/sample-types").param("active", "true", "false"), Role.ADMIN))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors.active").exists());
     }
 
     @Test

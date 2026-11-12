@@ -1,5 +1,8 @@
 package com.smartlims.appointments.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.appointments.dto.*;
 import com.smartlims.appointments.entity.*;
 import com.smartlims.appointments.exception.AppointmentException;
@@ -22,6 +25,7 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class AppointmentBookingService {
+    private final AuditPublisher audit;
     private final AppointmentAccess access;
     private final TestOrderRepository orders;
     private final AppointmentTypeRepository types;
@@ -32,7 +36,8 @@ public class AppointmentBookingService {
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public AppointmentBookingService(AppointmentAccess access, TestOrderRepository orders, AppointmentTypeRepository types, AppointmentSlotRepository slots, AppointmentRepository appointments, AppointmentAvailability availability, EntityManager entities,
-                                     com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                     com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit) {
+        this.audit = audit;
         this.access = access;
         this.orders = orders;
         this.types = types;
@@ -68,6 +73,7 @@ public class AppointmentBookingService {
         var appointment = appointments.saveAndFlush(new Appointment(order, slot, type, account, key));
         entities.refresh(appointment);
         notifications.appointment(appointment, false);
+        audit.record(account, APPOINTMENT_BOOK, appointment.getId());
         return new AppointmentResponses.Booking(AppointmentMapping.detail(appointment, now), true);
     }
 

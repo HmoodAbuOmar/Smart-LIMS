@@ -1,5 +1,22 @@
 # Smart-LIMS Patients API Contract
 
+## Admin Patients screenshot review — ADM-PEOPLE-01 (2026-11-10)
+
+| Visible field/action | Existing API/source |
+|---|---|
+| Medical file number, name, birth date, gender, phone | GET /api/patients staff content: patientNumber, fullName, dateOfBirth, gender, phoneNumber |
+| Account-link status | Existing read-only linkStatus=LINKED/UNLINKED from optional patients.user_id presence; no account ID/link token returned. Account eligibility and token issuance do not change this relationship status. |
+| Search by name/file number/phone; Results count | GET /api/patients?search=...; literal search across all three; totalElements is the full filtered count, independent of page size. Existing optional linkStatus filter combines before counting/paging. |
+| Add Patient | POST /api/patients; existing validated demographics, unlinked profile; 201 and Location |
+| View Profile | GET /api/patients/{id}; staff demographics plus linkStatus |
+| Edit Patient | PUT /api/patients/{id}; replace demographics only; preserves account relationship, patient number and creation identity |
+
+Reuse all existing roles, strict DTO validation and ownership rules below. No
+new field, route, linking workflow or migration is needed. Review also verifies
+pagination metadata at the supported maximum page; an empty page beyond results
+must return last=true without integer overflow. Current execution evidence is in
+TESTING.md; historical section 17 evidence is not treated as a fresh run.
+
 Migration-version references in historical sections describe the original V1-V9
 implementation. The current application migration set is canonical V1-V25 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
