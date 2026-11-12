@@ -49,7 +49,7 @@ export default function BirthDateField({ value, onChange, copy, language, disabl
   }
   return <div className="r02-birth-date" ref={container} onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={event => { if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); close() } }}>
     <div className="r02-date-control">
-      <input ref={input} id="r02-dateOfBirth" name="dateOfBirth" type="text" inputMode="numeric" autoComplete="bday" dir="ltr" placeholder="DD/MM/YYYY" required maxLength={10} disabled={disabled} value={displayBirthDate(value)} aria-invalid={invalid} aria-describedby={`r02-date-format${errorId ? ` ${errorId}` : ''}`} onChange={event => {
+      <input ref={input} id="r02-dateOfBirth" name="dateOfBirth" type="text" inputMode="numeric" autoComplete="bday" dir="ltr" required maxLength={10} disabled={disabled} value={displayBirthDate(value)} aria-invalid={invalid} aria-describedby={`r02-date-format${errorId ? ` ${errorId}` : ''}`} onChange={event => {
         const raw = event.target.value, date = parseBirthDate(raw)
         onChange(date || raw)
         if (date && date <= today) { setView({ year: date.slice(0, 4), month: Number(date.slice(5, 7)) - 1 }); setFocused(date) }

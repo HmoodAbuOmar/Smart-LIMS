@@ -47,14 +47,16 @@ export default function AddPatientDrawer({ copy, language, service, onClose, onS
     <form noValidate onSubmit={event => void submit(event)} aria-busy={saving}>
       <header><h2 id="r02-drawer-title">{copy.add}</h2><button type="button" className="r02-close" aria-label={copy.close} disabled={saving} onClick={onClose}><X size={20} /></button></header>
       <div className="r02-drawer-body">
-        <label htmlFor="r02-fullName">{copy.name} <span aria-hidden="true">*</span></label><input {...fieldProps('fullName')} required maxLength={120} autoComplete="name" />{fieldError('fullName')}
-        <label htmlFor="r02-dateOfBirth">{copy.dob} <span aria-hidden="true">*</span></label><BirthDateField value={values.dateOfBirth} onChange={value => update('dateOfBirth', value)} copy={copy} language={language} disabled={saving} invalid={!!errors.dateOfBirth} errorId={errors.dateOfBirth ? 'r02-error-dateOfBirth' : undefined} />{fieldError('dateOfBirth')}
+        <div className="r02-field"><label htmlFor="r02-fullName">{copy.name} <span aria-hidden="true">*</span></label><input {...fieldProps('fullName')} required maxLength={120} autoComplete="name" />{fieldError('fullName')}</div>
+        <div className="r02-contact-row">
+          <div className="r02-field"><label htmlFor="r02-dateOfBirth">{copy.dob} <span aria-hidden="true">*</span></label><BirthDateField value={values.dateOfBirth} onChange={value => update('dateOfBirth', value)} copy={copy} language={language} disabled={saving} invalid={!!errors.dateOfBirth} errorId={errors.dateOfBirth ? 'r02-error-dateOfBirth' : undefined} />{fieldError('dateOfBirth')}</div>
+          <div className="r02-field"><label htmlFor="r02-phoneNumber">{copy.phone} <span aria-hidden="true">*</span></label><input {...fieldProps('phoneNumber')} type="tel" dir="ltr" required maxLength={20} autoComplete="tel" />{fieldError('phoneNumber')}</div>
+        </div>
         <fieldset id="r02-gender" className="r02-gender" role="radiogroup" aria-required="true" aria-labelledby="r02-gender-label" aria-invalid={!!errors.gender} aria-describedby={errors.gender ? 'r02-error-gender' : undefined} disabled={saving}>
           <legend id="r02-gender-label">{copy.gender} <span aria-hidden="true">*</span></legend>
           <div className="r02-gender-options">{['MALE', 'FEMALE', 'UNKNOWN'].map(gender => <label key={gender} htmlFor={`r02-gender-${gender}`} title={!PATIENT_GENDERS.includes(gender) ? copy.errors.unsupportedGender : undefined}><input type="radio" id={`r02-gender-${gender}`} name="gender" value={gender} required disabled={!PATIENT_GENDERS.includes(gender)} checked={values.gender === gender} onChange={event => update('gender', event.target.value)} /><span>{copy[gender]}</span>{!PATIENT_GENDERS.includes(gender) && <small>{copy.errors.unsupportedGender}</small>}</label>)}</div>
         </fieldset>{fieldError('gender')}
-        <label htmlFor="r02-phoneNumber">{copy.phone} <span aria-hidden="true">*</span></label><input {...fieldProps('phoneNumber')} type="tel" dir="ltr" required maxLength={20} autoComplete="tel" />{fieldError('phoneNumber')}
-        <label htmlFor="r02-address">{copy.address}</label><textarea {...fieldProps('address')} rows={3} maxLength={500} autoComplete="street-address" />{fieldError('address')}
+        <div className="r02-field"><label htmlFor="r02-address">{copy.address}</label><textarea {...fieldProps('address')} rows={2} maxLength={500} autoComplete="street-address" />{fieldError('address')}</div>
         {errors._form && <p className="r02-field-error" role="alert">{copy[errors._form]}</p>}
       </div>
       <div className="r02-link-notice"><AlertTriangle size={17} aria-hidden="true" /><p>{copy.linking}</p></div>

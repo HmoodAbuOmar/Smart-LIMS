@@ -1,5 +1,6 @@
 export const patientsCopy = {
   en: {
+    actions: 'Actions', openFile: 'Open file',
     dateFormat: 'Format', openBirthDatePicker: 'Open date of birth calendar', birthCalendar: 'Choose date of birth', month: 'Month', year: 'Year', previousMonth: 'Previous month', nextMonth: 'Next month', closeCalendar: 'Close calendar', invalidYear: 'Enter a valid year up to the current year.',
     title: 'Patients', add: 'Add patient', search: 'Search by patient name, medical file number, or phone', file: 'File No.', name: 'Name', phone: 'Phone', dob: 'Date of Birth', account: 'Account', linked: 'Linked', unlinked: 'Unlinked', unavailableStatus: 'Unavailable',
     gender: 'Gender', MALE: 'Male', FEMALE: 'Female', UNKNOWN: 'Unknown', chooseGender: 'Choose gender', address: 'Address (optional)', save: 'Save patient', saving: 'Saving…', cancel: 'Cancel', close: 'Close Add patient',
@@ -9,6 +10,7 @@ export const patientsCopy = {
     errors: { required: 'This field is required.', nameLength: 'Use no more than 120 characters.', date: 'Enter a valid date.', future: 'Date of birth cannot be in the future.', phoneInvalid: 'Enter a valid phone number with 7–15 digits.', phoneLength: 'Use no more than 20 characters.', addressLength: 'Use no more than 500 characters.', unsupportedGender: 'This gender value is not supported.' },
   },
   ar: {
+    actions: 'الإجراءات', openFile: 'فتح الملف',
     dateFormat: 'الصيغة', openBirthDatePicker: 'فتح تقويم تاريخ الميلاد', birthCalendar: 'اختر تاريخ الميلاد', month: 'الشهر', year: 'السنة', previousMonth: 'الشهر السابق', nextMonth: 'الشهر التالي', closeCalendar: 'إغلاق التقويم', invalidYear: 'أدخل سنة صالحة لا تتجاوز السنة الحالية.',
     title: 'المرضى', add: 'إضافة مريض', search: 'ابحث باسم المريض أو رقم الملف الطبي أو الهاتف', file: 'رقم الملف', name: 'الاسم', phone: 'الهاتف', dob: 'تاريخ الميلاد', account: 'الحساب', linked: 'مرتبط', unlinked: 'غير مرتبط', unavailableStatus: 'غير متاح',
     gender: 'الجنس', MALE: 'ذكر', FEMALE: 'أنثى', UNKNOWN: 'غير معروف', chooseGender: 'اختر الجنس', address: 'العنوان (اختياري)', save: 'حفظ المريض', saving: 'جارٍ الحفظ…', cancel: 'إلغاء', close: 'إغلاق إضافة مريض',
