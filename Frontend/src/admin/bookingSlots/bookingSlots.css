@@ -1,0 +1,65 @@
+﻿.admin-main:has(> .admin-booking-slots){background:#f7faf9;border-color:transparent}
+.admin-booking-slots{display:grid;gap:18px;padding:22px;min-inline-size:0;color:#193b3a}
+.admin-booking-slots :is(h2,h3,p),.bs-dialog :is(h3,p){margin:0}
+.admin-booking-slots h2{font-size:24px;line-height:1.4}
+.admin-booking-slots h3,.bs-dialog h3{font-size:16px;line-height:1.6}
+.admin-booking-slots button,.bs-dialog button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-block-size:36px;padding:7px 10px;border:1px solid #c6dfda;border-radius:8px;background:#fff;color:#176b63;font:inherit;font-size:12px;cursor:pointer}
+.admin-booking-slots button:hover:not(:disabled),.bs-dialog button:hover:not(:disabled){background:#eaf5f1}
+.admin-booking-slots button:disabled,.bs-dialog button:disabled{opacity:.6;cursor:not-allowed}
+.admin-booking-slots .bs-primary,.bs-dialog .bs-primary{background:#146b63;border-color:#146b63;color:#fff}
+.admin-booking-slots .bs-primary:hover:not(:disabled),.bs-dialog .bs-primary:hover:not(:disabled){background:#10574f}
+.admin-booking-slots :is(button,input):focus-visible,.bs-dialog :is(button,input):focus-visible{outline:2px solid #258571;outline-offset:3px}
+.admin-booking-slots .bs-heading{display:flex;align-items:center;gap:12px}
+.admin-booking-slots .bs-heading>span{display:grid;place-items:center;inline-size:44px;block-size:44px;flex-shrink:0;border-radius:12px;background:#e3f2ec;color:#176b63;border:1px solid #cce4d9}
+.admin-booking-slots .bs-heading p{color:#42645a;font-size:13px;line-height:1.7}
+.admin-booking-slots .bs-workspace{display:grid;grid-template-columns:minmax(250px,290px) minmax(0,1fr);gap:18px;align-items:start;min-inline-size:0}
+.admin-booking-slots .bs-panel{min-inline-size:0;background:#fff;border:1px solid #dbe8e3;border-radius:12px;padding:16px}
+.admin-booking-slots .bs-month-heading{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-block-end:14px}
+.admin-booking-slots .bs-month-heading button{padding:5px;min-block-size:32px}
+.admin-booking-slots .bs-month-heading h3{font-size:14px;text-align:center}
+.admin-booking-slots .bs-weekdays,.admin-booking-slots .bs-dates{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center}
+.admin-booking-slots .bs-weekdays{color:#526963;font-size:11px;margin-block-end:8px}
+.admin-booking-slots .bs-dates button{position:relative;display:grid;place-items:center;min-inline-size:0;min-block-size:36px;padding:3px 0 8px;border:1px solid transparent;font-size:12px;background:#fff;color:#193b3a}
+.admin-booking-slots .bs-dates .bs-today{border-color:#90b9ad;color:#146b63;font-weight:700}
+.admin-booking-slots .bs-dates .bs-selected,.admin-booking-slots .bs-dates .bs-selected:hover:not(:disabled){background:#146b63;border-color:#146b63;color:#fff}
+.admin-booking-slots .bs-dates i{position:absolute;bottom:3px;inline-size:4px;block-size:4px;border-radius:50%;background:currentColor}
+.admin-booking-slots .bs-today-action{margin-block-start:12px;inline-size:100%;background:#f5faf7}
+.admin-booking-slots .bs-list>h3{margin-block-end:12px;color:#193b3a;font-size:15px}
+.admin-booking-slots .bs-table-container{container:booking-slots / inline-size;min-inline-size:0}
+.admin-booking-slots table{inline-size:100%;min-inline-size:0;table-layout:fixed;border-collapse:collapse;text-align:start;font-size:13px}
+.admin-booking-slots :is(th,td){padding:10px 5px;text-align:start;vertical-align:middle;border-block-end:1px solid #e9efec;overflow-wrap:anywhere;line-height:1.55}
+.admin-booking-slots th{background:#eaf5ef;color:#355a50;font-size:12px;font-weight:600}
+.admin-booking-slots th:nth-child(1){inline-size:21%}.admin-booking-slots th:nth-child(2){inline-size:10%}.admin-booking-slots th:nth-child(3){inline-size:16%}.admin-booking-slots th:nth-child(4){inline-size:11%}.admin-booking-slots th:nth-child(5){inline-size:18%}.admin-booking-slots th:nth-child(6){inline-size:24%}
+.admin-booking-slots tbody tr{background:#fff}.admin-booking-slots tbody tr:hover{background:#f7f9f9}
+.admin-booking-slots .bs-actions{display:flex;gap:5px;flex-wrap:wrap}.admin-booking-slots .bs-actions button{padding:4px 6px;min-block-size:30px;font-size:11px}.admin-booking-slots .bs-actions svg{flex-shrink:0}
+.admin-booking-slots .bs-badge{display:inline-block;padding:3px 7px;border:1px solid #dce5e0;border-radius:8px;background:#f1f5f3;color:#526963;font-size:11px;cursor:default}
+.admin-booking-slots .bs-available{background:#e7f5ee;border-color:#cce8d9;color:#25634d}.admin-booking-slots .bs-full{background:#fff3d9;border-color:#f1dfb3;color:#78551c}
+.admin-booking-slots .bs-occupancy{display:grid;gap:5px;font-size:12px}.admin-booking-slots [role='meter']{block-size:4px;background:#e4eeea;border-radius:4px;overflow:hidden}.admin-booking-slots [role='meter']>span{display:block;block-size:100%;background:#388d78}
+.admin-booking-slots .bs-cell-label{display:none}.admin-booking-slots .bs-cell-value{min-inline-size:0}
+.admin-booking-slots .bs-empty{padding:22px 10px;color:#42645a;text-align:center;font-size:13px;line-height:1.8}
+.admin-booking-slots .bs-create>h3{margin-block-end:14px}
+.admin-booking-slots .bs-form,.bs-dialog .bs-form{display:grid;gap:12px}
+.admin-booking-slots .bs-form-fields,.bs-dialog .bs-form-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.admin-booking-slots .bs-field,.bs-dialog .bs-field{display:grid;gap:6px;min-inline-size:0}
+.admin-booking-slots .bs-field label,.bs-dialog .bs-field label{font-size:13px;color:#25473f;font-weight:600}
+.admin-booking-slots .bs-field input,.bs-dialog .bs-field input{box-sizing:border-box;inline-size:100%;min-inline-size:0;min-block-size:40px;padding:8px 10px;border:1px solid #cfe0d8;border-radius:8px;background:#fff;color:#193b3a;font:inherit;font-size:13px}
+.admin-booking-slots .bs-field input[aria-invalid='true'],.bs-dialog .bs-field input[aria-invalid='true']{border-color:#b2675d}
+.bs-dialog .bs-field input:disabled{background:#f1f5f3;color:#526963}
+.admin-booking-slots .bs-form-actions,.bs-dialog .bs-form-actions{display:flex;justify-content:flex-end;gap:9px;padding-block-start:12px;border-block-start:1px solid #e4efea}
+.admin-booking-slots .bs-notice{padding:10px 14px;background:#eaf6f0;border:1px solid #d1e9dc;border-radius:8px;color:#23664f;font-size:13px}
+.admin-booking-slots .bs-error,.bs-dialog .bs-error{color:#8a3f36;font-size:12px;line-height:1.7}
+.bs-dialog{inline-size:min(650px,calc(100% - 24px));max-block-size:90dvh;box-sizing:border-box;margin:auto;padding:20px;overflow-y:auto;overscroll-behavior:contain;background:#fff;color:#193b3a;border:1px solid #d4e3dc;border-radius:14px;box-shadow:0 24px 80px #073f3b30;font:inherit}
+.bs-dialog::backdrop{background:#062f3b99;backdrop-filter:blur(2px)}.bs-dialog>header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-block-end:16px}.bs-dialog .bs-form-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.bs-dialog .bs-note,.bs-dialog .bs-deactivate p{color:#35534c;font-size:13px;line-height:1.8;margin-block-end:12px}
+.admin-booking-slots .bs-sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@container booking-slots (max-width:570px){.admin-booking-slots table,.admin-booking-slots tbody{display:block}.admin-booking-slots thead{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip-path:inset(50%)}.admin-booking-slots tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 14px;padding:10px;border:1px solid #dbe8e3;border-radius:9px;margin-block-end:10px}.admin-booking-slots td{display:grid;gap:4px;border:0;padding:6px 0}.admin-booking-slots td:last-child{grid-column:1/-1}.admin-booking-slots .bs-cell-label{display:block;color:#526963;font-size:12px;font-weight:600}}
+@media(max-width:760px){.admin-booking-slots{padding:12px 6px;gap:14px}.admin-booking-slots .bs-workspace{grid-template-columns:minmax(0,1fr);gap:14px}.admin-booking-slots .bs-calendar{inline-size:100%;max-inline-size:360px;box-sizing:border-box;justify-self:center}.admin-booking-slots .bs-form-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-booking-slots .bs-panel{padding:14px}.admin-booking-slots h2{font-size:22px}}
+@media(max-width:380px){.admin-booking-slots .bs-form-fields,.bs-dialog .bs-form-fields{grid-template-columns:minmax(0,1fr)}}
+.admin-booking-slots .bs-time-parts,.bs-dialog .bs-time-parts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:5px;min-inline-size:0}
+.admin-booking-slots .bs-time-parts select,.bs-dialog .bs-time-parts select{box-sizing:border-box;inline-size:100%;min-inline-size:0;min-block-size:40px;padding:7px 3px;border:1px solid #cfe0d8;border-radius:8px;background:#fff;color:#193b3a;font:inherit;font-size:13px}
+.admin-booking-slots select:focus-visible,.bs-dialog select:focus-visible{outline:2px solid #258571;outline-offset:3px}
+.admin-booking-slots .bs-time-parts select[aria-invalid='true'],.bs-dialog .bs-time-parts select[aria-invalid='true']{border-color:#b2675d}
+.bs-dialog .bs-time-parts select:disabled{background:#f1f5f3;color:#526963}
+.bs-dialog .bs-result p{color:#25473f;font-size:14px;line-height:1.8;margin-block-end:12px}
+.bs-dialog .bs-result-time{padding:12px;border-radius:9px;background:#eaf5f1;text-align:center;font-weight:600}
+.bs-dialog .bs-result-error{border-inline-start:3px solid #c6dfda;padding-inline-start:12px}

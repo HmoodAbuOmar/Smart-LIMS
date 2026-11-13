@@ -7,11 +7,17 @@ export function localDateValue(date = new Date()) {
 // the already-authorized temporary demographics, never a patient API payload.
 export const patientDraftFields = ['name', 'dateOfBirth', 'gender', 'phone']
 
+export function patientPhoneError(phone) {
+  if (!phone.trim()) return 'phoneRequired'
+  if (!/^\+?[\d\s().-]+$/.test(phone.trim()) || !/^[0-9]{7,15}$/.test(phone.replace(/\D/g, ''))) return 'phoneInvalid'
+  return null
+}
+
 export function validatePatientDraft(values, today = localDateValue()) {
   const errors = {}
   if (!values.name.trim()) errors.name = 'nameRequired'
-  if (!values.phone.trim()) errors.phone = 'phoneRequired'
-  else if (!/^\+?[\d\s().-]+$/.test(values.phone.trim()) || !/^[0-9]{7,15}$/.test(values.phone.replace(/\D/g, ''))) errors.phone = 'phoneInvalid'
+  const phoneError = patientPhoneError(values.phone)
+  if (phoneError) errors.phone = phoneError
   if (!values.dateOfBirth) errors.dateOfBirth = 'birthRequired'
   else {
     const parsed = new Date(`${values.dateOfBirth}T00:00:00Z`)

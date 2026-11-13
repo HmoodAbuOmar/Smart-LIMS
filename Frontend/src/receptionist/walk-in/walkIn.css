@@ -1,0 +1,77 @@
+.reception-today-layout .r05-walk-in{display:grid;gap:20px;inline-size:100%;max-inline-size:1120px;margin-inline:auto;min-inline-size:0;color:var(--medical-deep);font:14px/1.6 var(--font-ui)}
+.reception-today-layout .r05-walk-in.r05-confirmation{max-inline-size:800px}
+.reception-today-layout .r05-walk-in svg{stroke-width:1.75}
+.reception-today-layout .r05-walk-in button svg{inline-size:16px;block-size:16px;flex-shrink:0}
+.reception-today-layout .r05-walk-in :is(bdi,.r05-total){font-variant-numeric:tabular-nums}
+.reception-today-layout .r05-walk-in .r02-patients{gap:16px}
+.reception-today-layout .r05-walk-in .r02-heading{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip-path:inset(50%)}
+.reception-today-layout .r05-walk-in .r02-patients th{background:var(--medical-mint);color:var(--medical-deep)}
+.reception-today-layout .r05-walk-in .r02-patients td{padding-block:10px}
+.reception-today-layout .r05-walk-in .r02-patients tbody tr:hover{background:#edf6f3}
+.reception-today-layout .r05-walk-in .r02-patients tr:has([aria-pressed=true]){background:var(--medical-mint)}
+.reception-today-layout .r05-walk-in .r02-patients .r02-primary,.reception-today-layout .r05-walk-in .r02-drawer .r02-primary{background:var(--medical-deep);border-color:var(--medical-deep)}
+.reception-today-layout .r05-walk-in .r02-patients .r02-primary:hover,.reception-today-layout .r05-walk-in .r02-drawer .r02-primary:hover{background:var(--medical-green)}
+.reception-today-layout .r05-walk-in .r02-unlinked{background:#f1f5f3;border-color:#dce5e0;color:#526963}
+.reception-today-layout .r05-walk-in .r02-toolbar{padding:16px 20px}
+.reception-today-layout .r05-test-columns{display:grid;grid-template-columns:minmax(0,1fr) 92px 82px;align-items:center;gap:12px;background:var(--medical-mint);padding:8px 12px;border-radius:8px 8px 0 0;color:var(--medical-deep);font-size:12px;font-weight:600}
+.reception-today-layout .r05-test-columns>span:nth-child(2){text-align:end}
+.reception-today-layout .r05-test-columns>span:last-child{text-align:center}
+.reception-today-layout .r01-main .r05-test-list li>bdi{text-align:end;white-space:nowrap}
+.reception-today-layout .r01-main .r05-walk-in .r05-test-list li>button{min-block-size:32px;padding:5px 8px;font-size:12px}
+.reception-today-layout .r01-main .r05-walk-in .r05-test-list li:hover{background:#edf6f3}
+.reception-today-layout .r01-main .r05-walk-in .r05-test-list .r05-test-selected{background:var(--medical-mint);box-shadow:inset 3px 0 var(--medical-green)}
+[dir=rtl] .reception-today-layout .r01-main .r05-walk-in .r05-test-list .r05-test-selected{box-shadow:inset -3px 0 var(--medical-green)}
+.reception-today-layout .r01-main .r05-walk-in .r05-test-list .r05-test-selected>button{background:var(--medical-deep);border-color:var(--medical-deep);color:white;opacity:1;cursor:default}
+.reception-today-layout .r01-main .r05-walk-in .r05-summary .r05-total{background:var(--medical-mint);border:0;border-radius:8px;padding:10px 12px}
+@media(max-width:480px){.reception-today-layout .r05-test-columns{display:none}.reception-today-layout .r05-test-list li>div{grid-column:1;grid-row:1 / span 2}.reception-today-layout .r05-walk-in{gap:16px}.reception-today-layout .r05-walk-in .r02-toolbar{padding:16px}}
+.reception-today-layout .r01-main .r05-walk-in .r05-success-heading h1{display:flex;align-items:center;gap:8px}
+.reception-today-layout .r05-success-icon{color:#25634d;flex-shrink:0}
+.reception-today-layout .r05-receipt-context{display:flex;flex-wrap:wrap;gap:12px 20px;margin:0}
+.reception-today-layout .r05-receipt-context>div{flex:1;min-inline-size:min(100%,120px)}
+.reception-today-layout .r05-receipt-context>div:nth-child(2){flex:2}
+.reception-today-layout .r05-receipt-context dt{font-size:12px;color:var(--medical-secondary)}
+.reception-today-layout .r05-receipt-context dd{margin:3px 0 0;font-weight:600;overflow-wrap:anywhere}
+.reception-today-layout .r05-receipt li>span{min-inline-size:0;overflow-wrap:anywhere}
+.reception-today-layout .r05-receipt li>bdi{flex-shrink:0;white-space:nowrap}
+.reception-today-layout .r01-main .r05-walk-in .r05-receipt .r05-total{border:0;background:var(--medical-mint);border-radius:8px;padding:10px 12px}
+.reception-today-layout .r05-receipt .r05-total bdi{white-space:nowrap;flex-shrink:0}
+.reception-today-layout .r05-receipt-actions{display:flex;flex-wrap:wrap;gap:8px;border-block-start:1px solid var(--medical-border-light);padding-block-start:12px}
+.reception-today-layout .r01-main .r05-walk-in .r05-success-heading .r05-back{border:0;background:transparent;padding:6px 0;min-block-size:32px}
+.reception-today-layout .r01-main .r05-walk-in .r05-success-heading .r05-back:hover{background:transparent;text-decoration:underline;text-underline-offset:3px}
+.reception-today-layout .r05-walk-in .r02-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.reception-today-layout .r05-walk-in .r02-search{flex:1;min-inline-size:min(100%,220px);max-inline-size:none}
+.reception-today-layout .r05-walk-in .r02-add{flex-shrink:0}
+.reception-today-layout .r04-profile{display:grid;gap:14px;min-inline-size:0}
+.reception-today-layout .r01-main .r05-walk-in .r04-heading .r05-back{border:0;background:transparent;padding:6px 0;min-block-size:32px}
+.reception-today-layout .r01-main .r05-walk-in .r04-heading .r05-back:hover{background:transparent;text-decoration:underline;text-underline-offset:3px}
+.reception-today-layout .r04-summary{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:center;gap:24px}
+.reception-today-layout .r04-identity{display:flex;align-items:center;gap:12px;min-inline-size:0}
+.reception-today-layout .r04-identity>div{display:grid;gap:5px;min-inline-size:0;overflow-wrap:anywhere}
+.reception-today-layout .r04-avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;inline-size:44px;block-size:44px;border-radius:50%;background:var(--medical-mint);color:var(--medical-green);font-size:15px;font-weight:600}
+.reception-today-layout .r04-account{display:inline-flex;align-items:center;gap:6px;justify-self:start;border-radius:20px;background:#f1f5f3;padding:3px 9px;font-size:12px;color:#526963}
+.reception-today-layout .r04-linked{background:#def1e6;color:#25634d}
+.reception-today-layout .r04-tabs{display:flex;flex-wrap:wrap;border-block-end:1px solid var(--medical-border-light);gap:4px}
+.reception-today-layout .r01-main .r05-walk-in .r04-tabs button{border:0;border-radius:0;background:transparent;padding:9px 12px;border-block-end:2px solid transparent}
+.reception-today-layout .r01-main .r05-walk-in .r04-tabs [aria-selected=true]{border-block-end-color:var(--medical-deep);color:var(--medical-deep);background:var(--medical-mint);font-weight:700}
+.reception-today-layout .r04-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px 18px;margin:0}
+.reception-today-layout .r04-summary .r04-details{grid-template-columns:repeat(2,minmax(0,1fr))}
+.reception-today-layout .r04-details dt{font-size:12px;color:var(--medical-secondary)}
+.reception-today-layout .r04-details dd{margin:3px 0 0;overflow-wrap:anywhere}
+.reception-today-layout .r04-orders li{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;border-block-end:1px solid var(--medical-border-light);padding:11px 0}
+.reception-today-layout .r04-orders-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-block-end:8px}
+.reception-today-layout .r04-empty{display:grid;justify-items:center;gap:8px;padding:24px 12px;text-align:center}
+.reception-today-layout .r04-empty>svg{color:var(--medical-secondary)}
+.reception-today-layout .r04-empty h3{margin:0;font-size:16px}
+.reception-today-layout .r01-main .r05-walk-in .r04-created{position:fixed;inset-block-end:20px;inset-inline-end:20px;z-index:100;display:flex;align-items:center;gap:8px;max-inline-size:calc(100vw - 40px);box-sizing:border-box;color:#25634d;background:#eaf5f1;padding:8px 12px;border:1px solid var(--medical-border-light);border-radius:8px;box-shadow:0 4px 16px #083f3d18;font-size:13px}
+.reception-today-layout .r01-main .r05-walk-in .r04-created button{padding:4px;min-block-size:28px;border:0;background:transparent}
+@media(max-width:760px){.reception-today-layout .r04-summary{grid-template-columns:minmax(0,1fr);gap:16px}}
+@media(max-width:380px){.reception-today-layout .r01-main .r05-walk-in .r04-tabs button{padding:9px 7px;gap:4px;font-size:12px}}
+.reception-today-layout .r01-main .r05-walk-in :is(h1,h2,p,ul){margin:0}.reception-today-layout .r01-main .r05-walk-in h1{font-size:25px;line-height:1.35}.reception-today-layout .r01-main .r05-walk-in h2:not(:where(.r02-drawer *)){font-size:17px;line-height:1.5}.reception-today-layout .r01-main .r05-walk-in p:not(:where(.r02-patients *)),.reception-today-layout .r01-main .r05-walk-in small:not(:where(.r02-patients *)){color:#526963}.reception-today-layout .r01-main .r05-walk-in small:not(:where(.r02-patients *)){font-size:12px}.reception-today-layout .r01-main .r05-walk-in ul{list-style:none;padding:0}
+.reception-today-layout .r01-main .r05-walk-in button:not(:where(.r02-patients *)){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-block-size:40px;padding:8px 12px;border:1px solid #c6dfda;border-radius:8px;background:white;color:var(--medical-green);font:600 13px/1.5 var(--font-ui);cursor:pointer}
+.reception-today-layout .r01-main .r05-walk-in button:not(:where(.r02-patients *)):hover:not(:disabled){background:#eaf5f1}.reception-today-layout .r01-main .r05-walk-in button:not(:where(.r02-patients *)):disabled{opacity:.55;cursor:not-allowed}.reception-today-layout .r01-main .r05-walk-in .r05-primary{background:var(--medical-deep);border-color:var(--medical-deep);color:white}.reception-today-layout .r01-main .r05-walk-in .r05-primary:hover:not(:disabled){background:var(--medical-green)}
+.reception-today-layout .r01-main .r05-walk-in :is(button,input,textarea):not(:where(.r02-patients *)):focus-visible{outline:2px solid #258571;outline-offset:3px}.reception-today-layout .r01-main .r05-walk-in .r05-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.reception-today-layout .r01-main .r05-heading p{margin-block-start:4px}
+.reception-today-layout .r01-main .r05-walk-in .r05-card{min-inline-size:0;padding:20px;border:1px solid #d6e6df;border-radius:12px;background:white}.reception-today-layout .r01-main .r05-workspace{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start;gap:20px}.reception-today-layout .r01-main .r05-patient{display:flex;align-items:center;justify-content:space-between;gap:12px}.reception-today-layout .r01-main .r05-patient>div{display:grid;gap:3px}.reception-today-layout .r01-main .r05-patient strong{font-size:17px}
+.reception-today-layout .r01-main .r05-walk-in .r05-search{display:flex;align-items:center;gap:9px;margin-block:12px;border:1px solid #d6e3de;border-radius:8px;background:#eaf5ef;padding-inline:10px}.reception-today-layout .r01-main .r05-search svg{flex-shrink:0}.reception-today-layout .r01-main .r05-walk-in .r05-search input{min-inline-size:0;inline-size:100%;min-block-size:40px;background:transparent;border:0;padding:7px 0;font:13px/1.6 var(--font-ui);color:var(--medical-deep);box-shadow:none}.reception-today-layout .r01-main .r05-search:focus-within{outline:2px solid #258571;outline-offset:2px}.reception-today-layout .r01-main .r05-walk-in .r05-search input:focus-visible{outline:0}
+.reception-today-layout .r01-main .r05-test-list{max-block-size:480px;overflow:auto}.reception-today-layout .r01-main .r05-walk-in .r05-test-list li{display:grid;grid-template-columns:minmax(0,1fr) 92px 82px;align-items:center;gap:12px;padding:10px 12px;border-block-end:1px solid #e5eeea}.reception-today-layout .r01-main .r05-test-list li>div{display:grid;gap:2px;overflow-wrap:anywhere}.reception-today-layout .r01-main .r05-test-list li>div>bdi{font-size:12px;color:#526963}.reception-today-layout .r01-main .r05-test-list strong{font-size:13px}.reception-today-layout .r01-main .r05-summary{display:grid;gap:12px}.reception-today-layout .r01-main .r05-summary h2{display:flex;align-items:center;gap:7px}.reception-today-layout .r01-main .r05-summary li,.reception-today-layout .r01-main .r05-receipt li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:9px;border-block-end:1px solid #e5eeea}.reception-today-layout .r01-main .r05-summary li>div{display:grid;gap:3px}.reception-today-layout .r01-main .r05-summary li strong{overflow-wrap:anywhere;font-size:13px}.reception-today-layout .r01-main .r05-summary .r05-remove{flex-shrink:0;padding:6px;min-inline-size:32px}.reception-today-layout .r01-main .r05-walk-in .r05-total{display:flex;justify-content:space-between;gap:12px;align-items:center;color:var(--medical-deep);font-weight:700;border-block-start:1px solid #d6e6df;padding-block-start:12px}.reception-today-layout .r01-main .r05-total bdi{font-size:22px;overflow-wrap:anywhere}.reception-today-layout .r01-main .r05-summary label{font-weight:600;font-size:13px}.reception-today-layout .r01-main .r05-summary textarea{box-sizing:border-box;inline-size:100%;resize:vertical;background:white;border:1px solid #cfe0d8;border-radius:8px;padding:9px 12px;font:14px/1.6 var(--font-ui);color:var(--medical-deep)}.reception-today-layout .r01-main .r05-walk-in .r05-error{color:#923f38;background:#fff5f3;border:1px solid #edd1cb;border-radius:8px;padding:9px 12px}.reception-today-layout .r01-main .r05-state{padding:20px;text-align:center}.reception-today-layout .r01-main .r05-receipt{display:grid;gap:16px;inline-size:100%;box-sizing:border-box}.reception-today-layout .r01-main .r05-walk-in[dir=rtl] .r05-back svg,[dir=rtl] .r05-walk-in .r05-back svg{transform:scaleX(-1)}
+@media(max-width:900px){.reception-today-layout .r01-main .r05-workspace{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){.reception-today-layout .r01-main .r05-walk-in .r05-card{padding:16px}.reception-today-layout .r01-main .r05-walk-in .r05-test-list li{gap:8px;grid-template-columns:minmax(0,1fr) auto}.reception-today-layout .r01-main .r05-test-list li>button{grid-column:2;grid-row:2}.reception-today-layout .r01-main .r05-test-list li>bdi{grid-column:2;grid-row:1;text-align:end}.reception-today-layout .r01-main .r05-walk-in .r02-patients table{table-layout:auto}}

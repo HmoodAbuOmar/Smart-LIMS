@@ -1,0 +1,44 @@
+/* Single sidebar design source, extracted from Admin → Patients without resizing. */
+aside.workspace-sidebar {
+  --ws-deep:#083f3d; --ws-mint:#d9eee9; --ws-white:#fff;
+  --medical-deep:var(--ws-deep); --medical-mint:var(--ws-mint); --medical-off-white:#f7faf9;
+  grid-column:1; grid-row:1 / 3; display:flex; flex-direction:column;
+  inline-size:256px; position:sticky; inset-block-start:0; block-size:100dvh; overflow-y:auto;
+  padding:28px 18px 18px; background:var(--ws-deep); color:var(--ws-white);
+  font:400 14px/1.6 var(--font-ui); scrollbar-width:none; -ms-overflow-style:none;
+}
+aside.workspace-sidebar,aside.workspace-sidebar *{box-sizing:border-box}
+aside.workspace-sidebar::-webkit-scrollbar{display:none}
+.workspace-sidebar>:is(.ws-brand,.ws-nav,.ws-footer){flex-shrink:0}
+.workspace-sidebar .ws-brand{display:block;padding-block:0 26px;padding-inline:8px 0;margin:0 0 20px;inline-size:100%;border:0;background:transparent;text-align:start;font:inherit}
+.workspace-sidebar .ws-brand .ws-logo{display:block;inline-size:158px;block-size:64px;margin-inline-start:-15px;margin-inline-end:auto;object-position:left center}
+.workspace-sidebar[dir=rtl] .ws-brand .ws-logo{object-position:right center}
+.workspace-sidebar .ws-nav{display:grid;gap:6px;margin-inline:-4px;font:inherit}
+.workspace-sidebar .ws-item{position:relative;display:flex;align-items:center;gap:12px;inline-size:100%;padding:12px;border:0;border-radius:9px;background:transparent;color:var(--ws-mint);text-align:start;font:600 14px/1.6 var(--font-ui);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .2s,color .2s}
+.workspace-sidebar .ws-item svg{flex-shrink:0}
+.workspace-sidebar .ws-item:disabled{cursor:not-allowed}
+.workspace-sidebar .ws-item:not(:disabled):hover{background:#d9eee914}
+.workspace-sidebar .ws-item.is-active,.workspace-sidebar .ws-item.is-active:hover{background:#d9eee922;box-shadow:inset 3px 0 0 var(--ws-mint);color:var(--ws-white)}
+.workspace-sidebar[dir=rtl] .ws-item.is-active{box-shadow:inset -3px 0 0 var(--ws-mint)}
+.workspace-sidebar .ws-nav .ws-item:focus-visible,.workspace-sidebar .ws-brand:focus-visible{outline:2px solid #23a99a;outline-offset:3px}
+.workspace-sidebar .ws-group-toggle.has-active-child{color:var(--ws-white);background:#d9eee914}
+.workspace-sidebar .ws-chevron{margin-inline-start:auto;transition:transform 150ms ease}
+.workspace-sidebar .ws-group-toggle[aria-expanded=true] .ws-chevron{transform:rotate(180deg)}
+.workspace-sidebar .ws-submenu{list-style:none;margin:5px 0 0;margin-inline-start:22px;padding:0;padding-inline-start:10px;border-inline-start:1px solid #ffffff20}
+.workspace-sidebar .ws-submenu[hidden]{display:none}
+.workspace-sidebar .ws-submenu li+li{margin-block-start:4px}
+.workspace-sidebar .ws-item small{margin-inline-start:auto;min-inline-size:20px;padding:0 4px;border-radius:6px;background:var(--ws-mint);color:var(--ws-deep);font-size:11px;text-align:center}
+.workspace-sidebar .ws-footer{margin-block-start:auto;padding:24px 6px 0}
+.workspace-sidebar .ws-logout{border-block-start:1px solid #ffffff20;border-radius:0;color:#b1cbc6;font-weight:400}
+.workspace-sidebar .ws-language{display:block;line-height:0;margin-block-start:16px;font-family:inherit;color:var(--ws-mint)}
+.workspace-sidebar .ws-language .language-switcher{background:transparent}
+.workspace-sidebar .ws-language .language-switcher__segment{font-family:inherit;font-size:11px;line-height:1.5}
+.workspace-sidebar .ws-language .language-switcher__segment:focus-visible{outline:2px solid #23a99a;outline-offset:3px}
+.workspace-sidebar .ws-logout-error{font-size:12px;line-height:1.7;color:var(--ws-mint);margin:8px 0 0;padding-inline:12px}
+@media(max-width:900px){
+  aside.workspace-sidebar{display:none;grid-column:1;grid-row:2;position:static;inline-size:100%;block-size:65dvh;max-block-size:65dvh;padding:20px}
+  aside.workspace-sidebar[data-open=true]{display:flex}
+  .workspace-sidebar .ws-brand{padding-block-end:16px;margin-block-end:16px}
+  .workspace-sidebar .ws-footer{margin-block-start:auto;padding-block-start:40px}
+}
+@media(prefers-reduced-motion:reduce){.workspace-sidebar .ws-item,.workspace-sidebar .ws-chevron{transition:none}}

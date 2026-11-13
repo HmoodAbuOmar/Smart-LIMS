@@ -1,3 +1,6 @@
+
+
+
 # Authentication and navigation diagnosis
 
 ## Root cause
@@ -26,6 +29,7 @@ isolated frontend journey. That navigation regression is now corrected.
   CORS response exists to diagnose. No endpoints have been guessed.
 
 ## Restored navigation
+
 
 Production homepage, registration, verification, login, access checks, and
 patient routes remain real and fail closed until their services exist.
