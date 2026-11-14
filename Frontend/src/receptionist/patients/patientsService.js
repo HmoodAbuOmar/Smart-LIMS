@@ -10,7 +10,7 @@ export const receptionistPatientsApi = {
 let previewService
 async function source() {
   if (!import.meta.env?.DEV) return receptionistPatientsApi
-  previewService ??= import('./patientsDevelopmentService.js').then(module => module.createReceptionistPatientsService())
+  previewService ??= import('./patientsDevelopmentService.js').then(module => module.createReceptionistPatientsService({ storage: window.sessionStorage }))
   return previewService
 }
 export const receptionistPatientsService = {

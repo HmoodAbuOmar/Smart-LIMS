@@ -1,3 +1,4 @@
+import ReceptionistOrders from '../receptionist/orders/ReceptionistOrders.jsx'
 import ReceptionistWalkIn from '../receptionist/walk-in/ReceptionistWalkIn.jsx'
 import ReceptionistToday from '../receptionist/today/ReceptionistToday.jsx'
 import ReceptionistPatients from '../receptionist/patients/ReceptionistPatients.jsx'
@@ -8,5 +9,5 @@ export default function DevelopmentReceptionist({ page = 'today' }) {
   const query = new URLSearchParams(window.location.hash.split('?')[1] || '')
   const patientId = query.get('patientId') || null
   const fromPatients = !!patientId && query.get('from') === 'patients'
-  return <ReceptionistLayout page={page === 'walkIn' ? fromPatients ? 'patients' : 'today' : page}>{page === 'walkIn' ? <ReceptionistWalkIn initialPatientId={patientId} initialTab={fromPatients ? 'details' : 'orders'} fromPatients={fromPatients} /> : page === 'patients' ? <ReceptionistPatients /> : <ReceptionistToday />}</ReceptionistLayout>
+  return <ReceptionistLayout page={page === 'walkIn' ? fromPatients ? 'patients' : 'today' : page}>{page === 'orders' ? <ReceptionistOrders orderId={query.get('orderId')} /> : page === 'walkIn' ? <ReceptionistWalkIn initialPatientId={patientId} initialTab={fromPatients ? 'details' : 'orders'} fromPatients={fromPatients} /> : page === 'patients' ? <ReceptionistPatients /> : <ReceptionistToday />}</ReceptionistLayout>
 }

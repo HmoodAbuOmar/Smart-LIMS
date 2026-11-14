@@ -13,10 +13,12 @@ export const staffOrderApi = {
 let development
 async function source() {
   if (!import.meta.env?.DEV) { const error = new Error('Walk-in contract and staff transport unavailable'); error.code = 'SERVICE_UNAVAILABLE'; throw error }
-  development ??= import('./walkInDevelopmentService.js').then(module => module.createWalkInService())
+  development ??= import('./walkInDevelopmentService.js').then(module => module.createWalkInService({ storage: window.sessionStorage }))
   return development
 }
 export const walkInService = {
+  listAllOrders: () => source().then(service => service.listAllOrders()),
+  getOrder: id => source().then(service => service.getOrder(id)),
   getPatient: id => source().then(service => service.getPatient(id)),
   listOrders: id => source().then(service => service.listOrders(id)),
   listAppointments: id => source().then(service => service.listAppointments(id)),

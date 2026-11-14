@@ -9,7 +9,7 @@ Start Vite from `Frontend/` with `npm run dev`. Open `http://localhost:5173/#/__
 - `labtests/controller/LabTestController.java`: `GET /api/lab-tests` and `GET /api/lab-tests/{id}`; Receptionists have read permission. `LabTestResponse.java` provides name, price, currency and active status. Frontend catalog fixtures supply paired names and integer `priceCents`; these are service-provided values, not prices entered by the receptionist.
 - R02's existing patient service, search/pagination and Add patient drawer are reused. Add patient stays beside search in Walk-in mode. Existing records require explicit selection. A confirmed new-file save opens the same patient profile by its returned ID and shows Patient file created; search text is never treated as a name to prefill. Neither matching name nor phone selects, merges or links patient records.
 - `services/serviceTransport.js` is unconfigured, and the production Receptionist entry still fails closed. The regular `#/receptionist/walk-in` route explains the missing staff access, transport and WALK_IN/notes contract. It never imports the development workspace or reports a created order. Backend/authentication were not changed.
-- No Receptionist R06 screen or staff order-details route exists in this checkout. Patient-portal order details use patient permissions and are not reused for staff. After the local service confirms creation, R05 shows its returned number, immutable item prices and total, with an explicitly unavailable Open order action. R06 remains a dependency.
+- Receptionist Orders now provides the shared R06 workspace at #/__receptionist/orders?orderId=... . Confirmed Walk-in creation opens that saved ID directly. See ../orders/README.md for supported data and API gaps.
 - No UI-guide PDF was present in this checkout; the implementation follows the supplied R05 functional requirements. Page 41 could not be inspected.
 
 ## Patient profile step (R04)
@@ -20,7 +20,7 @@ Patient lookup is supported by GET /api/patients/{id}; its current backend respo
 
 ## Preview behavior
 
-The development-only order service uses the existing Admin catalog service and R02 patient store. Orders live in memory for the browser session. It does not import appointment/slot services. A confirmed local order has `source: 'WALK_IN'` and retains notes; neither is claimed to be supported by the live API.
+The development-only order service uses the existing Admin catalog service and R02 patient store. Orders and patient records use development-only session storage so the shared Orders workspace survives refresh. It does not import appointment/slot services. A confirmed local order has `source: 'WALK_IN'` and retains notes; neither is claimed to be supported by the live API.
 
 Before confirming, R05 reloads service test definitions. Changed prices update the draft and require another confirmation. Missing/inactive tests remain visible for removal and block creation. The local save boundary checks prices/activity again. In a future live integration the current backend has no expected-price/version field, so guaranteeing unchanged prices between review and commit requires an agreed server contract.
 

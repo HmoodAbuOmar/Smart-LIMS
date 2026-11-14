@@ -3,6 +3,7 @@ import { CalendarDays, CheckCircle2, FileText, Link, Link2Off, Plus, UserRound, 
 import { displayPatientName, linkStatus } from '../patients/patientsModel.js'
 import { money } from './walkInModel.js'
 import { todayCopy } from '../today/todayCopy.js'
+import { ordersRoute } from '../orders/ordersModel.js'
 
 const tabs = ['details', 'orders', 'appointments']
 export default function ReceptionistPatientProfile({ patientId, service, language, copy, onCreate, created, initialTab = 'orders' }) {
@@ -45,7 +46,7 @@ export default function ReceptionistPatientProfile({ patientId, service, languag
         }}><Icon size={15} aria-hidden="true" />{copy[id]}</button>
       })}</div>
       <div className="r05-card" id="r04-content" role="tabpanel" tabIndex={0} aria-labelledby={`r04-tab-${tab}`}>
-        {tab === 'details' ? renderDetails([['patient', name], ['file', patient.patientNumber], ...demographicFields]) : tab === 'appointments' ? !data.appointments.length ? <p className="r05-state">{copy.noAppointments}</p> : <ul className="r04-orders">{data.appointments.map(appointment => <li key={appointment.id}><bdi>{date(appointment.date)} | {appointment.time}</bdi><span>{todayCopy[language][appointment.status] || appointment.status}</span></li>)}</ul> : !data.orders.length ? <div className="r04-empty"><FileText size={26} aria-hidden="true" /><h3>{copy.noOrdersYet}</h3><p>{copy.noOrdersHint}</p>{createButton}</div> : <><div className="r04-orders-toolbar"><h2>{copy.orders}</h2>{createButton}</div><ul className="r04-orders">{data.orders.map(order => <li key={order.id}><bdi>{order.orderNumber}</bdi><span>{copy[order.status] || order.status}</span><bdi>{money(Math.round(Number(order.totalAmount) * 100), language)}</bdi></li>)}</ul></>}
+        {tab === 'details' ? renderDetails([['patient', name], ['file', patient.patientNumber], ...demographicFields]) : tab === 'appointments' ? !data.appointments.length ? <p className="r05-state">{copy.noAppointments}</p> : <ul className="r04-orders">{data.appointments.map(appointment => <li key={appointment.id}><bdi>{date(appointment.date)} | {appointment.time}</bdi><span>{todayCopy[language][appointment.status] || appointment.status}</span></li>)}</ul> : !data.orders.length ? <div className="r04-empty"><FileText size={26} aria-hidden="true" /><h3>{copy.noOrdersYet}</h3><p>{copy.noOrdersHint}</p>{createButton}</div> : <><div className="r04-orders-toolbar"><h2>{copy.orders}</h2>{createButton}</div><ul className="r04-orders">{data.orders.map(order => <li key={order.id}><bdi>{order.orderNumber}</bdi><span>{copy[order.status] || order.status}</span><bdi>{money(Math.round(Number(order.totalAmount) * 100), language)}</bdi><button type="button" onClick={() => { window.location.hash = ordersRoute(order.id) }}>{copy.openOrder}</button></li>)}</ul></>}
       </div>
     </>}
   </section>

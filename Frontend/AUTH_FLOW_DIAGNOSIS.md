@@ -31,6 +31,9 @@ isolated frontend journey. That navigation regression is now corrected.
 ## Restored navigation
 
 
+
+
+
 Production homepage, registration, verification, login, access checks, and
 patient routes remain real and fail closed until their services exist.
 

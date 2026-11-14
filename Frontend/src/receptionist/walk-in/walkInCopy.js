@@ -1,5 +1,6 @@
 export const walkInCopy = {
   en: {
+    clearAll: 'Clear all',
     price: 'Price (ILS)', actions: 'Actions',
     orderSummary: 'Order summary',
     profileSubtitle: 'View patient details, orders, and appointments.', backSearch: 'Back to patient search', dismissToast: 'Dismiss notification', noOrdersYet: 'No orders yet',
@@ -23,6 +24,7 @@ export const walkInCopy = {
     noSlot: 'Creating this order does not reserve an appointment slot.', selectedCount: count => `${count} selected`,
   },
   ar: {
+    clearAll: 'مسح الكل',
     price: 'السعر (شيكل)', actions: 'الإجراءات',
     orderSummary: 'ملخص الطلب',
     profileSubtitle: 'عرض بيانات المريض وطلباته ومواعيده.', backSearch: 'العودة إلى البحث عن مريض', dismissToast: 'إغلاق الإشعار', noOrdersYet: 'لا توجد طلبات بعد',
