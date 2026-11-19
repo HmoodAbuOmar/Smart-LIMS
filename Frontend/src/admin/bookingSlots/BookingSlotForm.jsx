@@ -23,7 +23,7 @@ export default function BookingSlotForm({date,slot,data,service,copy,onSaved,onC
   const [values,setValues]=useState(()=>slot?{date:slot.date,startTime:slot.startTime,endTime:slot.endTime,capacity:String(slot.capacity)}:{date,startTime:'',endTime:'',capacity:''})
   const [times,setTimes]=useState(()=>slot?{startTime:from24Hour(slot.startTime),endTime:from24Hour(slot.endTime)}:emptyTimes())
   const [errors,setErrors]=useState({}),[saving,setSaving]=useState(false),[failed,setFailed]=useState(false),[result,setResult]=useState(null)
-  const lock=useRef(false),mounted=useRef(false),form=useRef(null),returnTarget=useRef(null),locked=slot&&occupancy(slot.id,data.appointments)>0,prefix=slot?'bs-edit':'bs-create'
+  const lock=useRef(false),mounted=useRef(false),form=useRef(null),returnTarget=useRef(null),locked=slot&&(service.live||(slot.booked??occupancy(slot.id,data.appointments))>0),prefix=slot?'bs-edit':'bs-create'
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[])
   useEffect(()=>{onBusyChange?.(saving)},[saving,onBusyChange])
   const update=(key,value)=>{setValues(current=>({...current,[key]:value}));setErrors(current=>({...current,[key]:undefined,_form:undefined}));setFailed(false)}
@@ -46,7 +46,7 @@ export default function BookingSlotForm({date,slot,data,service,copy,onSaved,onC
     }
     lock.current=true;setSaving(true);setFailed(false)
     try{
-      const saved=await service.save(payload,slot?.id)
+      const saved=await service.save(payload,slot?.id,slot)
       if(mounted.current){if(!slot){setValues({date:saved.date,startTime:'',endTime:'',capacity:''});setTimes(emptyTimes())}onSaved(saved)}
     }catch(error){if(mounted.current){if(error.fields)setErrors(error.fields);else setFailed(true);if(!slot)showFailure(error.fields||{})}}
     finally{lock.current=false;if(mounted.current)setSaving(false)}

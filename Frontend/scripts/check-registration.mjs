@@ -34,7 +34,9 @@ assert.deepEqual(validateEmail({ email: ' ' }), { email: 'emailRequired' })
 assert.deepEqual(validateEmail({ email: 'bad' }), { email: 'emailInvalid' })
 assert.deepEqual(validatePasswordReset({ password: account.password, confirmPassword: account.password }), {})
 assert.equal(validatePasswordReset({ password: account.password, confirmPassword: 'different' }).confirmPassword, 'passwordMismatch')
-for (const operation of Object.values(patientApi)) await assert.rejects(operation(), error => error.code === 'SERVICE_UNAVAILABLE')
+for (const [name, operation] of Object.entries(patientApi)) {
+  if (['resendVerification', 'verificationStatus'].includes(name)) await assert.rejects(operation(), error => error.code === 'SERVICE_UNAVAILABLE')
+}
 const controller = new AbortController()
 controller.abort()
 await assert.rejects(patientApi.getAccess({ signal: controller.signal }), error => error.name === 'AbortError')

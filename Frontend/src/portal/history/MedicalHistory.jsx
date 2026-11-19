@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, TrendingUp } from 'lucide-react'
 import { biomarkerInformation } from './historyCopy.js'
 import { medicalVisits, measurementSeries, measurementsInRange, resultFlag, trendStatistics } from './historyModel.js'
+import { portalApi } from '../../services/portalApi.js'
 import './MedicalHistory.css'
 
 function referenceText(row) { return row?.range || (row?.reference ? `${row.reference.low}–${row.reference.high}` : '—') }
@@ -35,8 +36,37 @@ export function MeasurementChart({ api, points, series, miniature = false }) {
 }
 
 export function HealthTrendsPreview({ api }) {
-  const series = measurementSeries(medicalVisits(api.state)), current = series.find(s => s.biomarkerId === 'hemoglobin') || series[0]
+  const series = measurementSeries(medicalVisits(api.state)), current = api.development ? series.find(s => s.biomarkerId === 'hemoglobin') || series[0] : api.state.trendPreview?.points.length ? api.state.trendPreview : null
   return <button className="history-dashboard-card" onClick={() => api.navigate('history?view=trends')}><div><span className="history-preview-label"><TrendingUp size={18} />{api.t('dashboardTrends')}</span>{current ? <><strong>{api.local(current.name)}</strong><span><bdi>{current.points.at(-1).displayValue} {current.unit}</bdi> · {api.date(current.points.at(-1).date)}</span></> : <span>{api.t('noVisits')}</span>}<span>{api.t('viewAll')} <ArrowRight size={14} /></span></div>{current && <MeasurementChart api={api} points={current.points} series={current} miniature />}</button>
+}
+
+function LiveHealthTrends({ api, ui }) {
+  const { t } = api
+  const [series, setSeries] = useState(null)
+  const [selected, setSelected] = useState('')
+  const [period, setPeriod] = useState('6M')
+  const [data, setData] = useState(null)
+  const id = selected || series?.[0]?.seriesId
+  useEffect(() => {
+    const controller = new AbortController()
+    portalApi.biomarkerSeries({ signal: controller.signal }).then(value => { if (!controller.signal.aborted) setSeries(value) }, () => { if (!controller.signal.aborted) setSeries(false) })
+    return () => controller.abort()
+  }, [])
+  useEffect(() => {
+    if (!id) return
+    const controller = new AbortController()
+    portalApi.healthTrend(id, period, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) setData({ id, period, value }) }, () => { if (!controller.signal.aborted) setData({ id, period, error: true }) })
+    return () => controller.abort()
+  }, [id, period])
+  const result = data?.id === id && data?.period === period ? data : null
+  const current = result?.value
+  if (series === false) return <p role="alert">{t('unavailable')}</p>
+  if (!series) return <p role="status">{t('loading')}</p>
+  if (!series.length) return <p>{t('trendEmpty')}</p>
+  return <><section className="history-trends-card"><div className="history-trends-controls">
+    <ui.Field label="biomarker" name="history-biomarker" value={id} onChange={event => setSelected(event.target.value)}>{series.map(item => <option key={item.seriesId} value={item.seriesId}>{item.name} ({item.unit})</option>)}</ui.Field>
+    <ui.Field label="period" name="history-period" value={period} onChange={event => setPeriod(event.target.value)}>{[['3M', 'months3'], ['6M', 'months6'], ['1Y', 'year1'], ['ALL', 'allTime']].map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</ui.Field>
+  </div>{current ? <MeasurementChart key={id + period} api={api} points={current.points} series={current} /> : <p role={result?.error ? 'alert' : 'status'}>{t(result?.error ? 'unavailable' : 'loading')}</p>}</section>{current && <MeasurementHistory api={api} ui={ui} points={current.points} series={current} />}</>
 }
 
 function HealthTrends({ api, ui, visits }) {
@@ -61,8 +91,16 @@ function MeasurementHistory({ api, ui, points, series }) {
 
 function VisitCard({ api, ui, visit, initiallyOpen = false }) {
   const { t, state, local, money, datetime, navigate } = api, [open, setOpen] = useState(initiallyOpen)
+  const [details, setDetails] = useState(null)
+  useEffect(() => {
+    if (api.development || !open) return
+    const controller = new AbortController()
+    portalApi.visitDetail(visit.id, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) setDetails(value) }, () => { if (!controller.signal.aborted) setDetails(false) })
+    return () => controller.abort()
+  }, [api.development, open, visit.id])
+  const reports = api.development ? visit.reports : details?.reports || []
   const contentId = `history-content-${visit.id}`
-  return <article className="portal-card history-visit" id={`history-${visit.id}`}><header><span className="portal-icon"><CalendarDays size={21} /></span><div><h2><time dateTime={visit.timestamp}>{datetime(visit.timestamp)}</time></h2><p><bdi>{visit.id}</bdi></p></div><ui.Status value={visit.status} /></header><div className="history-visit-summary"><p>{visit.order.tests.map(id => local(state.tests.find(test => test.id === id)?.name || id)).join(' · ')}</p><div><span>{t('paymentStatus')}: <strong>{visit.order.paymentStatus ? t(visit.order.paymentStatus) : t('paymentUnknown')}</strong></span><span>{t('paidAmount')}: <strong>{Number.isFinite(visit.order.amountPaid) ? money(visit.order.amountPaid) : t('paymentUnknown')}</strong></span></div></div><button className="portal-button is-secondary history-expand" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(!open)}>{t(open ? 'hideVisit' : 'viewVisit')}<ChevronDown size={16} /></button><div id={contentId} hidden={!open}><dl className="history-visit-references"><div><dt>{t('appointmentRef')}</dt><dd><bdi>{visit.appointment.id}</bdi></dd></div><div><dt>{t('orderNumber')}</dt><dd><button className="portal-text" onClick={() => navigate(`orders/${visit.order.id}`)}><bdi>{visit.order.id}</bdi></button></dd></div></dl>{visit.reports.map(report => <section className="history-report-section" key={report.id}><div className="portal-card-heading"><h3>{local(state.tests.find(test => test.id === report.testId)?.name || report.testId)}</h3><div className="portal-row-actions"><ui.Button secondary onClick={() => navigate(`results/${report.id}`)}>{t('viewResult')}</ui.Button><ui.ReportDownload result={report} compact /></div></div><div className="portal-table-wrap" tabIndex={0}><table><thead><tr>{['test', 'result', 'unit', 'range', 'flag'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{report.values.map((row, index) => <tr key={`${report.id}-${index}`}><th scope="row">{local(row.name)}</th><td><bdi>{row.value}</bdi></td><td><bdi>{row.unit}</bdi></td><td><bdi>{referenceText(row)}</bdi></td><td><ui.Status value={resultFlag(row)} /></td></tr>)}</tbody></table></div></section>)}{visit.order.tests.filter(id => !visit.reports.some(report => report.testId === id)).map(id => <p key={id}>{local(state.tests.find(test => test.id === id)?.name || id)} · {t('resultsPending')}</p>)}</div></article>
+  return <article className="portal-card history-visit" id={`history-${visit.id}`}><header><span className="portal-icon"><CalendarDays size={21} /></span><div><h2><time dateTime={visit.timestamp}>{datetime(visit.timestamp)}</time></h2><p><bdi>{visit.number || visit.id}</bdi></p></div><ui.Status value={visit.status} /></header><div className="history-visit-summary"><p>{visit.order.tests.map(id => visit.testNames?.[id] || local(state.tests.find(test => test.id === id)?.name || id)).join(' · ')}</p><div><span>{t('paymentStatus')}: <strong>{visit.order.paymentStatus ? t(visit.order.paymentStatus) : t('paymentUnknown')}</strong></span><span>{t('paidAmount')}: <strong>{Number.isFinite(visit.order.amountPaid) ? money(visit.order.amountPaid) : t('paymentUnknown')}</strong></span></div></div><button className="portal-button is-secondary history-expand" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(!open)}>{t(open ? 'hideVisit' : 'viewVisit')}<ChevronDown size={16} /></button><div id={contentId} hidden={!open}><dl className="history-visit-references"><div><dt>{t('appointmentRef')}</dt><dd><bdi>{visit.appointment.id}</bdi></dd></div><div><dt>{t('orderNumber')}</dt><dd><button className="portal-text" onClick={() => navigate(`orders/${visit.order.id}`)}><bdi>{visit.order.number || (api.development ? visit.order.id : '—')}</bdi></button></dd></div></dl>{open && !api.development && !details && <p role={details === false ? 'alert' : 'status'}>{t(details === false ? 'unavailable' : 'loading')}</p>}{reports.map(report => <section className="history-report-section" key={report.id}><div className="portal-card-heading"><h3>{report.testName || local(state.tests.find(test => test.id === report.testId)?.name || report.testId)}</h3><div className="portal-row-actions"><ui.Button secondary onClick={() => navigate(`results/${report.id}`)}>{t('viewResult')}</ui.Button><ui.ReportDownload result={report} compact /></div></div><div className="portal-table-wrap" tabIndex={0}><table><thead><tr>{['test', 'result', 'unit', 'range', 'flag'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{report.values.map((row, index) => <tr key={`${report.id}-${index}`}><th scope="row">{local(row.name)}</th><td><bdi>{row.value}</bdi></td><td><bdi>{row.unit}</bdi></td><td><bdi>{referenceText(row)}</bdi></td><td><ui.Status value={resultFlag(row)} /></td></tr>)}</tbody></table></div></section>)}{visit.order.tests.filter(id => !visit.reports.some(report => report.testId === id)).map(id => <p key={id}>{local(state.tests.find(test => test.id === id)?.name || id)} · {t('resultsPending')}</p>)}</div></article>
 }
 
 export default function MedicalHistory({ api, ui, visitId, query }) {
@@ -72,10 +110,10 @@ export default function MedicalHistory({ api, ui, visitId, query }) {
   const invalidDates = filters.start && filters.end && filters.start > filters.end
   const matched = invalidDates ? [] : visits.filter(visit => {
     const names = visit.order.tests.map(id => local(state.tests.find(test => test.id === id)?.name || id)).join(' ')
-    const text = `${visit.id} ${visit.order.id} ${visit.appointment.id} ${names} ${visit.reports.flatMap(report => report.values.map(row => local(row.name))).join(' ')}`.toLocaleLowerCase()
+    const text = `${visit.number || visit.id} ${visit.order.number || (api.development ? visit.order.id : '')} ${visit.appointment.id} ${names} ${visit.reports.flatMap(report => report.values.map(row => local(row.name))).join(' ')}`.toLocaleLowerCase()
     return (!filters.start || visit.appointment.date >= filters.start) && (!filters.end || visit.appointment.date <= filters.end) && (filters.test === 'all' || visit.order.tests.includes(filters.test)) && (filters.status === 'all' || (filters.status === 'normal' ? visit.status === 'normal' : visit.flags.includes(filters.status))) && text.includes(filters.search.trim().toLocaleLowerCase()) && (!visitId || visit.id === visitId)
   })
   function update(event) { setFilters(previous => ({ ...previous, [event.target.name.replace('history-', '')]: event.target.value })) }
   function reset() { setFilters({ search: '', start: '', end: '', test: 'all', status: 'all' }); if (visitId) navigate('history') }
-  return <><ui.Title title="history" hint="historyHint" /><ui.FilterTabs options={['visits', 'healthTrends']} value={view} onChange={value => navigate(value === 'healthTrends' ? 'history?view=trends' : 'history')} />{view === 'healthTrends' ? <HealthTrends api={api} ui={ui} visits={visits} /> : <><div className="history-filters"><ui.Field label="searchVisits" name="history-search" type="search" value={filters.search} onChange={update} /><ui.Field label="fromDate" name="history-start" type="date" value={filters.start} onChange={update} /><ui.Field label="toDate" name="history-end" type="date" min={filters.start || undefined} value={filters.end} onChange={update} /><ui.Field label="test" name="history-test" value={filters.test} onChange={update}><option value="all">{t('all')}</option>{state.tests.map(test => <option key={test.id} value={test.id}>{local(test.name)}</option>)}</ui.Field><ui.Field label="visitStatus" name="history-status" value={filters.status} onChange={update}>{['all', 'normal', 'high', 'low', 'critical', 'unclassified'].map(key => <option key={key} value={key}>{t(key)}</option>)}</ui.Field><button className="portal-text" onClick={reset}>{t('clear')}</button></div>{invalidDates && <p className="portal-error" role="alert">{t('invalidHistoryDates')}</p>}{matched.length ? <div className="history-timeline">{matched.map(visit => <VisitCard key={visit.id} visit={visit} api={api} ui={ui} initiallyOpen={visitId === visit.id} />)}</div> : <ui.Empty title={visits.length ? 'noVisitMatches' : 'noVisits'} action="clear" onClick={reset} />}{visitId && <div className="portal-actions"><ui.Button secondary onClick={() => navigate('history')}>{t('history')}</ui.Button></div>}</>}</>
+  return <><ui.Title title="history" hint="historyHint" /><ui.FilterTabs options={['visits', 'healthTrends']} value={view} onChange={value => navigate(value === 'healthTrends' ? 'history?view=trends' : 'history')} />{view === 'healthTrends' ? api.development ? <HealthTrends api={api} ui={ui} visits={visits} /> : <LiveHealthTrends api={api} ui={ui} /> : <><div className="history-filters"><ui.Field label="searchVisits" name="history-search" type="search" value={filters.search} onChange={update} /><ui.Field label="fromDate" name="history-start" type="date" value={filters.start} onChange={update} /><ui.Field label="toDate" name="history-end" type="date" min={filters.start || undefined} value={filters.end} onChange={update} /><ui.Field label="test" name="history-test" value={filters.test} onChange={update}><option value="all">{t('all')}</option>{state.tests.map(test => <option key={test.id} value={test.id}>{local(test.name)}</option>)}</ui.Field><ui.Field label="visitStatus" name="history-status" value={filters.status} onChange={update}>{['all', 'normal', 'high', 'low', 'critical', 'unclassified'].map(key => <option key={key} value={key}>{t(key)}</option>)}</ui.Field><button className="portal-text" onClick={reset}>{t('clear')}</button></div>{invalidDates && <p className="portal-error" role="alert">{t('invalidHistoryDates')}</p>}{matched.length ? <div className="history-timeline">{matched.map(visit => <VisitCard key={visit.id} visit={visit} api={api} ui={ui} initiallyOpen={visitId === visit.id} />)}</div> : <ui.Empty title={visits.length ? 'noVisitMatches' : 'noVisits'} action="clear" onClick={reset} />}{visitId && <div className="portal-actions"><ui.Button secondary onClick={() => navigate('history')}>{t('history')}</ui.Button></div>}</>}</>
 }

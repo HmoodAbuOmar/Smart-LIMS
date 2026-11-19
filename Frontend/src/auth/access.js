@@ -10,9 +10,21 @@ export function patientDestination(access) {
   return null
 }
 
+const staffDestinations = {
+  admin: '#/admin',
+  receptionist: '#/receptionist/today',
+  lab_technician: '#/lab-technician',
+}
+
+export function accountDestination(access) {
+  if (!access?.authenticated) return '#/login'
+  if (access.role === 'patient') return patientDestination(access)
+  return Object.hasOwn(staffDestinations, access.role) ? staffDestinations[access.role] : null
+}
+
 // Never render arbitrary server exception text. Adapter errors use these normalized codes.
 export function actionErrorKey(code, fallback) {
-  const keys = { INVALID_CREDENTIALS: 'errors.invalidCredentials', RATE_LIMITED: 'errors.rateLimited', EMAIL_NOT_VERIFIED: 'errors.emailNotVerified', TOKEN_EXPIRED: 'errors.tokenExpired', TOKEN_INVALID: 'errors.tokenInvalid', SESSION_EXPIRED: 'errors.sessionExpired' }
+  const keys = { INVALID_CREDENTIALS: 'errors.invalidCredentials', RATE_LIMITED: 'errors.rateLimited', ACCOUNT_LOCKED: 'errors.rateLimited', ACCOUNT_BLOCKED: 'errors.accountBlocked', EMAIL_NOT_CONFIRMED: 'errors.emailNotVerified', EMAIL_NOT_VERIFIED: 'errors.emailNotVerified', INVALID_RESET_CODE: 'errors.invalidResetCode', SAME_PASSWORD: 'errors.samePassword', EMAIL_IN_USE: 'errors.emailInUse', TOKEN_EXPIRED: 'errors.tokenExpired', TOKEN_INVALID: 'errors.tokenInvalid', SESSION_EXPIRED: 'errors.sessionExpired' }
   return typeof code === 'string' && Object.hasOwn(keys, code) ? keys[code] : fallback
 }
 

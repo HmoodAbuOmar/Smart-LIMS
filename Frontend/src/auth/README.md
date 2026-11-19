@@ -52,11 +52,22 @@ After Login, `authenticatedPatientDestination()` obtains current server access s
 
 Other role destinations need an agreed role-routing implementation; this module does not invent staff dashboards. Client routing does not replace server authorization of patient records.
 
-In Vite DEV only, `App.jsx` connects normal Sign Up/Login/pending-verification navigation to the isolated frontend walkthrough. It validates and changes UI steps without creating sessions, accounts, verified-email flags or medical records. Real verification callbacks with tokens retain the actual controller. Production excludes this walkthrough. Credentials/tokens are not persisted in browser storage.
+In Vite DEV only, the isolated walkthrough uses `/#/login?preview=1`. It validates and changes UI steps without creating sessions, accounts, verified-email flags or medical records. Plain `/#/login` uses the cookie API in both dev and production. Real verification callbacks with tokens retain the actual controller. Production excludes the walkthrough.
 
 ## Integration status and checks
 
-`serviceTransport.js` currently throws `SERVICE_UNAVAILABLE`; no HTTP endpoint, email provider or session transport is configured there. UI errors are honest adapter failures. Backend account creation, mail delivery, verification, recovery, sessions and file association are not established by frontend tests.
+`cookieSession.js` handles CSRF, cookie login, session restoration and logout. Vite proxies those same-origin requests to `SMARTLIMS_API_TARGET` (default `http://127.0.0.1:8080`; the local backend-hmood setup uses `http://127.0.0.1:18080`). `/api/auth/me` supplies the role, and `/api/patients/me` determines whether a signed-in patient has a linked profile. The frontend never stores credentials or session tokens. Registration, explicit email confirmation, and code-based password recovery use the documented endpoints. Verification resend and verification-status polling remain unavailable because the backend has no corresponding endpoints.
+
+### CSRF response discrepancy in backend-hmood
+
+Reproduced against commit `e5635cf813c70e4fd67d74cceb0912252347cad2` directly on port 18080 and through Vite. Use a private cookie jar and log only HTTP statuses and cookie metadata.
+
+1. GET `/api/auth/csrf-token` returns 200 and issues a readable `XSRF-TOKEN`.
+2. POST `/api/auth/cookie-login` with that cookie and the matching `X-XSRF-TOKEN` header returns 200 and sets only the HttpOnly `access_token`. The controller also calls `csrf.saveToken` with a new token, but the CSRF cookie is missing from the response headers.
+3. With the authenticated cookie jar, issue a CSRF token again, then GET `/api/auth/me`. The read returns 200 and expires `XSRF-TOKEN`. This is reproducible after explicit issuance and the session remains valid. The controller's `me` method only reads the current account.
+4. Issue CSRF immediately before a protected mutation or logout and send the matching header. An Admin invitation and logout succeeded with this sequence. Logout emits the expired `access_token`; the frontend also clears any remaining readable CSRF cookie. A subsequent `/api/auth/me` returns 401.
+
+The frontend obtains CSRF immediately before login, invitation acceptance, Admin writes, and logout. It does not depend on cookie persistence across reads or automatically repeat a rejected write. Backend follow-up should verify that both Set-Cookie headers are emitted at login and logout and trace why the authenticated read expires the CSRF cookie.
 
 See [API requirements](../../PATIENT_API_REQUIREMENTS.md) for current payloads, normalized results and pending backend decisions. Do not replace server confirmation with local flags or tokens.
 

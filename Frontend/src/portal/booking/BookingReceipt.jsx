@@ -6,6 +6,8 @@ export default function BookingReceipt({ api, ui, id, details = false }) {
   const { state, t, navigate, money, date, local, dispatch, name } = api
   const draft = checkoutDraft(state)
   const pending = id === 'pending' && draft.stage === 'pending'
+  const live = state.appointments.find(item => item.id === id && item.serverConfirmed && item.slotId)
+  if (live) return <><ui.Title title="bookingDetails" /><article className="portal-card booking-receipt"><dl className="booking-receipt-details"><dt>{t('bookingReference')}</dt><dd><bdi>{live.id}</bdi></dd><dt>{t('type')}</dt><dd>{live.type}</dd><dt>{t('selectedDate')}</dt><dd>{date(live.date)} <bdi>{live.time}</bdi></dd><dt>{t('status')}</dt><dd>{t(live.status)}</dd></dl><div className="portal-actions"><ui.Button onClick={() => navigate('appointments')}>{t('viewAppointments')}</ui.Button><ui.Button secondary onClick={() => navigate('orders/' + live.orderId)}>{t('orders')}</ui.Button></div></article></>
   const saved = state.appointments.find(appointment => appointment.id === id && appointment.tests?.length && appointment.serverConfirmed === true && appointment.source === 'server' && (details || appointment.status === 'confirmed'))
   const appointment = pending ? { ...draft, id: null, patientName: name || state.profile.name, tests: draft.tests || [], total: totalPrice(draft.tests || [], state.tests), paymentMethod: draft.method, paymentStatus: 'pending' } : saved
   if (!appointment) return <><ui.Title title="bookingDetails" /><ui.Empty title="notFound" action="appointments" onClick={() => navigate('appointments')} /></>

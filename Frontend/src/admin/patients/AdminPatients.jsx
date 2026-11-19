@@ -10,8 +10,9 @@ import './adminPatients.css'
 
 function Status({ value, labels }) { return <span className={`ap-badge ap-status-${value.toLowerCase()}`}>{labels[value]}</span> }
 function AccountStatus({ patient, copy }) {
-  const Icon = patient.linkedAccountId ? Link2 : Unlink2
-  return <span className={`ap-badge ap-account-status ${patient.linkedAccountId ? 'ap-linked' : 'ap-unlinked'}`}><Icon size={12} aria-hidden="true" />{patient.linkedAccountId ? copy.linked : copy.unlinked}</span>
+  const linked = patient.linkStatus ? patient.linkStatus === 'LINKED' : Boolean(patient.linkedAccountId)
+  const Icon = linked ? Link2 : Unlink2
+  return <span className={`ap-badge ap-account-status ${linked ? 'ap-linked' : 'ap-unlinked'}`}><Icon size={12} aria-hidden="true" />{linked ? copy.linked : copy.unlinked}</span>
 }
 function Demographics({ patient, copy, date }) {
   return <dl className="ap-demographics">{['fileNumber', 'dateOfBirth', 'gender', 'phone', 'address', 'account'].map(field => <div key={field}>
@@ -22,6 +23,7 @@ function Demographics({ patient, copy, date }) {
 export default function AdminPatients({ language, onToggleLanguage, service = adminPatientsService }) {
   const copy = adminPatientsCopy[language]
   const rtl = language === 'ar'
+  const unavailable = rtl ? 'هذه السجلات غير متاحة من الواجهة البرمجية الحالية.' : 'These records are unavailable from the current API.'
   const [data, setData] = useState({ patients: [], orders: [], appointments: [], transactions: [] })
   const [loadState, setLoadState] = useState('loading')
   const [attempt, setAttempt] = useState(0)
@@ -101,8 +103,8 @@ export default function AdminPatients({ language, onToggleLanguage, service = ad
           {tab === 'overview' && <><h3>{copy.overview}</h3><p className="ap-profile-fullname">{patientName(selected, language)}</p><Demographics patient={selected} copy={copy} date={date} /></>}
           {tab === 'orders' && <><div className="ap-section-heading"><h3>{copy.orders}</h3><button type="button" disabled aria-describedby="patient-order-unavailable">{copy.newOrder}</button></div><p id="patient-order-unavailable" className="ap-muted">{copy.orderUnavailable}</p>
             {!orders.length ? <p className="ap-empty">{copy.noOrders}</p> : <div className="ap-table-scroll" tabIndex={0} role="region" aria-label={copy.orders}><table><caption className="ap-sr-only">{copy.orders}</caption><thead><tr>{[copy.orderNumber, copy.date, copy.status, copy.total, copy.actions].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{orders.map(order => <tr key={order.id}><th scope="row"><bdi>{order.number}</bdi></th><td>{date(order.date)}</td><td><Status value={order.status} labels={copy.orderStatuses} /></td><td><bdi>{money(order.total)}</bdi></td><td><button type="button" disabled aria-describedby="patient-order-unavailable">{copy.openOrder}</button></td></tr>)}</tbody></table></div>}</>}
-          {tab === 'appointments' && <><h3>{copy.appointments}</h3>{!appointments.length ? <p className="ap-empty">{copy.noAppointments}</p> : <div className="ap-table-scroll" tabIndex={0} role="region" aria-label={copy.appointments}><table><caption className="ap-sr-only">{copy.appointments}</caption><thead><tr>{[copy.date, copy.orderNumber, copy.status].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{appointments.map(item => <tr key={item.id}><td><time dateTime={`${item.date}T${item.time}`}>{date(item.date)} · <bdi>{item.time}</bdi></time></td><td><bdi>{data.orders.find(order => order.id === item.orderId)?.number || copy.missing}</bdi></td><td><Status value={item.status} labels={copy.appointmentStatuses} /></td></tr>)}</tbody></table></div>}</>}
-          {tab === 'financial' && <><h3>{copy.financial}</h3>{financials.available ? <><dl className="ap-financial">{['charges', 'payments', 'outstanding'].map(key => <div key={key}><dt>{copy[key]}</dt><dd><bdi>{money(financials[key])}</bdi></dd></div>)}</dl><p className="ap-muted">{copy.financeNote}</p></> : <p className="ap-empty">{copy.noFinancial}</p>}</>}
+          {tab === 'appointments' && <><h3>{copy.appointments}</h3>{service.live ? <p className="ap-empty">{unavailable}</p> : !appointments.length ? <p className="ap-empty">{copy.noAppointments}</p> : <div className="ap-table-scroll" tabIndex={0} role="region" aria-label={copy.appointments}><table><caption className="ap-sr-only">{copy.appointments}</caption><thead><tr>{[copy.date, copy.orderNumber, copy.status].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{appointments.map(item => <tr key={item.id}><td><time dateTime={`${item.date}T${item.time}`}>{date(item.date)} · <bdi>{item.time}</bdi></time></td><td><bdi>{data.orders.find(order => order.id === item.orderId)?.number || copy.missing}</bdi></td><td><Status value={item.status} labels={copy.appointmentStatuses} /></td></tr>)}</tbody></table></div>}</>}
+          {tab === 'financial' && <><h3>{copy.financial}</h3>{!service.live && financials.available ? <><dl className="ap-financial">{['charges', 'payments', 'outstanding'].map(key => <div key={key}><dt>{copy[key]}</dt><dd><bdi>{money(financials[key])}</bdi></dd></div>)}</dl><p className="ap-muted">{copy.financeNote}</p></> : <p className="ap-empty">{service.live ? unavailable : copy.noFinancial}</p>}</>}
         </div>
       </section>
     </> : <>

@@ -18,6 +18,7 @@ export function readLinkToken(location) {
 export function clearLinkToken() {
   const url = new URL(window.location.href)
   url.searchParams.delete('token')
+  url.searchParams.delete('userId')
   url.hash = url.hash.split('?')[0]
   window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
 }

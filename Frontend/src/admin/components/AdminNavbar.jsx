@@ -1,7 +1,7 @@
 import { Bell, Menu, Search, UserRound, X } from 'lucide-react'
 import '../adminNavbar.css'
 
-export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, menuButtonRef }) {
+export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, menuButtonRef, profile }) {
   return (
     <header className="admin-header">
       <button ref={menuButtonRef} type="button" className="admin-menu-toggle" aria-controls="admin-navigation"
@@ -27,7 +27,7 @@ export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, 
 
         <div className="admin-navbar-profile" role="group" aria-label={copy.navbar.profileUnavailable} title={copy.navbar.profileUnavailable}>
           <span className="admin-profile-avatar" aria-hidden="true"><UserRound size={18} /></span>
-          <div className="admin-profile-copy"><strong>{copy.navbar.profileName}</strong><span>{copy.navbar.profileRole}</span></div>
+          <div className="admin-profile-copy"><strong>{profile ? profile.displayName || '—' : copy.navbar.profileName}</strong><span>{copy.navbar.profileRole}</span></div>
         </div>
       </div>
     </header>

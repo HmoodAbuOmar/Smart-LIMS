@@ -22,6 +22,9 @@ const flowRoutes = Object.freeze({
   '#/onboarding/dashboard': 'dashboard',
 })
 const stepRoutes = Object.fromEntries(Object.entries(flowRoutes).map(([route, step]) => [step, route]))
+stepRoutes.login = '#/login?preview=1'
+stepRoutes.signup = '#/signup?preview=1'
+stepRoutes['verify-email'] = '#/verify-email?preview=1'
 function flowStep(hash = '') { return flowRoutes[hash.split('?')[0]] }
 
 // Compile-time DEV-only UI state. No API imports, session flags, tokens or storage.

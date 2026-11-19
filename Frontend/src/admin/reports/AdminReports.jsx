@@ -37,16 +37,16 @@ export default function AdminReports({ language = 'en', service = reportsService
   const [sourceOpener, setSourceOpener] = useState(null)
   useEffect(() => {
     let live = true
-    service.load().then(value => { if (live) { setData(value); setStatus('ready') } }, error => { if (live) setStatus(error.code === 'REPORTS_UNAVAILABLE' ? 'unavailable' : 'error') })
+    service.load(applied).then(value => { if (live) { setData(value); setStatus('ready') } }, error => { if (live) setStatus(error.code === 'REPORTS_UNAVAILABLE' ? 'unavailable' : 'error') })
     return () => { live = false }
-  }, [attempt, service])
-  const report = data && status === 'ready' ? buildReport(data, applied) : null
+  }, [attempt, service, applied])
+  const report = data && status === 'ready' ? service.live ? data : buildReport(data, applied) : null
   const changed = draft.from !== applied.from || draft.to !== applied.to
   function apply(event) {
     event.preventDefault()
     const bad = !draft.from || !draft.to || Object.keys(periodErrors(draft)).length > 0
     setInvalid(bad)
-    if (!bad) setApplied({ ...draft })
+    if (!bad) { if (service.live) setStatus('loading'); setApplied({ ...draft }) }
   }
   return <section className="admin-reports" aria-labelledby="rp-title" aria-busy={status === 'loading'}>
     <header className="rp-heading"><span className="rp-heading-icon"><ChartNoAxesCombined size={23} aria-hidden="true" /></span><div><h2 id="rp-title">{copy.title}</h2><p>{copy.subtitle}</p></div><div className="rp-heading-actions"><button type="button" onClick={event => setSourceOpener(event.currentTarget)}><FileSearch size={16} aria-hidden="true" />{copy.sources}</button><button type="button" disabled={!report} onClick={() => window.print()}><Printer size={16} aria-hidden="true" />{copy.print}</button></div></header>
@@ -65,7 +65,7 @@ export default function AdminReports({ language = 'en', service = reportsService
       </div>
       <section className="rp-panel rp-financial-panel" aria-labelledby="rp-financial-title"><h3 id="rp-financial-title" className="rp-section-title">{copy.financial}</h3><div className="rp-financial">{[
         { label: 'receipts', key: 'receiptsCents', Icon: Receipt }, { label: 'refunds', key: 'refundsCents', Icon: Undo2 }, { label: 'net', key: 'netCents', Icon: Wallet },
-      ].map(({ label, key, Icon }) => <div key={key}><h4><Icon size={18} aria-hidden="true" />{copy[label]}</h4><p><bdi>{formatCurrency(report.financial[key] / 100, language)}</bdi></p></div>)}</div></section>
+      ].map(({ label, key, Icon }) => <div key={key}><h4><Icon size={18} aria-hidden="true" />{copy[label]}</h4><p><bdi>{report.financial ? formatCurrency(report.financial[key] / 100, language) : copy.sectionUnavailable}</bdi></p></div>)}</div></section>
     </>}
     {sourceOpener && <SourceDetails copy={copy} opener={sourceOpener} onClose={() => setSourceOpener(null)} />}
   </section>

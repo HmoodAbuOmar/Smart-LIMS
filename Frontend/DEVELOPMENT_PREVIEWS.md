@@ -1,16 +1,14 @@
-# Seamless development-only frontend flow
+# Development-only Patient walkthrough
 
-Run npm.cmd run dev from Frontend and open http://localhost:5173/ normally.
-Get Started, Login, and the existing authentication tabs use the normal website
-routes. No testing link, failed API request, or special URL is needed.
+Run npm.cmd run dev from Frontend and open `/#/signup?preview=1` for the isolated walkthrough. Get Started and plain signup and login use the real account forms.
 
 ## Routes and navigation
 
 In Vite development only:
-- /#/signup validates account fields and opens /#/verify-email.
-- /#/verify-email displays the entered email with pending status. Continue opens
-  /#/login without claiming delivery or marking email verified.
-- /#/login validates fields and opens /#/onboarding/file.
+- /#/signup?preview=1 validates fixture fields and opens /#/verify-email?preview=1.
+- /#/verify-email?preview=1 displays the entered email with pending status. Continue opens
+  /#/login?preview=1 without claiming delivery or marking email verified.
+- /#/login?preview=1 validates fixture fields and opens /#/onboarding/file. Plain /#/login uses cookie authentication.
 - File selection opens /#/onboarding/file/new or /#/onboarding/file/link.
 - Validating either form opens /#/onboarding/dashboard, the existing patient portal with its original
   catalog, profile, order, appointment, result, notification, and history fixtures. No medical file is created or linked.
@@ -33,9 +31,8 @@ The flow import and route handling are compile-time DEV-only. There is no
 runtime query or storage flag that can activate it in production. The real
 patient URLs /#/patient/* retain their unchanged guards in both environments.
 Real email-verification callbacks containing a token use the actual verification
-controller even in development. Production signup/login use their actual API
-adapters and server-response requirements. Those adapters currently have no
-implemented transport and fail closed. No API endpoints have been invented.
+controller even in development. The real login uses the cookie session adapter.
+Registration, email confirmation and code-based recovery use the real API. Verification resend and status polling remain unavailable.
 
 The isolated flow never calls authentication or patient-file APIs, creates
 sessions, verifies emails, creates medical records, or injects fake responses.

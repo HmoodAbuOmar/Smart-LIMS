@@ -10,6 +10,7 @@ import AdminReports from '../reports/AdminReports.jsx'
 import AdminAuditLog from '../auditLog/AdminAuditLog.jsx'
 import AdminOperationsPayments from '../operationsPayments/AdminOperationsPayments.jsx'
 import { adminCopy } from '../adminCopy.js'
+import { liveAudit, liveCatalog, liveOperations, liveOverview, livePatients, liveReports, liveSlots, liveUsers } from '../adminLiveApi.js'
 
 const languageKey = 'smart-lims.admin.language'
 function initialLanguage() {
@@ -17,7 +18,7 @@ function initialLanguage() {
   catch { return 'en' }
 }
 
-export default function AdminLayout({ initialPage = 'overview', developmentPreview = false }) {
+export default function AdminLayout({ initialPage = 'overview', developmentPreview = false, live = false, profile }) {
   const [language, setLanguage] = useState(initialLanguage)
   const [activeId, setActiveId] = useState(initialPage)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -58,29 +59,31 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
   }
   function navigate(id, checked = false) {
     if (!checked && catalogGuard.current) { catalogGuard.current(() => navigate(id, true)); return }
-    // Preserve the existing selection flow; no API or new page routes are invented.
     setActiveId(id)
     if (mobileOpen) closeMenu()
   }
 
   return (
-    <div className="admin-layout" lang={language} dir={direction} data-admin-development-preview={developmentPreview || undefined} onKeyDown={event => {
+    <div className="admin-layout" lang={language} dir={direction} {...(import.meta.env.DEV && developmentPreview ? { 'data-admin-development-preview': true } : {})} onKeyDown={event => {
       if (event.key === 'Escape' && mobileOpen) closeMenu()
     }}>
-      <a className="admin-skip-link" href="#admin-main">{copy.skip}</a>
-      <AdminNavbar copy={copy} activeId={activeId} mobileOpen={mobileOpen} menuButtonRef={menuButton}
+      <a className="admin-skip-link" href="#admin-main" onClick={event => {
+        event.preventDefault()
+        document.getElementById('admin-main')?.focus()
+      }}>{copy.skip}</a>
+      <AdminNavbar copy={copy} activeId={activeId} mobileOpen={mobileOpen} menuButtonRef={menuButton} profile={profile}
         onToggleMenu={() => setMobileOpen(open => !open)} />
-      <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} language={language}
+      <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} language={language} live={live}
         onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />
       <main id="admin-main" className={`admin-main${activeId === 'users' ? ' admin-main-users' : ''}`} aria-label={copy.content} tabIndex={-1}>
-        {activeId === 'overview' && <AdminOverview language={language} />}
-        {activeId === 'users' && <AdminUsers language={language} />}
-        {activeId === 'reports' && <AdminReports language={language} />}
-        {activeId === 'auditLog' && <AdminAuditLog language={language} />}
-        {activeId === 'operationsPayments' && <AdminOperationsPayments language={language} />}
-        {activeId === 'bookingSlots' && <AdminBookingSlots language={language} />}
-        {activeId === 'patients' && <AdminPatients language={language} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
-        {['tests', 'parameters', 'referenceRanges'].includes(activeId) && <AdminTestCatalog language={language} activePage={activeId} registerNavigationGuard={registerCatalogGuard} onNavigate={id => navigate(id, true)} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
+        {activeId === 'overview' && <AdminOverview language={language} service={live ? liveOverview : undefined} />}
+        {activeId === 'users' && <AdminUsers language={language} service={live ? liveUsers : undefined} />}
+        {activeId === 'reports' && <AdminReports language={language} service={live ? liveReports : undefined} />}
+        {activeId === 'auditLog' && <AdminAuditLog language={language} service={live ? liveAudit : undefined} />}
+        {activeId === 'operationsPayments' && <AdminOperationsPayments language={language} service={live ? liveOperations : undefined} />}
+        {activeId === 'bookingSlots' && <AdminBookingSlots language={language} service={live ? liveSlots : undefined} />}
+        {activeId === 'patients' && <AdminPatients language={language} service={live ? livePatients : undefined} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
+        {['tests', 'parameters', 'referenceRanges'].includes(activeId) && <AdminTestCatalog language={language} service={live ? liveCatalog : undefined} activePage={activeId} registerNavigationGuard={registerCatalogGuard} onNavigate={id => navigate(id, true)} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
       </main>
     </div>
   )

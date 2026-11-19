@@ -14,7 +14,8 @@ export default function AdminBookingSlots({language,service=bookingSlotsService}
   const date=value=>new Intl.DateTimeFormat(language,{dateStyle:'long'}).format(new Date(`${value}T12:00:00`))
   const time=value=>formatSlotTime(value,language)
   const number=value=>new Intl.NumberFormat(language).format(value)
-  useEffect(()=>{let alive=true;service.load().then(value=>{if(alive){setData(value);setLoad('ready')}}).catch(()=>{if(alive)setLoad('error')});return()=>{alive=false}},[service,attempt])
+  const loadedMonth = service.live ? month : undefined
+  useEffect(()=>{let alive=true;service.load(loadedMonth).then(value=>{if(alive){setData(value);setLoad('ready')}}).catch(()=>{if(alive)setLoad('error')});return()=>{alive=false}},[service,attempt,loadedMonth])
   useEffect(()=>{if(focusDate.current){calendar.current?.querySelector(`[data-date="${selected}"]`)?.focus({preventScroll:true});focusDate.current=false}},[selected])
   useEffect(()=>{if(!notice)return undefined;const timer=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(timer)},[notice])
   const daySlots=data.slots.filter(slot=>slot.date===selected).sort((a,b)=>a.startTime.localeCompare(b.startTime)||a.id.localeCompare(b.id))
@@ -32,11 +33,11 @@ export default function AdminBookingSlots({language,service=bookingSlotsService}
     if(actionLock.current)return
     if(slot.active){setFailed(false);setDialog({kind:'deactivate',slot});return}
     actionLock.current=true;setBusy(true);setFailed(false)
-    try{saved(await service.setActive(slot.id,true))}catch{setNotice('saveError')}finally{actionLock.current=false;setBusy(false)}
+    try{saved(await service.setActive(slot.id,true,slot))}catch{setNotice('saveError')}finally{actionLock.current=false;setBusy(false)}
   }
   async function deactivate(){
     if(actionLock.current)return;actionLock.current=true;setBusy(true);setFailed(false)
-    try{saved(await service.setActive(dialog.slot.id,false))}catch{setFailed(true)}finally{actionLock.current=false;setBusy(false)}
+    try{saved(await service.setActive(dialog.slot.id,false,dialog.slot))}catch{setFailed(true)}finally{actionLock.current=false;setBusy(false)}
   }
   const headings=['time','capacity','booked','available','status','actions']
   function cell(key,content){return <td key={key} role="cell" headers={`bs-column-${key}`}><span className="bs-cell-label" aria-hidden="true">{copy[key]}</span><div className="bs-cell-value">{content}</div></td>}
@@ -50,7 +51,7 @@ export default function AdminBookingSlots({language,service=bookingSlotsService}
         <div className="bs-dates">{Array.from({length:cells},(_,index)=>{const day=index-offset+1;if(day<1||day>days)return <span key={index}/>;const value=`${month}-${String(day).padStart(2,'0')}`;return <button type="button" key={value} disabled={busy} data-date={value} className={`${value===selected?'bs-selected ':''}${value===today?'bs-today':''}`} aria-current={value===today?'date':undefined} aria-pressed={value===selected} aria-label={`${date(value)}${datesWithSlots.has(value)?` · ${copy.hasSlots}`:''}`} tabIndex={value===selected||selected.slice(0,7)!==month&&day===1?0:-1} onClick={()=>select(value)} onKeyDown={event=>dateKey(event,value)}><span>{number(day)}</span>{datesWithSlots.has(value)&&<i aria-hidden="true"/>}</button>})}</div>
         <button type="button" className="bs-today-action" disabled={busy} onClick={()=>select(today)}>{copy.today}</button>
       </section>
-      <section className="bs-list bs-panel" aria-labelledby="bs-list-title"><h3 id="bs-list-title">{copy.slotsFor} <time dateTime={selected}>{date(selected)}</time></h3>{!daySlots.length?<p className="bs-empty" role="status">{copy.empty}</p>:<div className="bs-table-container"><table role="table"><caption className="bs-sr-only">{copy.slotsFor} {date(selected)}</caption><thead role="rowgroup"><tr role="row">{headings.map(key=><th scope="col" role="columnheader" id={`bs-column-${key}`} key={key}>{copy[key]}</th>)}</tr></thead><tbody role="rowgroup">{daySlots.map(slot=>{const count=occupancy(slot.id,data.appointments),status=slotStatus(slot,data.appointments);return <tr role="row" key={slot.id} data-slot={slot.id}>
+      <section className="bs-list bs-panel" aria-labelledby="bs-list-title"><h3 id="bs-list-title">{copy.slotsFor} <time dateTime={selected}>{date(selected)}</time></h3>{!daySlots.length?<p className="bs-empty" role="status">{copy.empty}</p>:<div className="bs-table-container"><table role="table"><caption className="bs-sr-only">{copy.slotsFor} {date(selected)}</caption><thead role="rowgroup"><tr role="row">{headings.map(key=><th scope="col" role="columnheader" id={`bs-column-${key}`} key={key}>{copy[key]}</th>)}</tr></thead><tbody role="rowgroup">{daySlots.map(slot=>{const count=slot.booked??occupancy(slot.id,data.appointments),status=slotStatus(slot,data.appointments);return <tr role="row" key={slot.id} data-slot={slot.id}>
         {cell('time',<bdi>{time(slot.startTime)} – {time(slot.endTime)}</bdi>)}{cell('capacity',number(slot.capacity))}{cell('booked',<div className="bs-occupancy"><span>{number(count)} / {number(slot.capacity)}</span><div role="meter" aria-label={copy.occupancy} aria-valuemin={0} aria-valuemax={slot.capacity} aria-valuenow={count}><span style={{inlineSize:`${count/slot.capacity*100}%`}}/></div></div>)}{cell('available',number(available(slot,data.appointments)))}{cell('status',<span className={`bs-badge bs-${status}`}>{copy[status==='available'?'availableStatus':status]}</span>)}{cell('actions',<div className="bs-actions"><button type="button" disabled={busy} aria-label={`${copy.edit}: ${time(slot.startTime)}`} onClick={()=>{setBusy(false);setDialog({kind:'edit',slot})}}><Pencil size={13} aria-hidden="true"/>{copy.edit}</button><button type="button" disabled={busy} aria-label={`${slot.active?copy.deactivate:copy.activate}: ${time(slot.startTime)}`} onClick={()=>toggle(slot)}><Power size={13} aria-hidden="true"/>{slot.active?copy.deactivate:copy.activate}</button></div>)}
       </tr>})}</tbody></table></div>}</section></div>
       <section className="bs-panel bs-create" ref={createPanel}><h3>{copy.create}</h3><BookingSlotForm key={selected} date={selected} data={data} service={service} copy={copy} onBusyChange={setBusy} onSaved={record=>saved(record,'created')}/></section>

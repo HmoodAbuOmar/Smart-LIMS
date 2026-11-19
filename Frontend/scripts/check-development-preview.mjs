@@ -58,7 +58,7 @@ try {
   await send('Page.enable')
   await send('Network.enable')
   const waitFor=async expression=>{for(let i=0;i<200;i++){if(await evaluate(expression))return;await delay(75)}assert.fail('UI timeout: '+expression)}
-  const routes={signup:'#/signup','verify-email':'#/verify-email',login:'#/login','patient-file':'#/onboarding/file','create-file':'#/onboarding/file/new','link-file':'#/onboarding/file/link',dashboard:'#/onboarding/dashboard'}
+  const routes={signup:'#/signup?preview=1','verify-email':'#/verify-email?preview=1',login:'#/login?preview=1','patient-file':'#/onboarding/file','create-file':'#/onboarding/file/new','link-file':'#/onboarding/file/link',dashboard:'#/onboarding/dashboard'}
   const step=async value=>{await waitFor(`document.querySelector('[data-walkthrough-step]')?.dataset.walkthroughStep===${JSON.stringify(value)}`);assert.equal(await evaluate('location.hash'),routes[value])}
   const click=async(selector,index=0)=>{
     const point=await evaluate(`(()=>{const el=[...document.querySelectorAll(${JSON.stringify(selector)})].filter(el=>el.getClientRects().length)[${index}];if(!el)throw Error('Visible control missing');el.scrollIntoView({block:'center',behavior:'instant'});const b=el.getBoundingClientRect();const hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(!el.contains(hit))throw Error('Control is blocked');return {x:b.left+b.width/2,y:b.top+b.height/2}})()`)
@@ -85,7 +85,8 @@ try {
   await waitFor("!!document.querySelector('.tech-hero')")
   for(const language of ['en','ar']){
     await click('.language-switcher__segment',language==='ar'?0:1)
-    await click('.nav-cta');await step('signup');await inspect(language,'signup')
+    await click('.nav-cta');await waitFor("location.hash==='#/signup' && !!document.querySelector('.registration-form')")
+    await evaluate(`location.hash=${JSON.stringify(routes.signup)}`);await step('signup');await inspect(language,'signup')
     assert.ok(await evaluate("!document.querySelector('a[href*=__walkthrough]')"),'No testing links needed')
     await submit();assert.equal(await evaluate("document.querySelectorAll('[aria-invalid=true]').length"),4)
     await fill(account);await submit();await step('verify-email');await inspect(language,'verify-email')
@@ -138,18 +139,19 @@ try {
       if(screen==='verify-email'){await click('.walkthrough-verification-navigation button.auth-switch');await step('signup')}
       if(screen==='dashboard'){await click('.portal-onboarding-back');await step('patient-file')}
     }
-    await evaluate("location.hash='#/signup'");await step('signup')
+    await evaluate("location.hash='#/signup?preview=1'");await step('signup')
     await click('.auth-brand-tools > a');await waitFor("!!document.querySelector('.tech-hero')")
     assert.equal(await evaluate("document.querySelectorAll('[data-walkthrough-step]').length"),0)
   }
   // Independent security regression checks, not walkthrough navigation.
-  await evaluate("location.hash='#/login'");await step('login')
+  await evaluate(`location.hash=${JSON.stringify(routes.login)}`);await step('login')
   await fill({email:account.email,password:account.password});await submit();await step('patient-file')
   await click('.auth-form-panel a.auth-switch');await step('login')
   await click('.auth-tabs a[href="#/signup"]');await step('signup')
-  assert.equal(await evaluate('location.hash'),'#/signup','Tabs use normal application routes')
-  await evaluate("location.hash='#/patient/file'");await waitFor("!!document.querySelector('[role=alert]')")
-  assert.equal(await evaluate("document.querySelectorAll('input,table,.workflow-choices').length"),0)
+  assert.equal(await evaluate('location.hash'),routes.signup,'Tabs stay in the walkthrough')
+  await evaluate("location.hash='#/patient/file'")
+  await waitFor("location.hash==='#/login' && !!document.querySelector('#auth-email')")
+  assert.equal(await evaluate("document.querySelectorAll('table,.workflow-choices,[data-walkthrough-step]').length"),0)
   assert.ok(await evaluate("Object.keys(localStorage).every(k=>k==='smart-lims.language') && Object.keys(sessionStorage).every(k=>k==='smart-lims.dev-portal.v1')"))
   assert.ok(!requests.some(request=>request.method==='POST'))
   await evaluate("location.hash='#/verify-email?token=invalid-link-for-testing'")

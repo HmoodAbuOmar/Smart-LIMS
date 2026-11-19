@@ -15,9 +15,10 @@ export default function AdminCharts({ daily, summary, copy, number, date, local,
     return `C ${middle} ${previous.y}, ${middle} ${point.y}, ${point.x} ${point.y}`
   }).join(' ')
   const colors = ['#083f3d', '#12645f', '#426b67', '#77b4a7', '#a9d3c7', '#d9eee9']
-  const segments = summary.testDistribution.map((test, index, tests) => ({ ...test, color: colors[index],
-    percent: summary.total ? test.count / summary.total * 100 : 0,
-    offset: summary.total ? tests.slice(0, index).reduce((sum, value) => sum + value.count, 0) / summary.total * 100 : 0,
+  const totalTests = summary.totalTests ?? summary.total
+  const segments = summary.testDistribution.map((test, index, tests) => ({ ...test, color: colors[index % colors.length],
+    percent: totalTests ? test.count / totalTests * 100 : 0,
+    offset: totalTests ? tests.slice(0, index).reduce((sum, value) => sum + value.count, 0) / totalTests * 100 : 0,
   }))
   return <section className="admin-overview-charts" aria-label={copy.activity}>
     <article className="admin-overview-panel admin-activity-panel">
@@ -54,11 +55,11 @@ export default function AdminCharts({ daily, summary, copy, number, date, local,
     </article>
     <article className="admin-overview-panel admin-distribution-panel">
       <div className="admin-overview-panel-heading"><div><h3>{copy.distribution}</h3><p>{copy.distributionNote}</p></div></div>
-      <div className="admin-distribution-content"><div className="admin-test-donut" role="img" aria-label={`${copy.distribution}: ${number(summary.total)} ${copy.tests}`}>
+      <div className="admin-distribution-content"><div className="admin-test-donut" role="img" aria-label={`${copy.distribution}: ${number(totalTests)} ${copy.tests}`}>
         <svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="60" fill="none" stroke="#edf6f3" strokeWidth="20" />
           {segments.map(segment => <circle className="admin-donut-segment" key={segment.id} cx="80" cy="80" r="60" pathLength="100" fill="none" stroke={segment.color} strokeWidth="20" strokeDasharray={`${Math.max(0, segment.percent - .8)} ${100 - Math.max(0, segment.percent - .8)}`} strokeDashoffset={-segment.offset} transform="rotate(-90 80 80)" />)}
         </svg>
-        <div><strong>{number(summary.total)}</strong><span>{copy.tests}</span></div>
+        <div><strong>{number(totalTests)}</strong><span>{copy.tests}</span></div>
       </div>
       <ul className="admin-test-legend">{segments.map(segment => <li key={segment.id}><span className="admin-test-swatch" style={{ backgroundColor: segment.color }} aria-hidden="true" /><span>{local(segment.name)}</span><strong>{number(segment.count)}</strong><small>{number(Math.round(segment.percent))}%</small></li>)}</ul>
       </div>

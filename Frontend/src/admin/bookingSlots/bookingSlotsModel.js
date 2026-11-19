@@ -37,11 +37,11 @@ export function schedulingInstant(date,time) {
   return candidates.size?Math.min(...candidates):null
 }
 export const occupancy = (slotId, appointments) => appointments.filter(item => item.slotId === slotId && ['BOOKED','CHECKED_IN'].includes(item.status)).length
-export const available = (slot, appointments) => slot.capacity - occupancy(slot.id, appointments)
+export const available = (slot, appointments) => slot.capacity - (slot.booked ?? occupancy(slot.id, appointments))
 export const slotStatus = (slot, appointments) => !slot.active ? 'inactive' : available(slot, appointments) === 0 ? 'full' : 'available'
 export const overlap = (a,b) => a.date === b.date && a.startTime < b.endTime && b.startTime < a.endTime
 export function validateSlot(values, slots, appointments, original, now = new Date()) {
-  const errors = {}, count = original ? occupancy(original.id, appointments) : 0
+  const errors = {}, count = original ? original.booked ?? occupancy(original.id, appointments) : 0
   if (!validDate(values.date || '')) errors.date = 'date'
   if (!validTime(values.startTime || '')) errors.startTime = 'time'
   if (!validTime(values.endTime || '')) errors.endTime = 'time'

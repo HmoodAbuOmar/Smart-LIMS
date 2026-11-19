@@ -5,12 +5,13 @@ export function numericResult(value) {
 }
 export function resultFlag(row) {
   if (row.flag === 'critical') return row.criticalVerified === true ? 'critical' : 'unclassified'
-  if (['normal', 'high', 'low'].includes(row.flag)) return row.flag
+  if (['normal', 'high', 'low', 'abnormal'].includes(row.flag)) return row.flag
   const value = numericResult(row.value), range = row.reference
   if (value === null || !range || range.unit !== row.unit || !Number.isFinite(range.low) || !Number.isFinite(range.high) || range.low > range.high) return 'unclassified'
   return value < range.low ? 'low' : value > range.high ? 'high' : 'normal'
 }
 export function medicalVisits(state, now = new Date()) {
+  if (Array.isArray(state.visits)) return state.visits
   const patientId = state.profile.fileNumber
   const owned = record => typeof patientId === 'string' && patientId.length > 0 && record.patientId === patientId
   return state.appointments.flatMap(appointment => {

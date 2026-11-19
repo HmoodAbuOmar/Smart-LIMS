@@ -6,7 +6,11 @@ Smart-LIMS is a React 19 / Vite 8 frontend for laboratory patients. It includes 
 
 The UI, routing, validation, and isolated development interactions are implemented. Real authentication, email delivery/verification, patient medical files, authorized patient records, booking persistence, report retrieval, and payment processing still require backend/provider integration.
 
-`src/services/serviceTransport.js` and the methods in `src/services/portalApi.js` currently reject with `SERVICE_UNAVAILABLE`; no HTTP transport is configured there. Production does not substitute fixtures or claim successful accounts, verification, bookings, or payments after failed operations. This describes frontend code, not backend service or deployment availability.
+Sign in at `/#/login`. Vite dev and preview proxy same-origin `/api` requests to `http://127.0.0.1:8080` by default. If Smart-LIMS starts on another port, set the server-side `SMARTLIMS_API_TARGET` to its origin before starting Vite. Keep using the same frontend hostname (either `localhost` or `127.0.0.1`) for the entire cookie session. A deployed frontend needs an equivalent same-origin `/api` reverse proxy. The browser manages the HttpOnly session cookie and the frontend reads the current CSRF cookie for login and logout.
+
+Staff with the ADMIN role open the Admin workspace at `/#/admin`. It reads Smart-LIMS data through `src/admin/adminLiveApi.js` and labels unsupported features as unavailable. The development Admin preview has its own route and fixtures.
+
+Patient routes check verification and linkage before loading owned records. The Patient portal uses live profile, catalog, order, appointment, notification, result, PDF, archive and trend APIs. Online payments and verification email resend/status remain unavailable. Receptionist workspace data remain unavailable.
 
 See [API requirements](PATIENT_API_REQUIREMENTS.md), the [authentication module](src/auth/README.md), and [hosted payment integration](HOSTED_PAYMENT_INTEGRATION.md).
 

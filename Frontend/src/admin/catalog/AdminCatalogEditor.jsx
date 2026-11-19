@@ -33,7 +33,7 @@ export default function AdminCatalogEditor({ kind, record, test, parameter, data
     return () => { mounted.current = false; if (modal) { element.close(); document.body.style.overflow = previousOverflow; if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }) } onDirtyChange?.(false); onBusyChange?.(false) }
   }, [modal, onDirtyChange, onBusyChange])
   function close() { if (!busy.current) onClose() }
-  function update(field, value) { setValues(current => ({ ...current, [field]: value })); setErrors(current => ({ ...current, [field]: undefined, _form: undefined })); setFailed(false); setConfirm(false) }
+  function update(field, value) { setValues(current => ({ ...current, [field]: value, ...(service.live && /(?:En|Ar)$/.test(field) ? { [field.slice(0, -2) + (field.endsWith('En') ? 'Ar' : 'En')]: value } : {}) })); setErrors(current => ({ ...current, [field]: undefined, _form: undefined })); setFailed(false); setConfirm(false) }
   async function submit(event, confirmed = false) {
     event.preventDefault()
     if (busy.current) return
@@ -49,7 +49,7 @@ export default function AdminCatalogEditor({ kind, record, test, parameter, data
     if (kind === 'test' && record?.active && !values.active && !confirmed) { setConfirm(true); return }
     busy.current = true; setSaving(true); setFailed(false)
     try {
-      const saved = kind === 'test' ? await service.saveTest(values, record?.id) : kind === 'parameter' ? await service.saveParameter(values, test.id, record?.id) : kind === 'range' ? await service.saveRange(values, parameter.id) : kind === 'close' ? await service.closeRange(record.id, values.validTo) : await service.setTestActive(record.id, false)
+      const saved = kind === 'test' ? await service.saveTest(values, record?.id) : kind === 'parameter' ? await service.saveParameter(values, test.id, record?.id) : kind === 'range' ? await service.saveRange(values, parameter.id, test.id) : kind === 'close' ? await service.closeRange(record.id, values.validTo) : await service.setTestActive(record.id, false)
       if (mounted.current) onSaved(saved)
     } catch (error) { if (mounted.current) { if (error.code === 'VALIDATION') setErrors(error.fields); else setFailed(true) } }
     finally { busy.current = false; if (mounted.current) setSaving(false) }

@@ -24,10 +24,11 @@ export function portalReducer(state, action) {
   if (action.type.startsWith('CHECKOUT_')) return reduceCheckout(state, action)
   if (checkoutDraft(state).stage === 'processing' && ['ADD', 'REMOVE', 'ORDER'].includes(action.type)) return state
   switch (action.type) {
+    case 'SERVER_ACTIVITY': return { ...state, ...action.activity }
     case 'SERVER_RECORD': {
       const records = state[action.collection]
       if (!Array.isArray(records) || !action.record?.id) return state
-      return { ...state, [action.collection]: [action.record, ...records.filter(record => record.id !== action.record.id)], ...(action.collection === 'orders' ? { cart: [] } : {}) }
+      return { ...state, [action.collection]: [action.record, ...records.filter(record => record.id !== action.record.id)], ...(action.clearCart !== false && action.collection === 'orders' ? { cart: [] } : {}) }
     }
     case 'ADD': return state.tests.some(t => t.id === action.id) && !state.cart.includes(action.id) ? { ...state, cart: [...state.cart, action.id], checkout: { ...(checkoutDraft(state).stage === 'complete' ? checkoutDraft({}) : checkoutDraft(state)), stage: 'editing', requestId: null } } : state
     case 'REMOVE': return { ...state, cart: state.cart.filter(id => id !== action.id), checkout: { ...checkoutDraft(state), stage: 'editing', requestId: null } }

@@ -22,5 +22,5 @@ export default function ReportDownload({ result, compact = false }) {
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch { setNotice('pdfError') } finally { setBusy(false) }
   }
-  return <Button secondary onClick={download} disabled={result.status !== 'published' || busy} aria-label={t('downloadPdf')}><Download size={15} />{t(busy ? 'downloading' : compact ? 'download' : 'downloadPdf')}</Button>
+  return <Button secondary onClick={download} disabled={result.status !== 'published' || result.canDownloadReport === false || busy} aria-label={t('downloadPdf')}><Download size={15} />{t(busy ? 'downloading' : compact ? 'download' : 'downloadPdf')}</Button>
 }

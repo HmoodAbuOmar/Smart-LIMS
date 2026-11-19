@@ -78,17 +78,18 @@ function UserActions({ user, name, copy, onEdit, onToggleBlock, onDelete }) {
   </span>
 }
 
-export default function AdminUsers({ language }) {
+export default function AdminUsers({ language, service }) {
   const copy = adminUsersCopy[language]
   const rtl = language === 'ar'
   const local = useCallback(value => Array.isArray(value) ? value[rtl ? 1 : 0] : value, [rtl])
   const number = value => new Intl.NumberFormat(language).format(value)
   const dateFormatter = useMemo(() => new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }), [language])
-  const [users, setUsers] = useState(() => adminUsersData.map(user => ({ ...user })))
+  const [users, setUsers] = useState(() => service ? [] : adminUsersData.map(user => ({ ...user })))
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [dateFilter, setDateFilter] = useState('30')
+  const [dateFilter, setDateFilter] = useState(service ? 'all' : '30')
+  const [previewNow, setPreviewNow] = useState(Date.now)
   const [pageSize, setPageSize] = useState(7)
   const [sort, setSort] = useState({ key: 'name', direction: 'asc' })
   const [page, setPage] = useState(1)
@@ -97,12 +98,36 @@ export default function AdminUsers({ language }) {
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('PATIENT')
+  const [inviteUsername, setInviteUsername] = useState('')
+  const [invitePhone, setInvitePhone] = useState('')
   const [editRole, setEditRole] = useState('PATIENT')
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
   const dialog = useRef(null)
   const selectAllRef = useRef(null)
   const nextId = useRef(1008)
+  const lock = useRef(false)
+  const [result, setResult] = useState(null)
+  const [loadError, setLoadError] = useState(false)
+  const [revision, setRevision] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const words = rtl
+    ? { username: 'اسم المستخدم', phone: 'رقم الهاتف', created: 'تاريخ إنشاء الحساب', pending: 'بانتظار التحقق', loading: 'جارٍ التحميل…', failed: 'تعذّر تحميل الحسابات.', retry: 'إعادة المحاولة', saved: 'تم حفظ التغيير.', invited: 'أُرسلت الدعوة.', error: 'تعذّر حفظ التغيير.' }
+    : { username: 'Username', phone: 'Phone number', created: 'Account creation date', pending: 'Pending verification', loading: 'Loading…', failed: 'Accounts could not be loaded.', retry: 'Retry', saved: 'Change saved.', invited: 'Invitation sent.', error: 'The change could not be saved.' }
+  const statuses = { ...copy.statuses, PENDING_VERIFICATION: words.pending }
+  useEffect(() => {
+    if (!service) return
+    let active = true
+    service.load({
+      page: page - 1, size: pageSize, search: query.trim(), role: roleFilter, status: statusFilter,
+      sort: `${{ name: 'fullName', lastLogin: 'lastLoginAt' }[sort.key] || sort.key},${sort.direction}`, recent: dateFilter === '30',
+    }).then(data => {
+      if (!active) return
+      if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return }
+      setResult(data); setLoadError(false)
+    }, () => { if (active) { setResult(null); setLoadError(true) } })
+    return () => { active = false }
+  }, [service, page, pageSize, query, roleFilter, statusFilter, sort, dateFilter, revision])
 
   useEffect(() => {
     const element = dialog.current
@@ -118,7 +143,7 @@ export default function AdminUsers({ language }) {
       return (!needle || text.includes(needle)) &&
         (roleFilter === 'all' || user.role === roleFilter) &&
         (statusFilter === 'all' || user.status === statusFilter) &&
-        (dateFilter === 'all' || (user.lastLogin && Date.now() - new Date(user.lastLogin).getTime() <= 30 * 24 * 60 * 60 * 1000))
+        (dateFilter === 'all' || (user.lastLogin && previewNow - new Date(user.lastLogin).getTime() <= 30 * 24 * 60 * 60 * 1000))
     }).sort((left, right) => {
       const a = sort.key === 'name' ? local(left.name) : sort.key === 'email' ? left.email :
         sort.key === 'role' ? copy.roles[left.role] : sort.key === 'status' ? copy.statuses[left.status] : (left.lastLogin || '')
@@ -126,15 +151,16 @@ export default function AdminUsers({ language }) {
         sort.key === 'role' ? copy.roles[right.role] : sort.key === 'status' ? copy.statuses[right.status] : (right.lastLogin || '')
       return a.localeCompare(b, language) * (sort.direction === 'asc' ? 1 : -1)
     })
-  }, [users, query, roleFilter, statusFilter, dateFilter, sort, copy, language, local])
+  }, [users, query, roleFilter, statusFilter, dateFilter, previewNow, sort, copy, language, local])
 
-  const pageCount = Math.max(1, Math.ceil(visibleUsers.length / pageSize))
+  const totalUsers = service ? result?.totalElements ?? 0 : visibleUsers.length
+  const pageCount = Math.max(1, Math.ceil(totalUsers / pageSize))
   const currentPage = Math.min(page, pageCount)
-  const pageUsers = visibleUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const pageUsers = service ? result?.content ?? [] : visibleUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const allPageSelected = pageUsers.length > 0 && pageUsers.every(user => selectedIds.has(user.id))
   const somePageSelected = pageUsers.some(user => selectedIds.has(user.id))
-  const firstUser = visibleUsers.length ? (currentPage - 1) * pageSize + 1 : 0
-  const lastUser = Math.min(currentPage * pageSize, visibleUsers.length)
+  const firstUser = totalUsers ? (currentPage - 1) * pageSize + 1 : 0
+  const lastUser = Math.min(currentPage * pageSize, totalUsers)
 
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = somePageSelected && !allPageSelected
@@ -143,7 +169,7 @@ export default function AdminUsers({ language }) {
   function changeQuery(value) { setQuery(value); setPage(1) }
   function changeRole(value) { setRoleFilter(value); setPage(1) }
   function changeStatus(value) { setStatusFilter(value); setPage(1) }
-  function changeDate(value) { setDateFilter(value); setPage(1) }
+  function changeDate(value) { if (!service) setPreviewNow(Date.now()); setDateFilter(value); setPage(1) }
   function changePageSize(value) { setPageSize(value); setPage(1) }
   function toggleSelected(id) {
     setSelectedIds(current => {
@@ -162,10 +188,24 @@ export default function AdminUsers({ language }) {
     })
   }
   function openInvite() {
-    setInviteName(''); setInviteEmail(''); setInviteRole('PATIENT'); setFormError(''); setDialogState({ type: 'invite' })
+    setInviteName(''); setInviteEmail(''); setInviteUsername(''); setInvitePhone(''); setInviteRole('PATIENT'); setFormError(''); setDialogState({ type: 'invite' })
   }
   function openEdit(user) { setEditRole(user.role); setFormError(''); setDialogState({ type: 'edit', user }) }
-  function openDelete(user) { setDialogState({ type: 'delete', user }) }
+  function openDelete(user) { setFormError(''); setDialogState({ type: 'delete', user }) }
+
+  async function saveLive(action, message, inDialog = false) {
+    if (lock.current) return
+    lock.current = true
+    setSaving(true); setFormError(''); setNotice('')
+    try {
+      await action()
+      setRevision(value => value + 1)
+      setSelectedIds(new Set())
+      setDialogState(null)
+      setNotice(message)
+    } catch { if (inDialog) setFormError(words.error); else setNotice(words.error) }
+    finally { lock.current = false; setSaving(false) }
+  }
 
   function submitForm(event) {
     event.preventDefault()
@@ -174,6 +214,10 @@ export default function AdminUsers({ language }) {
       const email = inviteEmail.trim().toLowerCase()
       if (!name) { setFormError(copy.nameRequired); return }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setFormError(copy.emailInvalid); return }
+      if (service) {
+        void saveLive(() => service.invite({ fullName: name, email, userName: inviteUsername.trim(), phoneNumber: invitePhone.trim(), role: inviteRole }), words.invited, true)
+        return
+      }
       if (users.some(user => user.email.toLowerCase() === email)) { setFormError(copy.emailExists); return }
       const newUser = { id: `user-${nextId.current++}`, name: [name, name], email, role: inviteRole, status: 'INVITED', lastLogin: null }
       setUsers(current => [...current, newUser])
@@ -183,6 +227,7 @@ export default function AdminUsers({ language }) {
       return
     }
     if (dialogState?.type === 'edit') {
+      if (service) { void saveLive(() => service.role(dialogState.user.id, editRole), words.saved, true); return }
       setUsers(current => current.map(user => user.id === dialogState.user.id ? { ...user, role: editRole } : user))
       setNotice(copy.roleUpdatedLocal)
       setDialogState(null)
@@ -190,6 +235,7 @@ export default function AdminUsers({ language }) {
   }
 
   function toggleBlock(user) {
+    if (service) { void saveLive(() => service.block(user.id, user.status !== 'BLOCKED'), words.saved); return }
     const status = user.status === 'BLOCKED' ? 'ACTIVE' : 'BLOCKED'
     setUsers(current => current.map(item => item.id === user.id ? { ...item, status } : item))
     setNotice(user.status === 'BLOCKED' ? copy.unblockedLocal : copy.blockedLocal)
@@ -197,6 +243,7 @@ export default function AdminUsers({ language }) {
 
   function confirmDelete() {
     if (!dialogState?.user) return
+    if (service) { void saveLive(() => service.delete(dialogState.user.id), words.saved, true); return }
     setUsers(current => current.filter(user => user.id !== dialogState.user.id))
     setSelectedIds(current => { const next = new Set(current); next.delete(dialogState.user.id); return next })
     setNotice(copy.deletedLocal)
@@ -234,10 +281,10 @@ export default function AdminUsers({ language }) {
         </span>
         <span className="admin-users-filter-wrap"><CheckCircle2 className="admin-users-filter-icon" size={15} aria-hidden="true" />
           <AdminFilterDropdown label={copy.statusFilter} value={statusFilter} onChange={changeStatus}
-            options={[{ value: 'all', label: copy.allStatuses }, ...statusValues.map(value => ({ value, label: copy.statuses[value] }))]} />
+            options={[{ value: 'all', label: copy.allStatuses }, ...(service ? [...statusValues, 'PENDING_VERIFICATION'] : statusValues).map(value => ({ value, label: statuses[value] }))]} />
         </span>
         <span className="admin-users-filter-wrap"><CalendarDays className="admin-users-filter-icon" size={15} aria-hidden="true" />
-          <AdminFilterDropdown label={copy.lastLoginFilter} value={dateFilter} onChange={changeDate}
+          <AdminFilterDropdown label={service ? words.created : copy.lastLoginFilter} value={dateFilter} onChange={changeDate}
             options={[{ value: '30', label: copy.last30Days }, { value: 'all', label: copy.allTime }]} />
         </span>
       </div>
@@ -263,17 +310,18 @@ export default function AdminUsers({ language }) {
               <td className="admin-users-select-cell"><input type="checkbox" checked={selectedIds.has(user.id)} onChange={() => toggleSelected(user.id)} aria-label={copy.selectUser(name)} /></td>
               <th scope="row"><span className="admin-users-person"><span className="admin-users-avatar" aria-hidden="true">{initials}</span><span className="admin-users-person-copy"><span className="admin-users-name">{name}</span><bdi>{user.email}</bdi></span></span></th>
               <td><span className={`admin-users-role admin-users-role-${user.role.toLowerCase()}`}><RoleIcon size={13} aria-hidden="true" />{copy.roles[user.role]}</span></td>
-              <td><span className={`admin-users-status admin-users-status-${user.status.toLowerCase()}`}><span aria-hidden="true" />{copy.statuses[user.status]}</span></td>
+              <td><span className={`admin-users-status admin-users-status-${user.status.toLowerCase()}`}><span aria-hidden="true" />{statuses[user.status]}</span></td>
               <td className="admin-users-last-login">{user.lastLogin ? <span><CalendarDays size={14} aria-hidden="true" /><time dateTime={user.lastLogin}>{dateFormatter.format(new Date(user.lastLogin))}</time></span> : copy.never}</td>
               <td className="admin-users-actions-cell"><UserActions user={user} name={name} copy={copy} onEdit={() => openEdit(user)}
                 onToggleBlock={() => toggleBlock(user)} onDelete={() => openDelete(user)} /></td>
             </tr>
           })}</tbody>
         </table>
-        {!pageUsers.length && <p className="admin-users-empty" role="status">{copy.noResults}</p>}
+        {service && loadError ? <div className="admin-users-empty" role="alert">{words.failed} <button type="button" onClick={() => { setLoadError(false); setRevision(value => value + 1) }}>{words.retry}</button></div>
+          : !pageUsers.length && <p className="admin-users-empty" role="status">{service && !result ? words.loading : copy.noResults}</p>}
       </div>
       <div className="admin-users-footer">
-        <p aria-live="polite">{copy.showing} {number(firstUser)}–{number(lastUser)} {copy.of} {number(visibleUsers.length)} {copy.users}</p>
+        <p aria-live="polite">{copy.showing} {number(firstUser)}–{number(lastUser)} {copy.of} {number(totalUsers)} {copy.users}</p>
         <div className="admin-users-page-size"><span>{copy.rowsPerPage}</span><AdminFilterDropdown label={copy.rowsPerPage} value={pageSize} onChange={changePageSize}
           options={pageSizeOptions.map(value => ({ value, label: number(value) }))} /></div>
         <nav className="admin-users-pagination" aria-label={copy.title}>
@@ -296,12 +344,14 @@ export default function AdminUsers({ language }) {
       </div>
       {dialogState?.type === 'delete' ? <div className="admin-users-delete-content">
         <p>{copy.deletePrompt(local(dialogState.user.name))}</p>
+        {formError && <p className="admin-users-form-error" role="alert">{formError}</p>}
         <div className="admin-users-dialog-actions"><button type="button" className="admin-users-secondary" onClick={() => setDialogState(null)}>{copy.cancel}</button>
-          <button type="button" className="admin-users-danger" onClick={confirmDelete}>{copy.confirmDelete}</button></div>
+          <button type="button" className="admin-users-danger" disabled={saving} onClick={confirmDelete}>{copy.confirmDelete}</button></div>
       </div> : dialogState && <form className="admin-users-form" onSubmit={submitForm} noValidate>
         {dialogState?.type === 'invite' ? <>
           <label>{copy.fullName}<input autoFocus type="text" autoComplete="name" value={inviteName} onChange={event => { setInviteName(event.target.value); setFormError('') }} placeholder={copy.namePlaceholder} /></label>
           <label>{copy.email}<input type="email" autoComplete="email" dir="ltr" value={inviteEmail} onChange={event => { setInviteEmail(event.target.value); setFormError('') }} placeholder={copy.emailPlaceholder} /></label>
+          {service && <><label>{words.username}<input value={inviteUsername} onChange={event => setInviteUsername(event.target.value)} /></label><label>{words.phone}<input type="tel" dir="ltr" value={invitePhone} onChange={event => setInvitePhone(event.target.value)} /></label></>}
           <label>{copy.role}<select value={inviteRole} onChange={event => setInviteRole(event.target.value)}>
             {roleValues.map(value => <option key={value} value={value}>{copy.roles[value]}</option>)}
           </select></label>
@@ -314,7 +364,7 @@ export default function AdminUsers({ language }) {
         </>}
         {formError && <p className="admin-users-form-error" role="alert">{formError}</p>}
         <div className="admin-users-dialog-actions"><button type="button" className="admin-users-secondary" onClick={() => setDialogState(null)}>{copy.cancel}</button>
-          <button type="submit" className="admin-users-primary">{dialogState?.type === 'invite' ? copy.sendInvitation : copy.saveChanges}</button></div>
+          <button type="submit" className="admin-users-primary" disabled={saving}>{dialogState?.type === 'invite' ? copy.sendInvitation : copy.saveChanges}</button></div>
       </form>}
     </dialog>
   </section>

@@ -22,6 +22,7 @@ import Review from './booking/ReviewOrder.jsx'
 import Orders from './pages/MyOrders.jsx'
 import OrderDetails from './pages/OrderDetails.jsx'
 import Booking from './booking/AppointmentReschedule.jsx'
+import PatientAppointmentForm from './booking/PatientAppointmentForm.jsx'
 import Appointments from './booking/MyAppointments.jsx'
 import Results from './pages/MyResults.jsx'
 import Report from './pages/LabResultReport.jsx'
@@ -46,6 +47,7 @@ export default function PatientPortal({ initialData, development = false, route 
   const [busy, setBusy] = useState(false)
   const [transactionBusy, setTransactionBusy] = useState(false)
   const bookingLock = useRef(false)
+  const mutationLock = useRef(false)
   const accountRef = useRef(null)
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const local = value => Array.isArray(value) ? value[language === 'ar' ? 1 : 0] : value
@@ -53,7 +55,10 @@ export default function PatientPortal({ initialData, development = false, route 
   const money = value => <bdi dir="ltr">{formatCurrency(value, language)}</bdi>
   const number = value => new Intl.NumberFormat(language).format(value)
   const datetime = value => new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-  const name = patientDisplayName(language === 'ar' && state.profile.nameAr ? state.profile.nameAr : state.profile.name, t('samplePatient')) || t('samplePatient')
+  const profileName = state.profile.name
+  const name = development
+    ? patientDisplayName(language === 'ar' && state.profile.nameAr ? state.profile.nameAr : profileName, t('samplePatient')) || t('samplePatient')
+    : profileName?.trim() ? profileName : t('samplePatient')
   const navigate = path => { if (bookingLock.current) return; setMobileOpen(false); setAccountOpen(false); setNotice(''); onNavigate(path) }
   const [path, query = ''] = route.split('?'), [page = 'dashboard', id] = path.split('/')
   useEffect(() => { document.title = 'Smart-LIMS | Patient Portal'; document.querySelector('.portal-page-title')?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }) }, [route, t, page])
@@ -77,26 +82,36 @@ export default function PatientPortal({ initialData, development = false, route 
       if (message) setNotice(message)
       return true
     }
+    if (mutationLock.current) return false
+    mutationLock.current = true
     setBusy(true)
     try {
-      const operations = { PROFILE: 'saveProfile', ORDER: 'createOrder', APPOINTMENT: action.existing ? 'rescheduleAppointment' : 'bookAppointment', CANCEL: 'cancelAppointment' }
+      const operations = { PROFILE: 'saveProfile', ORDER: 'createOrder', CANCEL_ORDER: 'cancelOrder', APPOINTMENT: action.existing ? 'rescheduleAppointment' : 'bookAppointment', CANCEL: 'cancelAppointment', READ: 'readNotifications' }
       const operation = operations[action.type]
       if (!operation) throw new Error('Unsupported operation')
-      const response = await portalApi[operation](action)
+      const response = await portalApi[operation](action, state.profile)
       if (response?.confirmed !== true) throw new Error('Operation was not confirmed')
       if (action.type === 'PROFILE') {
         if (!response.profile || response.profile.fileNumber !== state.profile.fileNumber) throw new Error('Profile was not confirmed')
         dispatch({ type: 'PROFILE', profile: response.profile })
+      } else if (action.type === 'READ') {
+        dispatch(action)
       } else {
-        const collection = action.type === 'ORDER' ? 'orders' : 'appointments'
-        const record = action.type === 'ORDER' ? response.order : response.appointment
+        const isOrder = action.type === 'ORDER' || action.type === 'CANCEL_ORDER'
+        const collection = isOrder ? 'orders' : 'appointments'
+        const record = isOrder ? response.order : response.appointment
         if (!record?.id || isInternalRecord(record) || record.patientId !== state.profile.fileNumber) throw new Error('Record was not confirmed')
-        dispatch({ type: 'SERVER_RECORD', collection, record: { ...record, source: 'server' } })
+        dispatch({ type: 'SERVER_RECORD', collection, clearCart: action.type === 'ORDER', record: { ...record, source: 'server' } })
+        const activity = await portalApi.activity().catch(() => null)
+        if (activity) dispatch({ type: 'SERVER_ACTIVITY', activity })
       }
       if (message) setNotice(message)
       return response
-    } catch { setNotice('operationPending'); return false }
-    finally { setBusy(false) }
+    } catch (error) {
+      setNotice(['APPOINTMENT_SLOT_UNAVAILABLE', 'APPOINTMENT_CHANGED', 'ORDER_NOT_BOOKABLE'].includes(error.code) ? 'bookingConflict' : 'operationPending')
+      return false
+    }
+    finally { mutationLock.current = false; setBusy(false) }
   }
   async function finishBooking(options = {}) {
     const draft = checkoutDraft(state)
@@ -121,7 +136,7 @@ export default function PatientPortal({ initialData, development = false, route 
       return { ok: false, pending: true }
     } finally { bookingLock.current = false; setTransactionBusy(false) }
   }
-  function addAndBook(id) { if (!bookingLock.current) { dispatch({ type: 'ADD', id }); navigate('book') } }
+  function addAndBook(id) { if (!bookingLock.current) { dispatch({ type: 'ADD', id }); navigate(development ? 'book' : 'review') } }
   const value = { state, dispatch, development, t, local, date, money, number, name, navigate, commit, notice, setNotice, busy: busy || transactionBusy, language, datetime, finishBooking, addAndBook }
   const bookingUi = { Title, Button, Empty, Field, CalendarPicker }
   const historyUi = { Title, Button, Empty, Field, Status, FilterTabs, ReportDownload }
@@ -143,7 +158,7 @@ export default function PatientPortal({ initialData, development = false, route 
       <main id="portal-content" className="portal-main">
         <nav className="portal-breadcrumb" aria-label={t('home')}>{onBack && page === 'dashboard' && <><button className="portal-onboarding-back" onClick={onBack}>{t('back')}</button><span>·</span></>}<button onClick={() => navigate('dashboard')}>{t('home')}</button><span>/</span><span>{t(rootPage === 'tests' && id ? 'test' : rootPage === 'results' && id ? 'resultReport' : page === 'review' ? 'reviewTitle' : page === 'book' ? 'bookTitle' : page === 'payment' ? 'payment' : page === 'booking-confirmation' ? 'bookingConfirmation' : rootPage)}</span></nav>
         {notice && <div className={`portal-notice ${notice === 'unavailable' || notice === 'pdfError' ? 'is-error' : ''}`} role="status">{t(notice)}<button aria-label={t('close')} onClick={() => setNotice('')}><X size={16} /></button></div>}
-        {page === 'dashboard' ? <Dashboard /> : page === 'profile' ? <Profile /> : page === 'tests' && id ? <TestDetails id={id} /> : page === 'tests' ? <Catalog key={query} query={query} /> : page === 'review' ? <Review /> : page === 'orders' && id ? <OrderDetails id={id} /> : page === 'orders' ? <Orders /> : page === 'book' ? (new URLSearchParams(query).has('reschedule') ? <Booking key={query} query={query} /> : <BookingCheckout api={value} ui={bookingUi} query={query} />) : page === 'payment' ? <PaymentMethod api={value} ui={bookingUi} /> : page === 'booking-confirmation' ? <BookingReceipt api={value} ui={bookingUi} id={id} /> : page === 'appointments' && id ? <BookingReceipt api={value} ui={bookingUi} id={id} details /> : page === 'appointments' ? <Appointments /> : page === 'results' && id ? <Report id={id} /> : page === 'results' ? <Results /> : page === 'history' ? <MedicalHistory key={id || 'archive'} api={value} ui={historyUi} visitId={id} query={query} /> : page === 'notifications' ? <Notifications /> : <Empty title="notFound" action="backDashboard" onClick={() => navigate('dashboard')} />}
+        {page === 'dashboard' ? <Dashboard /> : page === 'profile' ? <Profile /> : page === 'tests' && id ? <TestDetails id={id} /> : page === 'tests' ? <Catalog key={query} query={query} /> : page === 'review' ? <Review /> : page === 'orders' && id ? <OrderDetails id={id} /> : page === 'orders' ? <Orders /> : page === 'book' && !development ? <PatientAppointmentForm key={query} query={query} /> : page === 'book' ? (new URLSearchParams(query).has('reschedule') ? <Booking key={query} query={query} /> : <BookingCheckout api={value} ui={bookingUi} query={query} />) : page === 'payment' && !development ? <Empty title="patientPaymentsUnavailable" action="appointments" onClick={() => navigate('appointments')} /> : page === 'payment' ? <PaymentMethod api={value} ui={bookingUi} /> : page === 'booking-confirmation' ? <BookingReceipt api={value} ui={bookingUi} id={id} /> : page === 'appointments' && id ? <BookingReceipt api={value} ui={bookingUi} id={id} details /> : page === 'appointments' ? <Appointments /> : page === 'results' && id ? <Report id={id} /> : page === 'results' ? <Results /> : page === 'history' ? <MedicalHistory key={id || 'archive'} api={value} ui={historyUi} visitId={id} query={query} /> : page === 'notifications' ? <Notifications /> : <Empty title="notFound" action="backDashboard" onClick={() => navigate('dashboard')} />}
       </main>
     </div>
   </div></Portal.Provider>
