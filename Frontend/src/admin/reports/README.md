@@ -29,4 +29,4 @@ node src/admin/reports/check-reports-browser.mjs
 
 Browser verification uses installed Chrome (or `CHROME_PATH`), a temporary Vite server and browser profile, and writes screenshots and print PDFs outside the repository. The server/browser close when the check finishes.
 
-Commit scope: this folder, and only Reports import/render/title recognition in `AdminLayout.jsx`, header title recognition in `AdminNavbar.jsx`, and the `reports` development-page allowlist entry in `DevelopmentAdmin.jsx`.
+Commit scope: this folder, and only Reports import/render/title recognition in `AdminLayout.jsx`, header title recognition in `AdminNavbar.jsx`, and the `reports` development-page allowlist entry in `AdminPreview.jsx`.

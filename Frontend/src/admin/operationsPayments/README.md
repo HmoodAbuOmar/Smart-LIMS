@@ -53,4 +53,4 @@ the screenshot directory. CHROME_PATH can override the Chrome executable.
 Commit scope: this folder, plus the import/render/document-title hunks in
 `../components/AdminLayout.jsx`, the title selection in
 `../components/AdminNavbar.jsx`, and the allowlist addition in
-`../../dev/DevelopmentAdmin.jsx`. No other feature or backup files are needed.
+`../AdminPreview.jsx`. No other feature or backup files are needed.

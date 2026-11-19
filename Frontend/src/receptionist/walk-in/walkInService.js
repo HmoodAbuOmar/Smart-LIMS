@@ -19,6 +19,8 @@ async function source() {
   return development
 }
 export const walkInService = {
+  listPaymentOrders: () => source().then(service => service.listPaymentOrders()),
+  recordPayment: request => source().then(service => service.recordPayment(request)),
   cancelOrder: (id, reason) => source().then(service => service.cancelOrder(id, reason)),
   listAllOrders: () => source().then(service => service.listAllOrders()),
   getOrder: async id => {

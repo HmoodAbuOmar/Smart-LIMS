@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import Navbar from './components/Navbar.jsx'
-import ProductShowcase from './components/ProductShowcase.jsx'
+import Navbar from './Navbar.jsx'
+import ProductShowcase from './ProductShowcase.jsx'
 import { Activity, ArrowRight, CalendarDays, Check, ClipboardCheck, FlaskConical, Heart, LayoutDashboard, LockKeyhole, Mail, Microscope, ShieldCheck, TestTubes, Users } from 'lucide-react'
-import BrandLogo from './components/BrandLogo.jsx'
-import HomepageHealthChart from './components/HomepageHealthChart.jsx'
+import BrandLogo from '../components/BrandLogo.jsx'
+import HomepageHealthChart from './HomepageHealthChart.jsx'
 
 function Logo() {
   const { t } = useTranslation('common')

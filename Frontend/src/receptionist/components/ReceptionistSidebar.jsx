@@ -8,8 +8,8 @@ const classes = {sidebar:'r01-sidebar',brand:'r01-brand',logo:'r01-logo',footer:
 export default function ReceptionistSidebar({ copy, activePage = 'today', menuOpen, onSelect }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
-  const items = navigation.map(item=>({...item,label:copy[item.id],disabled:!['today','patients','orders','appointments'].includes(item.id),describedBy:!['today','patients','orders','appointments'].includes(item.id)?'r01-navigation-unavailable':undefined}))
+  const items = navigation.map(item => ({ ...item, label: copy[item.id], dataPage: item.id }))
   return <WorkspaceSidebar id="r01-navigation" prefix="r01" classes={classes} items={items} activeId={activePage} onNavigate={onSelect} mobileOpen={menuOpen} language={language} onLanguageChange={next=>void i18n.changeLanguage(next)} navigationLabel={copy.navigation} logoutLabel={copy.logout} signingOutLabel={copy.signingOut} logoutError={copy.logoutError} logoutUnavailable={copy.logoutUnavailable} onLogoClick={() => onSelect('today')} onLogout={async()=>{await receptionistSession.signOut();window.location.hash='/login'}}>
-    <span className="r01-role-label r01-sr-only">{copy.workspace}</span><p id="r01-navigation-unavailable" className="r01-sr-only">{copy.navigationUnavailable}</p>
+    <span className="r01-role-label r01-sr-only">{copy.workspace}</span>
   </WorkspaceSidebar>
 }

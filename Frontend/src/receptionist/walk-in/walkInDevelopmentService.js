@@ -3,6 +3,7 @@ import { adminCatalogService } from '../../admin/catalog/adminCatalogService.js'
 import { receptionistPatientsService } from '../patients/patientsService.js'
 import { createPatientDemoData } from '../../admin/patients/adminPatientsService.js'
 import { reconcileTests, totalCents, validateSelection } from './walkInModel.js'
+import { eligibleBalance, paymentMethods } from '../payments/paymentsModel.js'
 
 // Development-only, in memory like R02. No appointment/slot service is imported.
 export function createWalkInService({ catalog = adminCatalogService, patients = receptionistPatientsService, beforeCreate = async () => {}, delay = 160, history = createPatientDemoData(), storage, previewOrders = false, cascadeCancellation = (_id, _reason, commit) => commit() } = {}) {
@@ -10,6 +11,12 @@ export function createWalkInService({ catalog = adminCatalogService, patients = 
   let stored = []
   try { const value = JSON.parse(storage?.getItem(storageKey) || '[]'); if (Array.isArray(value) && value.every(entry => entry.length === 2 && entry[1]?.order?.id)) stored = value } catch { /* No usable local snapshot. */ }
   const orders = new Map(stored)
+  const paymentKey = 'smart-lims.receptionist-payments.v1'
+  let payments = []
+  try {
+    const value = JSON.parse(storage?.getItem(paymentKey) || '[]')
+    if (Array.isArray(value)) payments = value
+  } catch { /* No usable local snapshot. */ }
   if (previewOrders) {
     const tests = createCatalogData().tests
     for (let index = 0; index < 2; index++) {
@@ -25,7 +32,36 @@ export function createWalkInService({ catalog = adminCatalogService, patients = 
   const wait = () => new Promise(resolve => setTimeout(resolve, delay))
   const existingOrders = () => history.orders.map(order => ({ ...order, orderNumber: order.number.replace(/^DEMO-/, ''), totalAmount: order.total, currency: 'ILS' }))
   const allOrders = () => [...existingOrders(), ...[...orders.values()].map(entry => entry.order)]
+  const transactions = id => [...(history.transactions || []), ...payments].filter(record => record.orderId === id)
+  const withTransactions = order => ({ ...order, transactions: transactions(order.id) })
+  const fail = code => { const error = new Error(code); error.code = code; throw error }
   return {
+    async listPaymentOrders() {
+      await wait()
+      return structuredClone(allOrders().map(withTransactions))
+    },
+    async recordPayment({ orderId, amountCents, method, idempotencyKey }) {
+      await wait()
+      if (!idempotencyKey || !Number.isSafeInteger(amountCents) || amountCents <= 0 || !paymentMethods.includes(method)) fail('invalidPayment')
+      const prior = payments.find(entry => entry.idempotencyKey === idempotencyKey)
+      if (prior) {
+        if (prior.orderId !== orderId || prior.amountCents !== amountCents || prior.method !== method) fail('invalidPayment')
+        return structuredClone(prior)
+      }
+      const order = allOrders().find(record => record.id === orderId)
+      const balance = order && eligibleBalance(withTransactions(order))
+      if (!balance || amountCents > balance.outstanding) fail('balanceChanged')
+      const recordedAt = new Date().toISOString()
+      const transaction = {
+        id: idempotencyKey, idempotencyKey, orderId, receiptNumber: `RCP-${payments.length + 1}`,
+        type: 'PAYMENT', status: 'CONFIRMED', method, amount: amountCents / 100, amountCents,
+        currency: 'ILS', recordedAt, confirmedAt: recordedAt,
+      }
+      const next = [...payments, transaction]
+      storage?.setItem(paymentKey, JSON.stringify(next))
+      payments = next
+      return structuredClone(transaction)
+    },
     async cancelOrder(id, reason) {
       await wait()
       if (!reason?.trim() || reason.trim().length > 1000) { const error = new Error('Cancellation reason required'); error.code = 'REASON_REQUIRED'; throw error }
@@ -43,7 +79,7 @@ export function createWalkInService({ catalog = adminCatalogService, patients = 
       await wait()
       const order = allOrders().find(record => record.id === id)
       if (!order) { const error = new Error('Order not found'); error.code = 'ORDER_NOT_FOUND'; throw error }
-      return structuredClone({ ...order, appointments: history.appointments.filter(record => record.orderId === id), transactions: history.transactions?.filter(record => record.orderId === id) || [] })
+      return structuredClone({ ...withTransactions(order), appointments: history.appointments.filter(record => record.orderId === id) })
     },
     async getPatient(id) {
       const patient = (await patients.list({ size: 10000 })).content.find(record => record.id === id)
@@ -68,7 +104,6 @@ export function createWalkInService({ catalog = adminCatalogService, patients = 
       const patient = (await patients.list({ size: 10000 })).content.find(item => item.id === patientId)
       const fresh = (await catalog.load()).tests
       const selected = testIds.map(id => fresh.find(test => test.id === id))
-      const fail = code => { const error = new Error(code); error.code = code; throw error }
       if (!idempotencyKey || (source !== undefined && source !== 'WALK_IN')) fail('invalidSelection')
       const error = validateSelection(patient, selected)
       if (error) fail(error)

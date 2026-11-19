@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, ChevronRight, Menu, X } from 'lucide-react'
-import LanguageSwitcher from './LanguageSwitcher.jsx'
+import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import './Navbar.css'
 
 // Ordered by the existing landing-page sections. The CTA keeps its signup action.

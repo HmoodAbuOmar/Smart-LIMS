@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { dailyOrders, periodOrders } from './adminOverviewModel.js'
+import { adminNavigation as navigationItems } from './adminNavigation.js'
 
 const frontend = fileURLToPath(new URL('../../', import.meta.url))
 const temporary = mkdtempSync(join(tmpdir(), 'smart-lims-admin-phase1-'))
@@ -64,12 +65,13 @@ try {
   }
   async function evaluate(expression) {
     const result = await send('Runtime.evaluate', { expression, returnByValue: true })
+      .catch(error => { throw new Error(`Browser evaluation failed: ${expression}`, { cause: error }) })
     assert.ok(!result.exceptionDetails, result.exceptionDetails?.text)
     return result.result.value
   }
   async function waitFor(expression) {
     for (let attempt = 0; attempt < 100; attempt++) {
-      if (await evaluate(expression)) return
+      if (await evaluate(`Boolean(${expression})`)) return
       await pause(100)
     }
     assert.fail(`Condition not met: ${expression}`)
@@ -266,9 +268,11 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
     await searchOrders('DEMO-O-1401')
     await waitFor("document.querySelectorAll('.admin-orders-section tbody tr').length === 1")
+    const displayedOrder = await evaluate("document.querySelector('.admin-orders-section tbody th').textContent.trim()")
+    assert.equal(displayedOrder, 'ORD-1401')
     await evaluate("document.querySelector('.admin-overview-text-button').click()")
     await waitFor("document.querySelector('.admin-order-dialog').open")
-    assert.ok(await evaluate("document.querySelector('.admin-order-dialog').textContent.includes('DEMO-O-1401')"))
+    assert.equal(await evaluate("document.querySelector('.admin-order-dialog dd').textContent.trim()"), displayedOrder)
     await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
     await waitFor("!document.querySelector('.admin-order-dialog').open")
@@ -297,12 +301,13 @@ try {
       })()`), `All paginated rows fit without internal vertical scrolling and section gaps match at ${width}px`)
       if (width > 900) assert.ok(await evaluate(`(() => {
         const alerts = document.querySelector('.admin-laboratory-alerts').getBoundingClientRect()
+        const orders = document.querySelector('.admin-orders-section').getBoundingClientRect()
         const rows = [...document.querySelectorAll('.admin-alert-row')].map(row => row.getBoundingClientRect())
-        return getComputedStyle(document.querySelector('.admin-laboratory-alerts')).alignSelf === 'start' &&
+        return Math.abs(alerts.top - orders.top) < 1 && Math.abs(alerts.bottom - orders.bottom) < 1 &&
           rows.every(row => row.height >= 76) &&
           rows[0].top >= alerts.top && rows.at(-1).bottom <= alerts.bottom &&
           rows.slice(1).every((row, index) => row.top >= rows[index].bottom)
-      })()`), 'Desktop alerts use compact natural card heights without stretching to the orders table')
+      })()`), 'Desktop alerts align with the orders panel and remain inside their card')
       if (width > 900) assert.ok(await evaluate(`(() => {
         const cards = [...document.querySelectorAll('.admin-overview-kpi')].map(element => element.getBoundingClientRect())
         const tables = [...document.querySelectorAll('.admin-overview-tables > section')].map(element => element.getBoundingClientRect())
@@ -329,21 +334,23 @@ try {
       console.log(`Screenshot: ${path}`)
     }
   }
-  const nav = '.admin-navigation > button'
+  const nav = '.admin-navigation > .ws-item, .admin-navigation > .ws-group > .ws-group-toggle'
   await send('Runtime.enable')
   await send('Emulation.setFocusEmulationEnabled', { enabled: true })
   await send('Network.enable')
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
   await send('Page.navigate', { url })
-  await waitFor(`document.querySelectorAll('${nav}').length === 8`)
+  await waitFor(`document.querySelectorAll('${nav}').length === ${navigationItems.length}`)
   await inspectNavbar()
   assert.equal(await evaluate("document.documentElement.dir"), 'ltr')
   await inspectOverview()
-  assert.equal(await evaluate("document.querySelector('.admin-logout').disabled"), true)
+  await evaluate("document.querySelector('.admin-logout').click()")
+  await waitFor("document.querySelector('.ws-logout-error[role=alert]')")
+  assert.equal(await evaluate("document.querySelector('.admin-logout').disabled"), false)
   await waitFor("document.querySelector('.admin-logo').complete && document.querySelector('.admin-logo').naturalWidth > 0")
   await evaluate(`document.querySelectorAll('${nav}')[1].click()`)
-  await waitFor("document.querySelector('.admin-header-heading > span').textContent === 'Users'")
-  assert.equal(await evaluate(`document.querySelectorAll('${nav}[aria-current="true"]').length`), 1)
+  await waitFor("document.querySelector('.admin-main-users')")
+  assert.equal(await evaluate("document.querySelectorAll('.admin-navigation [aria-current=true]').length"), 1)
   assert.equal(await evaluate("document.getElementById('admin-submenu-testCatalog').hidden"), true)
   await evaluate("document.getElementById('admin-group-testCatalog').focus()")
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', unmodifiedText: '\r', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 })
@@ -358,9 +365,10 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' })
   await waitFor("document.getElementById('admin-submenu-testCatalog').hidden")
   assert.equal(await evaluate("document.activeElement.id"), 'admin-group-testCatalog')
-  // Simulate a new selection supplied by a future route while the group is closed.
-  await evaluate("document.querySelector('.admin-submenu button').click()")
+  await evaluate("document.getElementById('admin-group-testCatalog').click()")
   await waitFor("!document.getElementById('admin-submenu-testCatalog').hidden")
+  await evaluate("document.querySelector('.admin-submenu button').click()")
+  await waitFor("document.querySelector('.admin-submenu button').getAttribute('aria-current') === 'true'")
   await changeAdminLanguage('ar')
   await waitFor("document.documentElement.dir === 'rtl'")
   assert.equal(await evaluate("document.documentElement.lang"), 'ar')

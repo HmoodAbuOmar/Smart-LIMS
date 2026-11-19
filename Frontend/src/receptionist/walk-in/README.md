@@ -43,4 +43,4 @@ Browser checks use installed Chrome, temporary profiles and temporary Vite/produ
 
 ## Separate feature commit scope
 
-Include this folder and only the Walk-in changes in `src/App.jsx`, `src/dev/DevelopmentReceptionist.jsx`, `src/receptionist/today/ReceptionistToday.jsx`, `ReceptionistEntry.jsx`, `check-today-browser.mjs`, and the optional patient-selection integration in `src/receptionist/patients/ReceptionistPatients.jsx`. No dependency or backend changes.
+Include this folder and only the Walk-in changes in `src/App.jsx`, `src/receptionist/ReceptionistPreview.jsx`, `src/receptionist/today/ReceptionistToday.jsx`, `src/receptionist/ReceptionistAccessEntry.jsx`, `check-today-browser.mjs`, and the optional patient-selection integration in `src/receptionist/patients/ReceptionistPatients.jsx`. No dependency or backend changes.

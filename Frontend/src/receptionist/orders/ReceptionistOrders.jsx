@@ -10,10 +10,12 @@ import { ordersCopy } from './ordersCopy.js'
 import './orders.css'
 import { bookableOrder } from '../appointments/appointmentsModel.js'
 
+import Table from '../components/ReceptionistTable.jsx'
+import { ReceiptDialog, RecordPaymentDialog } from '../payments/PaymentDialogs.jsx'
+import { eligibleBalance, paymentAmount } from '../payments/paymentsModel.js'
+import { paymentsCopy } from '../payments/paymentsCopy.js'
+
 const tabs = ['items', 'appointment', 'payments', 'details']
-function Table({ columns, rows, numeric = [] }) {
-  return <div className="ro-table"><table><thead><tr>{columns.map((label, index) => <th scope="col" key={index} className={numeric.includes(index) ? 'ro-numeric' : undefined}>{label}</th>)}</tr></thead><tbody>{rows.map((cells, row) => <tr key={row}>{cells.map((cell, column) => <td key={column} className={numeric.includes(column) ? 'ro-numeric' : undefined}><span className="ro-mobile-label" aria-hidden="true">{columns[column]}</span><div>{cell}</div></td>)}</tr>)}</tbody></table></div>
-}
 export default function ReceptionistOrders({ orderId, service = walkInService }) {
   const { i18n } = useTranslation(), language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en', copy = ordersCopy[language]
   const [data, setData] = useState(null), [state, setState] = useState('loading'), [attempt, setAttempt] = useState(0)
@@ -21,6 +23,8 @@ export default function ReceptionistOrders({ orderId, service = walkInService })
   const [cancelReason, setCancelReason] = useState(''), [cancelling, setCancelling] = useState(false), [cancelError, setCancelError] = useState('')
   const cancelLock = useRef(false), mounted = useRef(false)
   const [created, setCreated] = useState(() => !!orderId && window.sessionStorage.getItem('smart-lims.just-created-order') === orderId)
+  const [recording, setRecording] = useState(false), [receipt, setReceipt] = useState(null), [paymentSaved, setPaymentSaved] = useState(false)
+  const paymentCopy = paymentsCopy[language]
   const heading = useRef(null)
   useEffect(() => { mounted.current = true; heading.current?.focus(); return () => { mounted.current = false } }, [])
   useEffect(() => { if (created) window.sessionStorage.removeItem('smart-lims.just-created-order') }, [created])
@@ -83,10 +87,29 @@ export default function ReceptionistOrders({ orderId, service = walkInService })
         setTab(next); document.getElementById(`ro-tab-${next}`)?.focus()
       }}>{copy[id]}</button>)}</div>
       <section className="ro-card" id="ro-panel" role="tabpanel" tabIndex={0} aria-labelledby={`ro-tab-${tab}`}>
-        {tab === 'items' ? !order.items?.length ? <p className="ro-empty">{copy.itemGap}</p> : <><Table numeric={[2]} columns={[copy.code, copy.test, copy.price, copy.status]} rows={order.items.map(item => [<bdi key="c">{item.testCode}</bdi>, testName(item, language) || item.testName, <bdi key="p">{money(Math.round(item.priceAtOrder * 100), language)}</bdi>, badge(item.status)])} /><p className="ro-note">{copy.statusGap}</p></> : tab === 'appointment' ? <><div className="ro-booking-action"><button type="button" className="ro-primary ro-create-booking" disabled={!bookableOrder(order, order.appointments)} aria-describedby="ro-booking-rule" onClick={() => { window.location.hash = `/__receptionist/appointments?orderId=${encodeURIComponent(order.id)}` }}>{copy.createBooking}</button>{!bookableOrder(order, order.appointments) && <p id="ro-booking-rule">{copy.bookingUnavailable}</p>}</div>{!order.appointments?.length ? <p className="ro-empty">{copy.noAppointment}</p> : <Table columns={[copy.created, copy.status]} rows={order.appointments.map(appointment => [<bdi key="d">{appointment.startsAt ? dateTime({createdAt:appointment.startsAt}) : `${appointment.date} ${appointment.time}`}</bdi>, badge(appointment.status)])} />}</> : tab === 'payments' ? <><div className="ro-payment-action"><button type="button" disabled aria-describedby="ro-payment-gap">{copy.recordPayment}</button><p id="ro-payment-gap">{copy.paymentGap}</p></div>{!order.transactions?.length ? <p className="ro-empty">{Array.isArray(order.transactions) ? copy.noPayments : copy.unavailable}</p> : <Table numeric={[1]} columns={[copy.type, copy.amount, copy.status]} rows={order.transactions.map(entry => [copy[entry.type] || copy.unavailable, <bdi key="a">{money(Math.round(entry.amount * 100), language)}</bdi>, badge(entry.status)])} />}</> : <dl className="ro-details">{[[copy.number, order.orderNumber], [copy.type, copy[order.source] || copy.unavailable], [copy.created, dateTime(order)], [copy.notes, order.notes || '—']].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+        {tab === 'items' ? !order.items?.length ? <p className="ro-empty">{copy.itemGap}</p> : <><Table numeric={[2]} columns={[copy.code, copy.test, copy.price, copy.status]} rows={order.items.map(item => [<bdi key="c">{item.testCode}</bdi>, testName(item, language) || item.testName, <bdi key="p">{money(Math.round(item.priceAtOrder * 100), language)}</bdi>, badge(item.status)])} /><p className="ro-note">{copy.statusGap}</p></> : tab === 'appointment' ? <><div className="ro-booking-action"><button type="button" className="ro-primary ro-create-booking" disabled={!bookableOrder(order, order.appointments)} aria-describedby="ro-booking-rule" onClick={() => { window.location.hash = `/__receptionist/appointments?orderId=${encodeURIComponent(order.id)}` }}>{copy.createBooking}</button>{!bookableOrder(order, order.appointments) && <p id="ro-booking-rule">{copy.bookingUnavailable}</p>}</div>{!order.appointments?.length ? <p className="ro-empty">{copy.noAppointment}</p> : <Table columns={[copy.created, copy.status]} rows={order.appointments.map(appointment => [<bdi key="d">{appointment.startsAt ? dateTime({createdAt:appointment.startsAt}) : `${appointment.date} ${appointment.time}`}</bdi>, badge(appointment.status)])} />}</> : tab === 'payments' ? <>
+          <div className="ro-payment-action">
+            <button type="button" className="ro-primary" disabled={!eligibleBalance(order)} onClick={() => { setPaymentSaved(false); setRecording(true) }}>{paymentCopy.record}</button>
+            {!eligibleBalance(order) && <p>{paymentCopy.noneEligible}</p>}
+          </div>
+          {paymentSaved && <p className="ro-success" role="status">{paymentCopy.saved}</p>}
+          {!order.transactions?.length ? <p className="ro-empty">{Array.isArray(order.transactions) ? copy.noPayments : copy.unavailable}</p>
+            : <Table numeric={[1]} columns={[copy.type, copy.amount, copy.status, copy.actions]} rows={order.transactions.map(entry => [
+              copy[entry.type] || copy.unavailable, <bdi key="amount">{paymentAmount(entry, language)}</bdi>, badge(entry.status),
+              <button key="receipt" type="button" onClick={() => setReceipt({ transaction: entry, order, patient })}>{paymentCopy.view}</button>,
+            ])} />}
+        </> : <dl className="ro-details">{[[copy.number, order.orderNumber], [copy.type, copy[order.source] || copy.unavailable], [copy.created, dateTime(order)], [copy.notes, order.notes || '—']].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
         {tab === 'details' && order.status === 'PENDING' && !order.appointments?.some(record => record.status === 'CHECKED_IN') && <details className="ro-cancel-order"><summary>{copy.cancelOrder}</summary><form noValidate onSubmit={event => void cancelOrder(event)}><p>{copy.cancelNotice}</p><label htmlFor="ro-cancel-reason">{copy.cancelReason} *</label><textarea id="ro-cancel-reason" required maxLength={1000} rows={2} value={cancelReason} disabled={cancelling} onChange={event => setCancelReason(event.target.value)} />{cancelError && <p role="alert">{copy[cancelError]}</p>}<button type="submit" disabled={cancelling}>{copy.cancelOrder}</button></form></details>}
       </section>
       <section className="ro-balances ro-card" aria-label={copy.payments}>{[['total', balance?.total ?? (order.totalAmount == null ? undefined : Math.round(order.totalAmount * 100))], ['paid', balance?.paid], ['outstanding', balance?.outstanding]].map(([label, amount]) => <div key={label}><span>{copy[label]}</span><strong data-balance={label}>{amount === undefined ? copy.unavailable : <bdi>{money(amount, language)}</bdi>}</strong></div>)}</section>
+      {recording && <RecordPaymentDialog orders={[order]} patients={new Map([[patient.id, patient]])} initialOrderId={order.id}
+        service={service} language={language} onClose={() => setRecording(false)} onSaved={transaction => {
+          setData(current => ({ ...current, order: { ...current.order, transactions: [...current.order.transactions.filter(entry => entry.id !== transaction.id), transaction] } }))
+          setRecording(false)
+          setPaymentSaved(true)
+          setReceipt({ transaction, order, patient })
+        }} />}
+      {receipt && <ReceiptDialog row={receipt} language={language} onClose={() => setReceipt(null)} />}
     </>}
   </section>
 }

@@ -39,5 +39,5 @@ prints its screenshot directory. Set CHROME_PATH if Chrome is installed elsewher
 Commit scope: this entire feature folder plus only the Booking Slots import,
 render/title changes in `../components/AdminLayout.jsx`, the title selection in
 `../components/AdminNavbar.jsx`, and the preview allowlist addition in
-`../../dev/DevelopmentAdmin.jsx`. No backend, dependencies, generated files, or
+`../AdminPreview.jsx`. No backend, dependencies, generated files, or
 other Admin feature changes are required.

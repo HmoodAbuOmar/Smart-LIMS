@@ -1,14 +1,14 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 // Preserve the existing shared CSS cascade after moving the homepage module.
 import './components/LanguageSwitcher.css'
-import './components/Navbar.css'
+import './marketing/Navbar.css'
 import './components/BrandLogo.css'
 import PatientOnboarding from './components/PatientOnboarding.jsx'
 import AuthPage from './auth/AuthPage.jsx'
 import PatientFileStateProvider from './components/PatientFileStateProvider.jsx'
-import Homepage from './Homepage.jsx'
+import Homepage from './marketing/Homepage.jsx'
 import './App.css'
-import './Hero.css'
+import './marketing/HomepageHero.css'
 import './theme.css'
 import './styles/refinements/index.css'
 
@@ -16,9 +16,9 @@ import './styles/refinements/index.css'
 
 const DevelopmentPortal = import.meta.env.DEV ? lazy(() => import('./dev/DevelopmentPortal.jsx')) : null
 const DevelopmentWalkthrough = import.meta.env.DEV ? lazy(() => import('./dev/PatientPreview.jsx')) : null
-const DevelopmentAdmin = import.meta.env.DEV ? lazy(() => import('./dev/DevelopmentAdmin.jsx')) : null
-const DevelopmentReceptionist = import.meta.env.DEV ? lazy(() => import('./dev/DevelopmentReceptionist.jsx')) : null
-const ReceptionistEntry = lazy(() => import('./receptionist/today/ReceptionistEntry.jsx'))
+const AdminPreview = import.meta.env.DEV ? lazy(() => import('./admin/AdminPreview.jsx')) : null
+const ReceptionistPreview = import.meta.env.DEV ? lazy(() => import('./receptionist/ReceptionistPreview.jsx')) : null
+const ReceptionistAccessEntry = lazy(() => import('./receptionist/ReceptionistAccessEntry.jsx'))
 const PortalEntry = lazy(() => import('./portal/PortalEntry.jsx'))
 
 function AppRouter() {
@@ -46,9 +46,9 @@ function AppRouter() {
     if (frontendRoutes.includes(route) && !verificationCallback) return <Suspense fallback={null}><DevelopmentWalkthrough route={hash} /></Suspense>
   }
   if (import.meta.env.DEV && route.startsWith('#/__portal/')) return <Suspense fallback={null}><DevelopmentPortal route={hash.slice('#/__portal/'.length)} onNavigate={path => { window.location.hash = `/__portal/${path}` }} /></Suspense>
-  if (import.meta.env.DEV && (route === '#/__admin' || route.startsWith('#/__admin/'))) return <Suspense fallback={null}><DevelopmentAdmin key={route} page={route.slice('#/__admin/'.length)} /></Suspense>
-  if (import.meta.env.DEV && (route === '#/__receptionist' || route === '#/__receptionist/today' || route === '#/__receptionist/patients' || route === '#/__receptionist/walk-in' || route === '#/__receptionist/orders' || route === '#/__receptionist/appointments')) return <Suspense fallback={null}><DevelopmentReceptionist key={hash} page={route.endsWith('/appointments') ? 'appointments' : route.endsWith('/orders') ? 'orders' : route.endsWith('/walk-in') ? 'walkIn' : route.endsWith('/patients') ? 'patients' : 'today'} /></Suspense>
-  if (route === '#/receptionist' || route === '#/receptionist/today' || route === '#/receptionist/patients' || route === '#/receptionist/walk-in' || route === '#/receptionist/orders' || route === '#/receptionist/appointments') return <Suspense fallback={null}><ReceptionistEntry page={route.endsWith('/appointments') ? 'appointments' : route.endsWith('/orders') ? 'orders' : route.endsWith('/walk-in') ? 'walkIn' : route.endsWith('/patients') ? 'patients' : 'today'} /></Suspense>
+  if (import.meta.env.DEV && (route === '#/__admin' || route.startsWith('#/__admin/'))) return <Suspense fallback={null}><AdminPreview key={route} page={route.slice('#/__admin/'.length)} /></Suspense>
+  if (import.meta.env.DEV && (route === '#/__receptionist' || route === '#/__receptionist/today' || route === '#/__receptionist/patients' || route === '#/__receptionist/walk-in' || route === '#/__receptionist/orders' || route === '#/__receptionist/appointments' || route === '#/__receptionist/payments')) return <Suspense fallback={null}><ReceptionistPreview key={hash} page={route.endsWith('/payments') ? 'payments' : route.endsWith('/appointments') ? 'appointments' : route.endsWith('/orders') ? 'orders' : route.endsWith('/walk-in') ? 'walkIn' : route.endsWith('/patients') ? 'patients' : 'today'} /></Suspense>
+  if (route === '#/receptionist' || route === '#/receptionist/today' || route === '#/receptionist/patients' || route === '#/receptionist/walk-in' || route === '#/receptionist/orders' || route === '#/receptionist/appointments' || route === '#/receptionist/payments') return <Suspense fallback={null}><ReceptionistAccessEntry page={route.endsWith('/payments') ? 'payments' : route.endsWith('/appointments') ? 'appointments' : route.endsWith('/orders') ? 'orders' : route.endsWith('/walk-in') ? 'walkIn' : route.endsWith('/patients') ? 'patients' : 'today'} /></Suspense>
   if (/^#\/patient\/(dashboard|profile|tests|review|orders|book|payment|booking-confirmation|appointments|results|history|notifications)(\/|$)/.test(route)) return <Suspense fallback={null}><PortalEntry route={hash.slice('#/patient/'.length)} /></Suspense>
   if (Object.hasOwn(emailRoutes, route)) return <AuthPage key={hash} mode="login" step={emailRoutes[route]} registration={registration} />
   if (Object.hasOwn(onboardingRoutes, route)) return <AuthPage key={hash} mode="login" step={onboardingRoutes[route]}><PatientOnboarding step={onboardingRoutes[route]} /></AuthPage>

@@ -42,6 +42,7 @@ try {
   }
   async function evaluate(expression) {
     const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
+      .catch(error => { throw new Error(`Browser evaluation failed: ${expression}`, { cause: error }) })
     assert.ok(!result.exceptionDetails, JSON.stringify(result.exceptionDetails))
     return result.result.value
   }
@@ -76,7 +77,7 @@ try {
   }
   const base = `http://127.0.0.1:${server.httpServer.address().port}`
   await send('Page.navigate', { url: `${base}/#/__receptionist/orders` })
-  await waitFor("document.querySelectorAll('.ro-open').length===5")
+  await waitFor("document.querySelectorAll('.ro-open').length===7")
   async function buttonStyle() { return evaluate("(()=>{const b=document.querySelector('.ro-open'),s=getComputedStyle(b);return {background:s.backgroundColor,color:s.color,outline:s.outlineStyle,outlineWidth:s.outlineWidth}})()") }
   for(const language of ['en','ar']) {
     await evaluate("import('/src/i18n.js').then(m=>m.default.changeLanguage("+JSON.stringify(language)+"))")
@@ -99,7 +100,7 @@ try {
     await screenshot('open-order-focus-'+language)
     await key('Enter');await waitFor("document.querySelector('.ro-context')")
     assert.ok(await evaluate("location.hash.includes("+JSON.stringify('orderId='+encodeURIComponent(expected))+")"))
-    await click('.ro-back');await waitFor("document.querySelectorAll('.ro-open').length===5")
+    await click('.ro-back');await waitFor("document.querySelectorAll('.ro-open').length===7")
   }
   await evaluate("import('/src/i18n.js').then(m=>m.default.changeLanguage('en'))")
   assert.ok(await evaluate("document.querySelector('.ws-nav [aria-current=page]').textContent.includes('Orders')"))
@@ -109,7 +110,7 @@ try {
   assert.ok(await evaluate("document.querySelector('#ro-panel').textContent.includes('snapshots')"))
   await click('#ro-tab-appointment');assert.equal(await evaluate("document.querySelectorAll('#ro-panel tbody tr').length"),1)
   await click('#ro-tab-payments');assert.equal(await evaluate("document.querySelectorAll('#ro-panel tbody tr').length"),2)
-  assert.equal(await evaluate("document.querySelector('.ro-payment-action button').disabled"),true)
+  assert.equal(await evaluate("document.querySelector('.ro-payment-action button').disabled"),false)
   await click('#ro-tab-items');await key('ArrowRight')
   assert.equal(await evaluate("document.querySelector('#ro-tab-appointment').getAttribute('aria-selected')"),'true')
   const before = await evaluate("import('/src/receptionist/walk-in/walkInService.js').then(m=>m.walkInService.listAllOrders()).then(JSON.stringify)")
@@ -170,14 +171,151 @@ try {
   await waitFor("location.hash.includes('orderId=r05-order-2') && document.querySelector('.ro-context')")
   await reloadOrder()
   assert.ok(await evaluate("document.querySelector('.ro-context').textContent.includes('Fresh Workspace Patient')"))
-  await click('.ro-back');await waitFor("document.querySelectorAll('.ro-open').length===7")
+  await click('.ro-back');await waitFor("document.querySelectorAll('.ro-open').length===8")
   await input('.ro-search input','ORD-000002');await click('.ro-open');await waitFor("document.querySelector('.ro-context')")
   assert.ok(await evaluate("document.querySelector('.ro-context').textContent.includes('Fresh Workspace Patient')"))
+  await evaluate("import('/src/i18n.js').then(m=>m.default.changeLanguage('en'))")
+  await click('.r01-sidebar [data-page=payments]')
+  await waitFor("document.querySelector('.rp-payments tbody')")
+  assert.match(await evaluate("document.querySelector('.rp-collections').textContent"), /130\.00/)
+  await input('.rp-filters [name=type]', 'REFUND')
+  assert.equal(await evaluate("document.querySelectorAll('.rp-payments tbody tr').length"), 1)
+  assert.match(await evaluate("document.querySelector('.rp-collections').textContent"), /-.*20\.00/)
+  await input('.rp-filters [name=query]', 'Omar')
+  assert.ok(await evaluate("Boolean(document.querySelector('.rp-payments .ro-empty'))"))
+  await input('.rp-filters [name=query]', 'Lina')
+  assert.equal(await evaluate("document.querySelectorAll('.rp-payments tbody tr').length"), 1)
+  await input('.rp-filters [name=query]', '')
+  await input('.rp-filters [name=type]', '')
+  await click('.rp-payments header button')
+  await input('.rp-form select:first-of-type', 'demo-patient-order-1')
+  assert.match(await evaluate("document.querySelector('.rp-summary').textContent"), /150\.00.*130\.00.*20\.00/)
+  await input('.rp-form input', '20.01')
+  await input('.rp-form label:last-child select', 'CASH')
+  await click('.rp-form button[type=submit]')
+  assert.ok(await evaluate("Boolean(document.querySelector('.rp-error[role=alert]'))"))
+  await input('.rp-form input', '10.50')
+  await evaluate("document.querySelector('.rp-form button[type=submit]').click(); document.querySelector('.rp-form button[type=submit]').click()")
+  await waitFor("document.querySelector('.rp-receipt[open]')")
+  assert.match(await evaluate("document.querySelector('.rp-receipt').textContent"), /RCP-1.*PO-2001.*Cash.*10\.50/)
+  await evaluate(`window.print = () => {
+    window.receiptPrinted = document.fonts.status === 'loaded' &&
+      [...document.querySelectorAll('.rp-receipt img')].every(image => image.complete && image.naturalWidth > 0)
+  }`)
+  for (const [language, direction] of [['en', 'ltr'], ['ar', 'rtl']]) {
+    await evaluate(`import('/src/i18n.js').then(m => m.default.changeLanguage('${language}'))`)
+    assert.equal(await evaluate("document.querySelector('.rp-receipt').dir"), direction)
+    assert.match(await evaluate("document.querySelector('.rp-receipt-amount').textContent"), /ILS 10\.50/)
+    await evaluate('window.receiptPrinted = false')
+    await click('.rp-receipt .ro-primary')
+    await waitFor('window.receiptPrinted')
+    await screenshot(`receipt-${language}`)
+    const pdf = await send('Page.printToPDF', { preferCSSPageSize: true, printBackground: true, displayHeaderFooter: false })
+    writeFileSync(join(temporary, `payment-receipt-${language}.pdf`), Buffer.from(pdf.data, 'base64'))
+  }
+  await evaluate("import('/src/i18n.js').then(m=>m.default.changeLanguage('en'))")
+  await click('.rp-receipt button:first-child')
+  assert.match(await evaluate("document.querySelector('.rp-collections').textContent"), /140\.50/)
+  await click('.rp-payments .ro-pagination button:last-child')
+  assert.equal(await evaluate("document.querySelectorAll('.rp-payments tbody tr').length"), 1)
+  await input('.rp-filters [name=query]', 'PO-2001')
+  assert.equal(await evaluate("document.querySelectorAll('.rp-payments tbody tr').length"), 3)
+  await input('.rp-filters [name=type]', 'REFUND')
+  await click('.rp-payments tbody button')
+  assert.match(await evaluate("document.querySelector('.rp-receipt-amount').textContent"), /Amount refunded.*ILS 20\.00/)
+  assert.match(await evaluate("document.querySelector('.rp-receipt-heading').textContent"), /Unavailable/)
+  await click('.rp-receipt button:first-child')
+  await input('.rp-filters [name=type]', '')
+  const paymentDate = await evaluate("import('/src/admin/operationsPayments/operationsPaymentsModel.js').then(m=>m.reportDate())")
+  await input('.rp-filters [name=from]', paymentDate)
+  await input('.rp-filters [name=to]', paymentDate)
+  assert.equal(await evaluate("document.querySelectorAll('.rp-payments tbody tr').length"), 1)
+  await click('.rp-payments tbody a')
+  await waitFor("document.querySelector('[data-balance=outstanding]')")
+  assert.match(await evaluate("document.querySelector('[data-balance=outstanding]').textContent"), /9\.50/)
+  await click('#ro-tab-payments')
+  await click('.ro-payment-action button')
+  await input('.rp-form input', '9.50')
+  await input('.rp-form label:last-child select', 'CARD')
+  await click('.rp-form button[type=submit]')
+  await waitFor("document.querySelector('.rp-receipt[open]')")
+  assert.match(await evaluate("document.querySelector('.rp-receipt').textContent"), /RCP-2.*Card terminal.*9\.50/)
+  await click('.rp-receipt button:first-child')
+  assert.match(await evaluate("document.querySelector('[data-balance=outstanding]').textContent"), /0\.00/)
+  await reloadOrder()
+  assert.match(await evaluate("document.querySelector('[data-balance=paid]').textContent"), /150\.00/)
+  await click('.r01-sidebar [data-page=payments]')
+  await waitFor("document.querySelector('.rp-payments tbody')")
+  assert.match(await evaluate("document.querySelector('.rp-payments tbody').textContent"), /RCP-2/)
+  for (const [language, direction] of [['en', 'ltr'], ['ar', 'rtl']]) {
+    await evaluate("import('/src/i18n.js').then(m=>m.default.changeLanguage(" + JSON.stringify(language) + "))")
+    assert.equal(await evaluate("document.querySelector('.reception-today-layout').dir"), direction)
+    for (const width of [1920, 1366, 390]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height: width === 390 ? 844 : 900, deviceScaleFactor: 1, mobile: width === 390 })
+      const geometry = await evaluate(`(async () => {
+        await document.fonts.ready
+        const scroller = document.querySelector('.rp-table')
+        const table = scroller.querySelector('table')
+        const headers = [...table.rows[0].cells].map(cell => cell.getBoundingClientRect())
+        const controls = [...document.querySelectorAll('.rp-filters :is(.ro-search, input[type=date], select)')]
+          .map(control => control.getBoundingClientRect())
+        const actions = [...table.querySelectorAll('td.rp-col-actions button')]
+        const summary = document.querySelector('.rp-collections').getBoundingClientRect()
+        const viewport = scroller.getBoundingClientRect()
+        return {
+          display: getComputedStyle(table).display,
+          header: headers[0].height,
+          rows: [...table.tBodies[0].rows].map(row => row.getBoundingClientRect().height),
+          aligned: [...table.tBodies[0].rows].every(row => [...row.cells].every((cell, i) => {
+            const rect = cell.getBoundingClientRect()
+            return Math.abs(rect.x - headers[i].x) < 1 && Math.abs(rect.width - headers[i].width) < 1
+          })),
+          actionsFit: actions.every(button => {
+            const range = document.createRange()
+            range.selectNodeContents(button)
+            const label = range.getBoundingClientRect()
+            const cell = button.closest('td').getBoundingClientRect()
+            const bounds = button.getBoundingClientRect()
+            return getComputedStyle(button).whiteSpace === 'nowrap' && range.getClientRects().length === 1 &&
+              label.left >= bounds.left && label.right <= bounds.right && bounds.left >= cell.left && bounds.right <= cell.right
+          }),
+          statusFits: [...table.querySelectorAll('.ro-badge')].every(badge => badge.getBoundingClientRect().width < badge.closest('td').getBoundingClientRect().width - 20),
+          toolbarAligned: controls.every(control => Math.abs(control.top - controls[0].top) < 1 && Math.abs(control.bottom - controls[0].bottom) < 1),
+          stripBelow: summary.top >= viewport.bottom && Math.abs(summary.width - viewport.width) < 1 && summary.height <= 48,
+          tableScrolls: scroller.scrollWidth > scroller.clientWidth,
+          pageFits: document.documentElement.scrollWidth <= innerWidth,
+        }
+      })()`)
+      assert.equal(geometry.display, 'table')
+      assert.ok(geometry.header >= 44 && geometry.header <= 50, JSON.stringify(geometry))
+      assert.ok(geometry.rows.every(height => height >= 60 && height <= 68), JSON.stringify(geometry))
+      assert.ok(geometry.aligned && geometry.actionsFit && geometry.statusFits && geometry.stripBelow && geometry.pageFits, JSON.stringify(geometry))
+      assert.equal(geometry.tableScrolls, width === 390)
+      if (width !== 390) assert.ok(geometry.toolbarAligned, JSON.stringify(geometry))
+      await screenshot(`payments-${language}-${width}`)
+      if (width === 390) {
+        assert.ok(await evaluate(`(() => {
+          const scroller = document.querySelector('.rp-table')
+          const button = scroller.querySelector('tbody button')
+          scroller.scrollLeft = ${direction === 'rtl' ? '-1' : '1'} * scroller.scrollWidth
+          const viewport = scroller.getBoundingClientRect(), bounds = button.getBoundingClientRect()
+          return bounds.left >= viewport.left && bounds.right <= viewport.right
+        })()`))
+        await screenshot(`payments-${language}-${width}-actions`)
+      }
+    }
+    await click('.rp-payments tbody button')
+    assert.equal(await evaluate("document.querySelector('.rp-receipt h2').textContent"), language === 'ar' ? 'إيصال المعاملة' : 'Payment receipt')
+    await click('.rp-receipt button:first-child')
+  }
   await evaluate("location.hash='/__receptionist/orders?orderId=missing'");await waitFor("document.querySelector('.ro-empty[role=alert]')")
   production = await preview({ configFile: false, root: fileURLToPath(new URL('../../../', import.meta.url)), preview: { host: '127.0.0.1', port: 0 } })
   await send('Page.navigate',{url:`http://127.0.0.1:${production.httpServer.address().port}/#/receptionist/orders`})
   await waitFor("document.querySelector('.r01-access [role=alert]')")
   assert.equal(await evaluate("document.querySelector('.ro-orders')"),null)
+  await send('Page.navigate',{url:`http://127.0.0.1:${production.httpServer.address().port}/#/receptionist/payments`})
+  await waitFor("document.querySelector('.r01-access h1')?.textContent.match(/Payments|المدفوعات/)")
+  assert.equal(await evaluate("document.querySelector('.rp-payments')"),null)
   assert.deepEqual(errors,[])
   console.log(`PASS: Orders navigation/search, existing order IDs and linked payments/refunds/appointments, Today → Walk-in, clear-all, failed drafts, duplicate prevention, saved-ID workspace navigation, read-only refresh/new patient persistence, Items defaults, four tabs, EN/AR desktop/mobile, missing order and production unavailable. Screenshots: ${temporary}`)
 } finally { socket?.close(); browser?.kill(); await server.close(); if(production) await new Promise(resolve=>production.httpServer.close(resolve)) }

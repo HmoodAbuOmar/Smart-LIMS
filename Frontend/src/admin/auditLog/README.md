@@ -18,4 +18,4 @@ node scripts/check-preview-build.mjs
 
 The browser check uses installed Chrome (or `CHROME_PATH`) and a temporary Vite server and browser profile, then closes them. Screenshots are written outside the repository.
 
-Commit scope: this folder, plus the Audit Log import/render/title changes in `components/AdminLayout.jsx`, title recognition in `components/AdminNavbar.jsx`, and page allowlist in `src/dev/DevelopmentAdmin.jsx`.
+Commit scope: this folder, plus the Audit Log import/render/title changes in `components/AdminLayout.jsx`, title recognition in `components/AdminNavbar.jsx`, and page allowlist in `src/admin/AdminPreview.jsx`.

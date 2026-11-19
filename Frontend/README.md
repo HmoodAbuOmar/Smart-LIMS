@@ -43,7 +43,10 @@ Preview serves the built application; it does not enable the DEV walkthrough or 
 | --- | --- |
 | `src/main.jsx`, `src/i18n.js` | Initialize translations, document language/direction and saved language before rendering React. |
 | `src/App.jsx` | Hash router, registration context, onboarding provider, lazy portal entry and compile-time DEV entries. No React Router dependency is used. |
-| `src/Homepage.jsx` | Homepage using Navbar, ProductShowcase, BrandLogo and HomepageHealthChart. |
+| `src/marketing/Homepage.jsx` | Homepage using Navbar, ProductShowcase, BrandLogo and HomepageHealthChart. |
+| `src/admin/AdminPreview.jsx` | Development-only Admin entry shared by the hash route and standalone Admin page. |
+| `src/receptionist/` | Receptionist feature folders, shared layout, development preview, and regular access entry. |
+| `src/dev/` | Patient walkthrough, portal preview, and browser-test fixtures. |
 | `src/auth/` | Split-card account forms, email-link verification/resend, password recovery/reset, account API and access policy. |
 | `src/components/PatientOnboarding.jsx`, `PatientFileStateProvider.jsx` | Patient-file selection/creation/linking, access checks and in-memory creation draft. |
 | `src/portal/PatientPortal.jsx`, `PortalEntry.jsx` | Shared state/layout/sidebar/navigation and authenticated workspace loading. |
@@ -56,7 +59,7 @@ Preview serves the built application; it does not enable the DEV walkthrough or 
 | `src/services/` | Account, patient-file, workspace, booking and hosted-payment boundaries. |
 | `src/dev/` | Isolated walkthrough, fixture workspace and browser-test harnesses; not real authentication. |
 | `src/locales/`, `src/portal/*Copy.js` | Bundled English/Arabic resources. |
-| `src/index.css`, `App.css`, `Hero.css`, `theme.css`, component CSS | Existing tokens, typography, responsive surfaces and component styles. |
+| `src/index.css`, `App.css`, `src/marketing/HomepageHero.css`, `theme.css`, component CSS | Existing tokens, typography, responsive surfaces and component styles. |
 | `scripts/` | Committed Node/model/rendering/browser checks. |
 
 The logo is `public/images/smart-lims-logo.png`, shared through `BrandLogo.jsx`. Homepage chart measurements are illustrative marketing data, separate from the Medical History chart, which consumes the authorized patient workspace or isolated DEV fixtures. Homepage measurements are not actual patient records or clinical diagnoses.

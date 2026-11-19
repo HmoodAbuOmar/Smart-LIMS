@@ -7,6 +7,7 @@
 }
 :root:lang(ar), [lang='ar'] { --font-ui: var(--font-ar); }
 [lang='en'] { --font-ui: var(--font-en); }
+.admin-layout .admin-language-control .language-switcher__segment[lang] { font-family: var(--font-ui); }
 .admin-layout {
   --admin-font: var(--font-ui);
   --admin-deep: #083f3d; --admin-green: #12645f; --admin-mint: #d9eee9;

@@ -1,4 +1,4 @@
-import BrandLogo from './BrandLogo.jsx'
+import BrandLogo from '../components/BrandLogo.jsx'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Clock, FileText, FlaskConical, TestTubes, Users, X } from 'lucide-react'

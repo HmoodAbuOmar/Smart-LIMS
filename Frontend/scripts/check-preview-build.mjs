@@ -14,6 +14,6 @@ for (const file of files('dist').filter(file => /\.(html|js|css|map)$/.test(file
   const source = fs.readFileSync(file, 'utf8')
   for (const marker of markers) assert.ok(!source.includes(marker), `${file}: development fixture ${marker} is absent`)
   assert.ok(!path.basename(file).includes('PatientPreview'), 'No development preview chunk')
-  assert.ok(!path.basename(file).includes('DevelopmentAdmin'), 'No Admin development preview chunk')
+  assert.ok(!path.basename(file).includes('AdminPreview'), 'No Admin development preview chunk')
 }
 console.log('Production isolation passed: preview routes, navigator, CSS, sample data and development module are absent from built assets.')
