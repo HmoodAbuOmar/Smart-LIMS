@@ -1,3 +1,5 @@
+import { validDate } from '../appointments/appointmentsModel.js'
+import { todayDate } from '../today/todayModel.js'
 import { ordersRoute } from '../orders/ordersModel.js'
 import ReceptionistPatientProfile from './ReceptionistPatientProfile.jsx'
 import { useEffect, useRef, useState } from 'react'
@@ -10,9 +12,11 @@ import { money, reconcileTests, testMatches, testName, totalCents, validTest, va
 import { walkInService } from './walkInService.js'
 import './walkIn.css'
 
-export default function ReceptionistWalkIn({ service = walkInService, initialPatientId = null, initialTab = 'orders', fromPatients = false }) {
+export default function ReceptionistWalkIn({ service = walkInService, initialPatientId = null, initialTab = 'orders', fromPatients = false, bookingContext = null }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en', copy = walkInCopy[language]
+  const bookingDate = validDate(bookingContext?.date) ? bookingContext.date : todayDate()
+  const bookingRoute = orderId => `${window.location.hash.startsWith('#/__receptionist') ? '/__receptionist' : '/receptionist'}/appointments?book=1&date=${encodeURIComponent(bookingDate)}${orderId ? `&orderId=${encodeURIComponent(orderId)}` : ''}`
   const [patient, setPatient] = useState(() => initialPatientId ? { id: initialPatientId } : null), [stage, setStage] = useState(initialPatientId ? 'profile' : 'search')
   const choosingPatient = stage === 'search'
   const [patientCreated, setPatientCreated] = useState(false)
@@ -52,18 +56,18 @@ export default function ReceptionistWalkIn({ service = walkInService, initialPat
         setMessage(checked.unavailable.length ? 'testUnavailable' : 'pricesChanged'); return
       }
       key.current ??= crypto.randomUUID()
-      const saved = await service.create({ patientId: patient.id, testIds: selected.map(test => test.id), source: 'WALK_IN', notes, quotedTests: selected, idempotencyKey: key.current })
+      const saved = await (bookingContext ? service.createPending : service.create)({ patientId: patient.id, testIds: selected.map(test => test.id), source: bookingContext ? undefined : 'WALK_IN', notes, quotedTests: selected, idempotencyKey: key.current })
       if (!saved?.id || !saved.orderNumber || saved.patientId !== patient.id || !Array.isArray(saved.items) || !Number.isFinite(Number(saved.totalAmount))) throw new Error('Unconfirmed order response')
-      if (live.current) { window.sessionStorage.setItem('smart-lims.just-created-order',saved.id); window.location.hash = ordersRoute(saved.id) }
+      if (live.current) { if (bookingContext) window.location.hash = bookingRoute(saved.id); else { window.sessionStorage.setItem('smart-lims.just-created-order',saved.id); window.location.hash = ordersRoute(saved.id) } }
     } catch (failure) {
       if (live.current) {
         setMessage(['testUnavailable', 'pricesChanged', 'ORDER_TEST_UNAVAILABLE'].includes(failure.code) ? failure.code === 'ORDER_TEST_UNAVAILABLE' ? 'testUnavailable' : failure.code : 'saveError')
       }
     } finally { lock.current = false; if (live.current) setSaving(false) }
   }
-  function back() { if (!lock.current) { window.location.hash = `${window.location.hash.startsWith('#/__receptionist') ? '/__receptionist' : '/receptionist'}/${fromPatients ? 'patients' : 'today'}`; requestAnimationFrame(() => document.querySelector(fromPatients ? '#r02-search' : '.r01-walk-in')?.focus()) } }
+  function back() { if (bookingContext) { if (!lock.current) window.location.hash = bookingRoute(); return } if (!lock.current) { window.location.hash = `${window.location.hash.startsWith('#/__receptionist') ? '/__receptionist' : '/receptionist'}/${fromPatients ? 'patients' : 'today'}`; requestAnimationFrame(() => document.querySelector(fromPatients ? '#r02-search' : '.r01-walk-in')?.focus()) } }
   return <section className="r05-walk-in" aria-labelledby="r05-title">
-    <header className={`r05-heading${stage === 'profile' ? ' r04-heading' : ''}`}><div><h1 id="r05-title" ref={heading} tabIndex={-1}>{stage === 'profile' ? copy.profile : choosingPatient ? copy.selectPatient : copy.title}</h1><p>{stage === 'profile' ? copy.profileSubtitle : copy.subtitle}</p></div><button type="button" disabled={saving} className="r05-back" onClick={stage === 'profile' && !fromPatients ? () => { setPatientCreated(false); setStage('search'); requestAnimationFrame(() => document.querySelector('#r02-search')?.focus()) } : back}><ArrowLeft size={16} aria-hidden="true" />{fromPatients ? copy.backPatients : stage === 'profile' ? copy.backSearch : copy.back}</button></header>
+    <header className={`r05-heading${stage === 'profile' ? ' r04-heading' : ''}`}><div><h1 id="r05-title" ref={heading} tabIndex={-1}>{stage === 'profile' ? copy.profile : choosingPatient ? copy.selectPatient : bookingContext ? copy.pendingTitle : copy.title}</h1><p>{stage === 'profile' ? copy.profileSubtitle : bookingContext ? copy.scheduledSubtitle : copy.subtitle}</p></div><button type="button" disabled={saving} className="r05-back" onClick={stage === 'profile' && !fromPatients ? () => { setPatientCreated(false); setStage('search'); requestAnimationFrame(() => document.querySelector('#r02-search')?.focus()) } : back}><ArrowLeft size={16} aria-hidden="true" />{fromPatients ? copy.backPatients : stage === 'profile' ? copy.backSearch : bookingContext ? copy.backBooking : copy.back}</button></header>
       {choosingPatient ? <ReceptionistPatients onSelect={selectPatient} selectedPatientId={patient?.id} selectionLabel={copy.selectPatient} selectedLabel={copy.selected} onCreated={record => selectPatient(record, true)} addHint={copy.addHint} /> : stage === 'profile' ? <ReceptionistPatientProfile key={patient.id} patientId={patient.id} initialTab={profileTab} service={service} language={language} copy={copy} created={patientCreated} onCreate={startOrder} /> : <section className="r05-card r05-patient" aria-label={copy.patient}><div><small>{copy.patient}</small><strong>{displayPatientName(patient, language)}</strong><bdi>{patient.patientNumber}</bdi><dl className="r05-selected-details">{[[copy.dob,patient.dateOfBirth ? new Intl.DateTimeFormat(language === 'ar' ? 'ar-PS' : 'en-GB',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(`${patient.dateOfBirth}T12:00:00Z`)) : '\u2014'],[copy.gender,copy[patient.gender] || '\u2014'],[copy.phone,patient.phoneNumber || '\u2014']].map(([label,value])=><div key={label}><dt>{label}</dt><dd><bdi>{value}</bdi></dd></div>)}</dl></div><button type="button" disabled={saving} onClick={() => setStage('search')}>{copy.changePatient}</button></section>}
       {stage === 'order' && <><button type="button" className="r05-back-profile" disabled={saving} onClick={() => { setPatientCreated(false); setStage('profile') }}>{copy.backProfile}</button><div className="r05-workspace"><section className="r05-card r05-test-panel" aria-labelledby="r05-tests-title">
         <h2 ref={testsHeading} tabIndex={-1} id="r05-tests-title">{copy.tests}</h2>
@@ -79,9 +83,9 @@ export default function ReceptionistWalkIn({ service = walkInService, initialPat
         {!selected.length ? <p>{copy.emptySelection}</p> : <ul>{selected.map(test => <li key={test.id}><div><strong>{testName(test, language)}</strong><bdi>{money(test.priceCents, language)}</bdi>{!validTest(test) && <small>{copy.inactive}</small>}</div><button type="button" className="r05-remove" disabled={saving} aria-label={`${copy.remove}: ${testName(test, language)}`} onClick={() => toggleTest(test)}><Trash2 size={16} aria-hidden="true" /></button></li>)}</ul>}
         <p className="r05-total">{copy.total}<bdi>{money(totalCents(selected), language)}</bdi></p>
         <label htmlFor="r05-notes">{copy.notes}</label><textarea id="r05-notes" rows={3} value={notes} disabled={saving} aria-describedby="r05-notes-hint" onChange={event => { changed(); setNotes(event.target.value) }} /><small id="r05-notes-hint">{copy.notesHint}</small>
-        <p>{copy.noSlot}</p>{message && <p className="r05-error" role="alert">{copy[message]}</p>}
+        <p>{bookingContext ? copy.pendingHint : copy.noSlot}</p>{message && <p className="r05-error" role="alert">{copy[message]}</p>}
         {choosingPatient && <small>{copy.choosePatient}</small>}
-        <button type="submit" className="r05-primary" disabled={saving || choosingPatient}>{saving ? copy.saving : copy.confirm}</button>
+        <button type="submit" className="r05-primary" disabled={saving || choosingPatient}>{saving ? copy.saving : bookingContext ? copy.savePending : copy.confirm}</button>
       </form></div></>}
   </section>
 }

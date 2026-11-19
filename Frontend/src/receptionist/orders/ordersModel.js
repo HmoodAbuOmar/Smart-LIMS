@@ -1,6 +1,6 @@
 export function balances(order) {
   if (!Array.isArray(order.transactions)) return null
-  if (!Number.isFinite(Number(order.totalAmount)) || Number(order.totalAmount) < 0) return null
+  if (order.totalAmount === null || order.totalAmount === undefined || !Number.isFinite(Number(order.totalAmount)) || Number(order.totalAmount) < 0) return null
   const cents = amount => Math.round(Number(amount) * 100)
   let receipts = 0, refunds = 0
   for (const entry of order.transactions) {

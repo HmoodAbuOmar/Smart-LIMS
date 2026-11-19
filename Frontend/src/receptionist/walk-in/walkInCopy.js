@@ -1,5 +1,6 @@
 export const walkInCopy = {
   en: {
+    pendingTitle: 'Create lab order', scheduledSubtitle: 'Select a patient and tests, then choose an appointment slot.', backBooking: 'Back to booking', savePending: 'Save order and continue to booking', pendingHint: 'This saves a pending order only. Select and confirm an appointment slot in the next step.',
     clearAll: 'Clear all',
     price: 'Price (ILS)', actions: 'Actions',
     orderSummary: 'Order summary',
@@ -24,6 +25,7 @@ export const walkInCopy = {
     noSlot: 'Creating this order does not reserve an appointment slot.', selectedCount: count => `${count} selected`,
   },
   ar: {
+    pendingTitle: 'إنشاء طلب مختبر', scheduledSubtitle: 'اختر المريض والفحوصات، ثم اختر فترة الموعد.', backBooking: 'العودة إلى الحجز', savePending: 'حفظ الطلب والمتابعة للحجز', pendingHint: 'يُحفظ الطلب بحالة قيد الانتظار فقط. اختر فترة الموعد وأكّد الحجز في الخطوة التالية.',
     clearAll: 'مسح الكل',
     price: 'السعر (شيكل)', actions: 'الإجراءات',
     orderSummary: 'ملخص الطلب',

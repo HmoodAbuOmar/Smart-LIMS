@@ -1,6 +1,12 @@
 .reception-today-layout .ro-orders{inline-size:100%;max-inline-size:1120px;margin-inline:auto;display:grid;gap:18px;color:var(--medical-deep);font:14px/1.6 var(--font-ui);min-inline-size:0}
 .reception-today-layout .ro-orders h1{font-size:25px;line-height:1.4}
 .ro-orders h1 bdi{display:inline-block;white-space:nowrap}
+.ro-booking-action{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-block-end:12px}
+.ro-booking-action p{font-size:12px;flex:1;min-inline-size:min(100%,220px)}
+.ro-cancel-order{margin-block-start:16px;border-block-start:1px solid var(--medical-border-light);padding-block-start:12px}
+.ro-cancel-order summary{cursor:pointer;color:var(--medical-green);font-weight:600}
+.ro-cancel-order form{display:grid;gap:9px;margin-block-start:12px;max-inline-size:480px}
+.ro-cancel-order textarea{box-sizing:border-box;inline-size:100%;border:1px solid var(--medical-border-light);border-radius:8px;padding:8px;resize:vertical;font:14px/1.6 var(--font-ui);color:var(--medical-deep);background:white}
 .ro-table .ro-numeric{text-align:end}
 @container ro-table (max-width:600px){.ro-table td.ro-numeric{text-align:start}.ro-table td.ro-numeric>div{text-align:end}}
 .ro-orders :is(h1,h2,p){margin:0}.ro-orders h1{font-size:25px;line-height:1.4}.ro-orders h2{font-size:18px}.ro-orders p{color:var(--medical-secondary)}

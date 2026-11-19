@@ -1,4 +1,5 @@
-import { canCheckIn, canMarkNoShow, todayDate } from './todayModel.js'
+import { createAppointmentsStore } from '../appointments/appointmentsDevelopmentStore.js'
+import { todayDate } from './todayModel.js'
 export function createTodayData(now = new Date()) {
   const date = todayDate(now)
   // Midday UTC lies on the same calendar day in the scheduling zone, including DST.
@@ -18,22 +19,6 @@ export function createTodayData(now = new Date()) {
     version: 0, checkInEligible: i !== 6, noShowSupported: true,
   }))
 }
-export function createTodayService({ initial, now = () => new Date(), delay = 140, beforeWrite = async () => {} } = {}) {
-  const data = structuredClone(initial ?? createTodayData(now()))
-  const wait = () => new Promise(resolve => setTimeout(resolve, delay))
-  const fail = code => { const error = new Error(code); error.code = code; throw error }
-  async function change(id, version, action) {
-    await wait()
-    await beforeWrite(action, id)
-    const record = data.find(appointment => appointment.id === id)
-    if (!record || record.version !== version) fail('APPOINTMENT_CHANGED')
-    const timestamp = now()
-    if (todayDate(new Date(record.startsAt)) !== todayDate(timestamp)) fail('APPOINTMENT_CHANGED')
-    if (action === 'checkIn' ? !canCheckIn(record) : !canMarkNoShow(record, timestamp)) fail('APPOINTMENT_STATE_CONFLICT')
-    record.status = action === 'checkIn' ? 'CHECKED_IN' : 'NO_SHOW'
-    if (action === 'checkIn') record.arrivedAt = timestamp.toISOString()
-    record.version++
-    return structuredClone(record)
-  }
-  return { async load() { await wait(); return structuredClone(data) }, checkIn: (id, version) => change(id, version, 'checkIn'), markNoShow: (id, version) => change(id, version, 'noShow') }
+export function createTodayService(options = {}) {
+  return createAppointmentsStore({ ...options, initial: options.initial ?? createTodayData((options.now || (() => new Date()))()) })
 }

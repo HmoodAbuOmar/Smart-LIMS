@@ -1,5 +1,7 @@
 export const ordersCopy = {
   en: {
+    createBooking: 'Create booking', bookingUnavailable: 'Booking requires a pending order with test items and no active appointment.',
+    cancelOrder: 'Cancel order', cancelReason: 'Reason for cancelling the order', reasonRequired: 'Enter a reason (up to 1000 characters).', cancelError: 'Could not cancel the order. Your reason has been kept.', cancelNotice: 'Cancelling this order also cancels its active booked appointment.',
     title: 'Orders', subtitle: 'Find orders and review laboratory and payment activity.', workspace: 'Order workspace', newOrder: 'Create Walk-in Order', open: 'Open order', back: 'Back to Orders', search: 'Search by order number or patient', loading: 'Loading orders…', error: 'Could not load this order data.', retry: 'Retry', missing: 'Order not found', empty: 'No orders found',
     number: 'Order No.', patient: 'Patient', file: 'File No.', dob: 'Date of Birth', gender: 'Gender', phone: 'Phone', total: 'Total', paid: 'Paid', outstanding: 'Outstanding', status: 'Status', created: 'Created', type: 'Order type', actions: 'Actions',
     items: 'Items', appointment: 'Appointment', payments: 'Payments', details: 'Order Details', code: 'Code', test: 'Test', price: 'Price (ILS)', amount: 'Amount (ILS)',
@@ -8,6 +10,8 @@ export const ordersCopy = {
     production: 'Receptionist orders are unavailable: staff authentication and frontend transport are not configured, and staff order-list/detail and payment APIs are missing. No order is created by opening this page.', showing: count => `${count} orders`, previous: 'Previous', next: 'Next',
   },
   ar: {
+    createBooking: 'إنشاء حجز', bookingUnavailable: 'يلزم للحجز طلب قيد الانتظار يحتوي على فحوصات وليس لديه موعد نشط.',
+    cancelOrder: 'إلغاء الطلب', cancelReason: 'سبب إلغاء الطلب', reasonRequired: 'أدخل سببًا بحد أقصى ١٠٠٠ حرف.', cancelError: 'تعذّر إلغاء الطلب. احتُفظ بالسبب.', cancelNotice: 'يؤدي إلغاء الطلب إلى إلغاء موعده المحجوز النشط أيضًا.',
     title: 'الطلبات', subtitle: 'ابحث عن الطلبات وراجع نشاط المختبر والمدفوعات.', workspace: 'مساحة عمل الطلب', newOrder: 'إنشاء طلب زيارة دون موعد', open: 'فتح الطلب', back: 'العودة إلى الطلبات', search: 'ابحث برقم الطلب أو المريض', loading: 'جارٍ تحميل الطلبات…', error: 'تعذّر تحميل بيانات الطلب.', retry: 'إعادة المحاولة', missing: 'لم يُعثر على الطلب', empty: 'لم يُعثر على طلبات',
     number: 'رقم الطلب', patient: 'المريض', file: 'رقم الملف', dob: 'تاريخ الميلاد', gender: 'الجنس', phone: 'الهاتف', total: 'الإجمالي', paid: 'المدفوع', outstanding: 'المتبقي', status: 'الحالة', created: 'تاريخ الإنشاء', type: 'نوع الطلب', actions: 'الإجراءات',
     items: 'الفحوصات', appointment: 'الموعد', payments: 'المدفوعات', details: 'تفاصيل الطلب', code: 'الرمز', test: 'الفحص', price: 'السعر (شيكل)', amount: 'المبلغ (شيكل)',

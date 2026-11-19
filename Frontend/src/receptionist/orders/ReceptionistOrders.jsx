@@ -8,6 +8,7 @@ import { SCHEDULING_TIME_ZONE } from '../today/todayModel.js'
 import { balances, ordersRoute } from './ordersModel.js'
 import { ordersCopy } from './ordersCopy.js'
 import './orders.css'
+import { bookableOrder } from '../appointments/appointmentsModel.js'
 
 const tabs = ['items', 'appointment', 'payments', 'details']
 function Table({ columns, rows, numeric = [] }) {
@@ -17,9 +18,11 @@ export default function ReceptionistOrders({ orderId, service = walkInService })
   const { i18n } = useTranslation(), language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en', copy = ordersCopy[language]
   const [data, setData] = useState(null), [state, setState] = useState('loading'), [attempt, setAttempt] = useState(0)
   const [tab, setTab] = useState('items'), [search, setSearch] = useState(''), [page, setPage] = useState(0)
+  const [cancelReason, setCancelReason] = useState(''), [cancelling, setCancelling] = useState(false), [cancelError, setCancelError] = useState('')
+  const cancelLock = useRef(false), mounted = useRef(false)
   const [created, setCreated] = useState(() => !!orderId && window.sessionStorage.getItem('smart-lims.just-created-order') === orderId)
   const heading = useRef(null)
-  useEffect(() => { heading.current?.focus() }, [])
+  useEffect(() => { mounted.current = true; heading.current?.focus(); return () => { mounted.current = false } }, [])
   useEffect(() => { if (created) window.sessionStorage.removeItem('smart-lims.just-created-order') }, [created])
   useEffect(() => {
     let active = true
@@ -48,6 +51,17 @@ export default function ReceptionistOrders({ orderId, service = walkInService })
   const birthDate = value => value ? new Intl.DateTimeFormat(language === 'ar' ? 'ar-PS' : 'en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)) : '—'
   const newOrder = () => { window.location.hash = '/__receptionist/walk-in' }
   const order = data?.order, patient = data?.patient, balance = order && balances(order)
+  async function cancelOrder(event) {
+    event.preventDefault(); if (cancelLock.current) return
+    if (!cancelReason.trim() || cancelReason.trim().length > 1000) { setCancelError('reasonRequired'); return }
+    cancelLock.current = true; setCancelling(true); setCancelError('')
+    try {
+      const saved = await service.cancelOrder(order.id, cancelReason.trim())
+      if (saved.id !== order.id || saved.status !== 'CANCELLED') throw new Error('Unconfirmed cancellation')
+      if (mounted.current) { setState('loading'); setAttempt(value => value + 1) }
+    } catch { if (mounted.current) setCancelError('cancelError') }
+    finally { cancelLock.current = false; if (mounted.current) setCancelling(false) }
+  }
   const matches = data?.orders?.filter(order => {
     const patient = data.patients.get(order.patientId), needle = search.trim().toLocaleLowerCase()
     return [order.orderNumber, patient.fullName, patient.nameEn, patient.nameAr].some(value => value?.toLocaleLowerCase().includes(needle))
@@ -69,9 +83,10 @@ export default function ReceptionistOrders({ orderId, service = walkInService })
         setTab(next); document.getElementById(`ro-tab-${next}`)?.focus()
       }}>{copy[id]}</button>)}</div>
       <section className="ro-card" id="ro-panel" role="tabpanel" tabIndex={0} aria-labelledby={`ro-tab-${tab}`}>
-        {tab === 'items' ? !order.items?.length ? <p className="ro-empty">{copy.itemGap}</p> : <><Table numeric={[2]} columns={[copy.code, copy.test, copy.price, copy.status]} rows={order.items.map(item => [<bdi key="c">{item.testCode}</bdi>, testName(item, language) || item.testName, <bdi key="p">{money(Math.round(item.priceAtOrder * 100), language)}</bdi>, badge(item.status)])} /><p className="ro-note">{copy.statusGap}</p></> : tab === 'appointment' ? !order.appointments?.length ? <p className="ro-empty">{copy.noAppointment}</p> : <Table columns={[copy.created, copy.status]} rows={order.appointments.map(appointment => [<bdi key="d">{appointment.date} {appointment.time}</bdi>, badge(appointment.status)])} /> : tab === 'payments' ? <><div className="ro-payment-action"><button type="button" disabled aria-describedby="ro-payment-gap">{copy.recordPayment}</button><p id="ro-payment-gap">{copy.paymentGap}</p></div>{!order.transactions?.length ? <p className="ro-empty">{copy.noPayments}</p> : <Table numeric={[1]} columns={[copy.type, copy.amount, copy.status]} rows={order.transactions.map(entry => [copy[entry.type] || copy.unavailable, <bdi key="a">{money(Math.round(entry.amount * 100), language)}</bdi>, badge(entry.status)])} />}</> : <dl className="ro-details">{[[copy.number, order.orderNumber], [copy.type, copy[order.source] || copy.unavailable], [copy.created, dateTime(order)], [copy.notes, order.notes || '—']].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+        {tab === 'items' ? !order.items?.length ? <p className="ro-empty">{copy.itemGap}</p> : <><Table numeric={[2]} columns={[copy.code, copy.test, copy.price, copy.status]} rows={order.items.map(item => [<bdi key="c">{item.testCode}</bdi>, testName(item, language) || item.testName, <bdi key="p">{money(Math.round(item.priceAtOrder * 100), language)}</bdi>, badge(item.status)])} /><p className="ro-note">{copy.statusGap}</p></> : tab === 'appointment' ? <><div className="ro-booking-action"><button type="button" className="ro-primary ro-create-booking" disabled={!bookableOrder(order, order.appointments)} aria-describedby="ro-booking-rule" onClick={() => { window.location.hash = `/__receptionist/appointments?orderId=${encodeURIComponent(order.id)}` }}>{copy.createBooking}</button>{!bookableOrder(order, order.appointments) && <p id="ro-booking-rule">{copy.bookingUnavailable}</p>}</div>{!order.appointments?.length ? <p className="ro-empty">{copy.noAppointment}</p> : <Table columns={[copy.created, copy.status]} rows={order.appointments.map(appointment => [<bdi key="d">{appointment.startsAt ? dateTime({createdAt:appointment.startsAt}) : `${appointment.date} ${appointment.time}`}</bdi>, badge(appointment.status)])} />}</> : tab === 'payments' ? <><div className="ro-payment-action"><button type="button" disabled aria-describedby="ro-payment-gap">{copy.recordPayment}</button><p id="ro-payment-gap">{copy.paymentGap}</p></div>{!order.transactions?.length ? <p className="ro-empty">{Array.isArray(order.transactions) ? copy.noPayments : copy.unavailable}</p> : <Table numeric={[1]} columns={[copy.type, copy.amount, copy.status]} rows={order.transactions.map(entry => [copy[entry.type] || copy.unavailable, <bdi key="a">{money(Math.round(entry.amount * 100), language)}</bdi>, badge(entry.status)])} />}</> : <dl className="ro-details">{[[copy.number, order.orderNumber], [copy.type, copy[order.source] || copy.unavailable], [copy.created, dateTime(order)], [copy.notes, order.notes || '—']].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+        {tab === 'details' && order.status === 'PENDING' && !order.appointments?.some(record => record.status === 'CHECKED_IN') && <details className="ro-cancel-order"><summary>{copy.cancelOrder}</summary><form noValidate onSubmit={event => void cancelOrder(event)}><p>{copy.cancelNotice}</p><label htmlFor="ro-cancel-reason">{copy.cancelReason} *</label><textarea id="ro-cancel-reason" required maxLength={1000} rows={2} value={cancelReason} disabled={cancelling} onChange={event => setCancelReason(event.target.value)} />{cancelError && <p role="alert">{copy[cancelError]}</p>}<button type="submit" disabled={cancelling}>{copy.cancelOrder}</button></form></details>}
       </section>
-      <section className="ro-balances ro-card" aria-label={copy.payments}>{[['total', balance?.total ?? Math.round(order.totalAmount * 100)], ['paid', balance?.paid], ['outstanding', balance?.outstanding]].map(([label, amount]) => <div key={label}><span>{copy[label]}</span><strong data-balance={label}>{amount === undefined ? copy.unavailable : <bdi>{money(amount, language)}</bdi>}</strong></div>)}</section>
+      <section className="ro-balances ro-card" aria-label={copy.payments}>{[['total', balance?.total ?? (order.totalAmount == null ? undefined : Math.round(order.totalAmount * 100))], ['paid', balance?.paid], ['outstanding', balance?.outstanding]].map(([label, amount]) => <div key={label}><span>{copy[label]}</span><strong data-balance={label}>{amount === undefined ? copy.unavailable : <bdi>{money(amount, language)}</bdi>}</strong></div>)}</section>
     </>}
   </section>
 }
