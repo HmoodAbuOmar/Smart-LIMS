@@ -47,7 +47,7 @@ Modified existing files:
 
 - `src/App.jsx`
 - `src/i18n.js`
-- `src/components/Navbar.jsx`
+- `src/marketing/Navbar.jsx`
 - `src/locales/en/common.json`
 - `src/locales/ar/common.json`
 - `src/styles/refinements/index.css`
@@ -63,8 +63,8 @@ Modified existing files:
 
 New files:
 
-- `src/components/ProductShowcase.jsx`
-- `src/components/ProductShowcase.css`
+- `src/marketing/ProductShowcase.jsx`
+- `src/marketing/ProductShowcase.css`
 - `src/locales/en/showcase.json`
 - `src/locales/ar/showcase.json`
 - `src/styles/refinements/09-hero-balance.css`

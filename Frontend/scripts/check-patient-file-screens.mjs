@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import assert from 'node:assert/strict'
 
 
-const testHtml = "<!doctype html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body><div id=\"root\"></div><script type=\"module\">\nimport React, {useEffect,useState} from 'react';import {createRoot} from 'react-dom/client';\nimport '/src/i18n.js';import '/src/index.css';import '/src/App.css';import '/src/theme.css';import '/src/styles/refinements/index.css';import '/src/components/Navbar.css';\nimport {AuthLayout} from '/src/components/AuthModal.jsx';\nimport {PatientOnboardingContent} from '/src/components/PatientOnboarding.jsx';\nimport PatientFileStateProvider from '/src/components/PatientFileStateProvider.jsx';\nfunction Components(){const [hash,setHash]=useState(location.hash);useEffect(()=>{const fn=()=>setHash(location.hash);addEventListener('hashchange',fn);return()=>removeEventListener('hashchange',fn)},[]);const step=({'#/patient/file':'selection','#/patient/file/new':'createFile','#/patient/file/link':'linkFile'})[hash]||'selection';return React.createElement(PatientFileStateProvider,null,React.createElement(AuthLayout,{mode:'login'},React.createElement(PatientOnboardingContent,{step,key:step})))}\ncreateRoot(document.getElementById('root')).render(React.createElement(Components));\n</script></body></html>"
+const testHtml = "<!doctype html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body><div id=\"root\"></div><script type=\"module\">\nimport React, {useEffect,useState} from 'react';import {createRoot} from 'react-dom/client';\nimport '/src/i18n.js';import '/src/index.css';import '/src/App.css';import '/src/theme.css';import '/src/styles/refinements/index.css';import '/src/marketing/Navbar.css';\nimport {AuthLayout} from '/src/components/AuthModal.jsx';\nimport {PatientOnboardingContent} from '/src/components/PatientOnboarding.jsx';\nimport PatientFileStateProvider from '/src/components/PatientFileStateProvider.jsx';\nfunction Components(){const [hash,setHash]=useState(location.hash);useEffect(()=>{const fn=()=>setHash(location.hash);addEventListener('hashchange',fn);return()=>removeEventListener('hashchange',fn)},[]);const step=({'#/patient/file':'selection','#/patient/file/new':'createFile','#/patient/file/link':'linkFile'})[hash]||'selection';return React.createElement(PatientFileStateProvider,null,React.createElement(AuthLayout,{mode:'login'},React.createElement(PatientOnboardingContent,{step,key:step})))}\ncreateRoot(document.getElementById('root')).render(React.createElement(Components));\n</script></body></html>"
 const server = await createServer({server:{host:'127.0.0.1',port:5174,strictPort:true},plugins:[{
   name:'isolated-patient-component-check', configureServer(vite){vite.middlewares.use('/__patient_components',async(req,res,next)=>{
     try{res.setHeader('Content-Type','text/html');res.end(await vite.transformIndexHtml('/__patient_components',testHtml))}catch(error){next(error)}
@@ -95,8 +95,9 @@ try {
   await evaluate("location.hash='#/patient/file/link'");await waitFor("!!document.getElementById('file-identifier')")
   assert.equal(await evaluate("document.getElementById('file-identifier').value"),'','Link identifier is discarded on leaving')
   for(const language of ['en','ar']) {
-    await evaluate("document.querySelector('.language-switcher__trigger').click()")
-    await evaluate(`document.querySelectorAll('[role=menuitemradio]')[${language==='ar'?0:1}].click()`)
+    const segment = `.language-switcher button[lang=${language}]`
+    await evaluate(`document.querySelector('${segment}').click()`)
+    await waitFor(`document.documentElement.lang === '${language}' && document.querySelector('${segment}').getAttribute('aria-pressed') === 'true'`)
     for(const route of ['#/patient/file','#/patient/file/new','#/patient/file/link']) {
       await evaluate('location.hash='+JSON.stringify(route));await delay(150)
       assert.ok(await evaluate("!document.body.innerText.match(/preview|demo|mock|backend/i)"))

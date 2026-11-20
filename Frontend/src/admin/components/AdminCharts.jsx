@@ -15,9 +15,10 @@ export default function AdminCharts({ daily, summary, copy, number, date, local,
     return `C ${middle} ${previous.y}, ${middle} ${point.y}, ${point.x} ${point.y}`
   }).join(' ')
   const colors = ['#083f3d', '#12645f', '#426b67', '#77b4a7', '#a9d3c7', '#d9eee9']
-  const segments = summary.testDistribution.map((test, index, tests) => ({ ...test, color: colors[index],
-    percent: summary.total ? test.count / summary.total * 100 : 0,
-    offset: summary.total ? tests.slice(0, index).reduce((sum, value) => sum + value.count, 0) / summary.total * 100 : 0,
+  const totalTests = summary.totalTests ?? summary.total
+  const segments = summary.testDistribution.map((test, index, tests) => ({ ...test, color: colors[index % colors.length],
+    percent: totalTests ? test.count / totalTests * 100 : 0,
+    offset: totalTests ? tests.slice(0, index).reduce((sum, value) => sum + value.count, 0) / totalTests * 100 : 0,
   }))
   return <section className="admin-overview-charts" aria-label={copy.activity}>
     <article className="admin-overview-panel admin-activity-panel">
@@ -32,7 +33,7 @@ export default function AdminCharts({ daily, summary, copy, number, date, local,
       <svg className="admin-activity-chart" viewBox="0 24 640 200" preserveAspectRatio="none" aria-hidden="true">
         <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#12645f" stopOpacity=".24" /><stop offset="100%" stopColor="#d9eee9" stopOpacity=".12" /></linearGradient></defs>
         {[0, 1, 2, 3].map(tick => <g key={tick}><line className="admin-chart-gridline" x1="44" x2="596" y1={182 - tick * 44} y2={182 - tick * 44} /><text className="admin-chart-axis" x={rtl ? 620 : 20} y={186 - tick * 44} textAnchor="middle">{number(Math.round(maximum * tick / 3))}</text></g>)}
-        <path className="admin-chart-area" fill={`url(#${areaGradientId})`} d={`${line} L ${points.at(-1).x} 182 L ${points[0].x} 182 Z`} />
+        {points.length > 0 && <path className="admin-chart-area" fill={`url(#${areaGradientId})`} d={`${line} L ${points.at(-1).x} 182 L ${points[0].x} 182 Z`} />}
         <path className="admin-chart-line" d={line} />
         {points.map((point, index) => <g className="admin-activity-column" key={point.date}>
           <circle cx={point.x} cy={point.y} r={activeDate === point.date ? 5 : 4} className="admin-chart-point" />
@@ -54,11 +55,11 @@ export default function AdminCharts({ daily, summary, copy, number, date, local,
     </article>
     <article className="admin-overview-panel admin-distribution-panel">
       <div className="admin-overview-panel-heading"><div><h3>{copy.distribution}</h3><p>{copy.distributionNote}</p></div></div>
-      <div className="admin-distribution-content"><div className="admin-test-donut" role="img" aria-label={`${copy.distribution}: ${number(summary.total)} ${copy.tests}`}>
+      <div className="admin-distribution-content"><div className="admin-test-donut" role="img" aria-label={`${copy.distribution}: ${number(totalTests)} ${copy.tests}`}>
         <svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="60" fill="none" stroke="#edf6f3" strokeWidth="20" />
           {segments.map(segment => <circle className="admin-donut-segment" key={segment.id} cx="80" cy="80" r="60" pathLength="100" fill="none" stroke={segment.color} strokeWidth="20" strokeDasharray={`${Math.max(0, segment.percent - .8)} ${100 - Math.max(0, segment.percent - .8)}`} strokeDashoffset={-segment.offset} transform="rotate(-90 80 80)" />)}
         </svg>
-        <div><strong>{number(summary.total)}</strong><span>{copy.tests}</span></div>
+        <div><strong>{number(totalTests)}</strong><span>{copy.tests}</span></div>
       </div>
       <ul className="admin-test-legend">{segments.map(segment => <li key={segment.id}><span className="admin-test-swatch" style={{ backgroundColor: segment.color }} aria-hidden="true" /><span>{local(segment.name)}</span><strong>{number(segment.count)}</strong><small>{number(Math.round(segment.percent))}%</small></li>)}</ul>
       </div>

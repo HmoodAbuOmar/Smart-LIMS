@@ -48,7 +48,7 @@ try {
     assert.equal(document.documentElement.lang, language)
     assert.equal(document.documentElement.dir, language === 'ar' ? 'rtl' : 'ltr')
     assert.equal(storage.get('smart-lims.language'), language)
-    assert.equal(document.title, 'Smart-LIMS')
+    assert.equal(document.title, 'Smart-LIMS | Laboratory Platform')
     assert.equal(meta.content, i18n.t('landing:meta.description'))
     const markup = renderToStaticMarkup(createElement(App))
     for (const key of ['hero.title1', 'roles.patient.title', 'months.Jan', 'cta.button', 'testimonial.quote']) {
@@ -56,7 +56,7 @@ try {
       assert.ok(markup.includes(translated), `render includes ${language} ${key}`)
     }
     assert.ok(markup.includes('value="6 months" selected=""'), 'chart selection retains a stable value')
-    for (const key of ['heading', 'empty']) {
+    for (const key of ['heading', 'panelTitles.samples']) {
       const translated = renderToStaticMarkup(createElement('span', null, i18n.t(`showcase:${key}`))).slice(6, -7)
       assert.ok(markup.includes(translated), `render includes ${language} showcase ${key}`)
     }

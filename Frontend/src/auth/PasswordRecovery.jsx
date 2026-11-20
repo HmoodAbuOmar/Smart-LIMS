@@ -1,47 +1,47 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff } from 'lucide-react'
 import { authApi as patientApi } from './api.js'
 import { actionErrorKey } from './access.js'
-import { readLinkToken, clearLinkToken, validateEmail, validatePasswordReset } from '../services/emailFlow.js'
+import { clearLinkToken, validateEmail, validatePasswordReset } from '../services/emailFlow.js'
 import useFormAction from '../utils/useFormAction.js'
 
 export default function PasswordRecovery({ reset = false }) {
   const { t } = useTranslation('auth')
-  const token = useRef(reset ? readLinkToken(window.location) : '')
-  const [values, setValues] = useState({ email: '', password: '', confirmPassword: '' })
+  const [values, setValues] = useState({ email: '', code: '', password: '', confirmPassword: '' })
   const [visible, setVisible] = useState({})
   const [completed, setCompleted] = useState(false)
-  const fields = reset ? ['password', 'confirmPassword'] : ['email']
   useEffect(() => { if (reset) clearLinkToken() }, [reset])
+  const fields = reset ? ['email', 'code', 'password', 'confirmPassword'] : ['email']
   const { errors, clearField, pending, failure, submit } = useFormAction({
-    values, fields, validate: reset ? validatePasswordReset : validateEmail,
+    values, fields, validate: details => ({ ...validateEmail(details), ...(reset ? {
+      ...validatePasswordReset(details), ...(/^\d{4}$/.test(details.code.trim()) ? {} : { code: 'resetCodeInvalid' }),
+    } : {}) }),
     action: (details, options) => {
       if (!reset) return patientApi.requestPasswordReset({ email: details.email.trim() }, options)
-      if (!token.current) { const error = new Error('Reset link is required'); error.code = 'TOKEN_INVALID'; throw error }
-      return patientApi.resetPassword({ token: token.current, password: details.password }, options)
+      return patientApi.resetPassword({ email: details.email.trim(), code: details.code.trim(), newPassword: details.password }, options)
     },
     onSuccess: result => {
       if ((reset ? result?.passwordReset : result?.accepted) !== true) throw new Error('Recovery request was not confirmed')
-      if (reset) token.current = ''
       setCompleted(true)
-      setValues({ email: '', password: '', confirmPassword: '' })
+      setValues({ email: '', code: '', password: '', confirmPassword: '' })
     },
   })
   return <>
     <div className="eyebrow">{t('recovery.label')}</div>
     <h1 id="auth-heading" tabIndex={-1}>{t(reset ? 'recovery.resetTitle' : 'recovery.title')}</h1>
     <p id="auth-description">{t(reset ? 'recovery.resetDescription' : 'recovery.description')}</p>
-    {completed ? <p className="auth-supporting" role="status">{t(reset ? 'recovery.resetComplete' : 'recovery.requestAccepted')}</p> : <form noValidate onSubmit={submit} aria-busy={pending}>
+    {completed ? <><p className="auth-supporting" role="status">{t(reset ? 'recovery.resetComplete' : 'recovery.requestAccepted')}</p>{!reset && <a className="auth-submit" href="#/reset-password">{t('fields.code')}</a>}</> : <form noValidate onSubmit={submit} aria-busy={pending}>
       {fields.map(field => {
-        const password = field !== 'email'
+        const password = field === 'password' || field === 'confirmPassword'
         const id = 'recovery-' + field
         const visibilityKey = field === 'confirmPassword' ? 'ConfirmPassword' : 'Password'
         return <div className="auth-field" key={field}>
           <label htmlFor={id}>{t('fields.' + field)}</label>
           <div className={password ? 'auth-password' : undefined}>
-            <input id={id} name={field} type={password ? visible[field] ? 'text' : 'password' : 'email'}
-              dir={password ? undefined : 'ltr'} autoComplete={password ? 'new-password' : 'email'} required disabled={pending}
+            <input id={id} name={field} type={password ? visible[field] ? 'text' : 'password' : field === 'code' ? 'text' : 'email'}
+              inputMode={field === 'code' ? 'numeric' : undefined} maxLength={field === 'code' ? 4 : undefined}
+              dir={password ? undefined : 'ltr'} autoComplete={password ? 'new-password' : field === 'code' ? 'one-time-code' : 'email'} required disabled={pending}
               value={values[field]} onChange={event => { setValues(previous => ({ ...previous, [field]: event.target.value })); clearField(field) }}
               aria-invalid={Boolean(errors[field])} aria-describedby={errors[field] ? id + '-error' : field === 'password' ? 'recovery-password-hint' : undefined} />
             {password && <button type="button" className="auth-password-toggle" disabled={pending} aria-controls={id} aria-pressed={Boolean(visible[field])}

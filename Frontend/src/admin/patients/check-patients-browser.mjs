@@ -79,8 +79,8 @@ try {
     assert.ok(!unwantedCopy.test(copy), `Unexpected presentation wording at ${await evaluate('location.hash')}: ${copy.match(unwantedCopy)?.[0]}`)
   }
   const copyRoutes = [
-    ['', '.hero'], ['#/signup', '[data-walkthrough-step]'], ['#/login', '[data-walkthrough-step]'],
-    ['#/verify-email', '[data-walkthrough-step]'], ['#/forgot-password', '.auth-field'], ['#/reset-password', '#auth-heading'],
+    ['', '.hero'], ['#/signup?preview=1', '[data-walkthrough-step]'], ['#/login?preview=1', '[data-walkthrough-step]'],
+    ['#/verify-email?preview=1', '[data-walkthrough-step]'], ['#/forgot-password', '.auth-field'], ['#/reset-password', '#auth-heading'],
     ['#/onboarding/file', '[data-walkthrough-step]'],
     ...['overview', 'users', 'patients'].map(page => [`#/__admin/${page}`, '.admin-layout']),
     ...['dashboard', 'profile', 'tests', 'tests/cbc', 'orders', 'orders/SAMPLE-0012', 'appointments', 'results', 'results/SAMPLE-R1', 'history', 'notifications', 'review', 'book'].map(page => [`#/__portal/${page}`, '.patient-portal']),

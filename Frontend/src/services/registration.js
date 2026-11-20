@@ -6,7 +6,7 @@ export function validateRegistration(values) { return validateAuth(values, 'sign
 export function toRegistrationPayload(values) {
   return { fullName: values.name.trim(), email: values.email.trim(), password: values.password }
 }
-// Local validation only. Add the account API adapter here when its contract exists.
+// Used by the isolated walkthrough to validate without creating an account.
 export function prepareRegistration(values) {
   const errors = validateRegistration(values)
   return { status: Object.keys(errors).length ? 'invalid' : 'validated', errors }

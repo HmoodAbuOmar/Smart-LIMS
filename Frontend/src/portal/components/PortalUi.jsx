@@ -6,6 +6,15 @@ export function Title({ title, hint, children }) { const { t } = usePortal(); re
 
 export function Button({ children, onClick, secondary = false, ...props }) { return <button type="button" className={`portal-button ${secondary ? 'is-secondary' : ''}`} onClick={onClick} {...props}>{children}</button> }
 
+export function PageActions({ data, page, onChange }) {
+  const { t } = usePortal()
+  if (!data || (page === 0 && data.totalPages <= 1)) return null
+  return <div className="portal-actions">
+    <Button secondary disabled={page === 0} onClick={() => onChange(page - 1)}>{t('previous')}</Button>
+    <Button secondary disabled={data.last || page + 1 >= data.totalPages} onClick={() => onChange(page + 1)}>{t('next')}</Button>
+  </div>
+}
+
 export function VisitLink({ visit }) { const { t, navigate } = usePortal(); return visit ? <Button secondary onClick={() => navigate(`history/${visit.id}`)}>{t('viewVisit')}</Button> : null }
 
 export function Status({ value }) { const { t } = usePortal(); return <span className={`portal-status status-${value}`}>{t(value === 'published' ? 'available' : value)}</span> }

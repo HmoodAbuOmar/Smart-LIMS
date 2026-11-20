@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Eye, EyeOff } from 'lucide-react'
-import { validateAuth } from '../utils/authValidation.js'
-import { authApi as patientApi } from './api.js'
-import { authenticatedPatientDestination, actionErrorKey } from './access.js'
+import { authApi } from './api.js'
+import { accountDestination, actionErrorKey } from './access.js'
 import useFormAction from '../utils/useFormAction.js'
+
+function validateLogin({ email, password }) {
+  return { ...(email.trim() ? {} : { email: 'identityRequired' }), ...(password ? {} : { password: 'passwordRequired' }) }
+}
 
 export default function Login({ mode = 'login' }) {
   const { t } = useTranslation(['auth', 'common'])
@@ -12,11 +15,12 @@ export default function Login({ mode = 'login' }) {
   const [visible, setVisible] = useState({})
   const fields = ['email', 'password']
   const { errors, setErrors, clearField, pending, failure, submit } = useFormAction({
-    values, fields, validate: details => validateAuth(details, 'login'),
-    action: (details, options) => patientApi.login({ email: details.email.trim(), password: details.password }, options),
+    values, fields, validate: validateLogin,
+    action: (details, options) => authApi.login({ email: details.email.trim(), password: details.password }, options),
     onSuccess: async (_result, options) => {
-      const destination = await authenticatedPatientDestination(options)
-      if (destination === '#/login') throw new Error('Authentication was not confirmed')
+      const destination = accountDestination(await authApi.getAccess(options))
+      options.signal.throwIfAborted()
+      if (!destination || destination === '#/login') throw new Error('Authentication was not confirmed')
       window.location.hash = destination.slice(1)
     },
   })
@@ -37,22 +41,22 @@ export default function Login({ mode = 'login' }) {
         const errorId = `${id}-error`
         const visibilityKey = field === 'confirmPassword' ? 'ConfirmPassword' : 'Password'
         return <div className="auth-field" key={field}>
-          <label htmlFor={id}>{t(`auth:fields.${field}`)}</label>
+          <label htmlFor={id}>{t(field === 'email' ? 'auth:fields.identity' : `auth:fields.${field}`)}</label>
           <div className={password ? 'auth-password' : undefined}>
             <input
               id={id}
               name={field}
-              type={password ? (visible[field] ? 'text' : 'password') : field === 'email' ? 'email' : 'text'}
+              type={password && !visible[field] ? 'password' : 'text'}
               value={values[field]}
               onChange={event => updateValue(field, event.target.value)}
-              onBlur={() => setErrors(previous => ({ ...previous, [field]: validateAuth(values, mode)[field] }))}
+              onBlur={() => setErrors(previous => ({ ...previous, [field]: validateLogin(values)[field] }))}
               required
               disabled={pending}
               autoFocus={index === 0}
               autoComplete={field === 'email' ? 'username' : 'current-password'}
               dir={field === 'email' ? 'ltr' : undefined}
               lang={field === 'email' ? 'en' : undefined}
-              placeholder={t(`auth:fields.${field}`)}
+              placeholder={t(field === 'email' ? 'auth:fields.identity' : `auth:fields.${field}`)}
               aria-invalid={Boolean(errors[field])}
               aria-describedby={errors[field] ? errorId : undefined}
               autoCapitalize={field === 'name' ? 'words' : 'none'}

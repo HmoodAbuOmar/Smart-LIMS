@@ -15,7 +15,7 @@ export const adminCopy = {
     items: {
       overview: 'Dashboard', users: 'Users', patients: 'Patients', testCatalog: 'Test Catalog',
       tests: 'Tests', parameters: 'Parameters', referenceRanges: 'Reference Ranges', bookingSlots: 'Booking Slots',
-      operationsPayments: 'Operations & Payments', reports: 'Reports', auditLog: 'Audit Log', settings: 'Settings',
+      operationsPayments: 'Operations & Payments', reports: 'Reports', auditLog: 'Audit Log',
     },
   },
   ar: {
@@ -34,7 +34,7 @@ export const adminCopy = {
     items: {
       overview: 'لوحة التحكم', users: 'المستخدمون', patients: 'المرضى', testCatalog: 'دليل الفحوصات',
       tests: 'الفحوصات', parameters: 'المعايير', referenceRanges: 'النطاقات المرجعية', bookingSlots: 'مواعيد الحجز',
-      operationsPayments: 'العمليات والمدفوعات', reports: 'التقارير', auditLog: 'سجل التدقيق', settings: 'الإعدادات',
+      operationsPayments: 'العمليات والمدفوعات', reports: 'التقارير', auditLog: 'سجل التدقيق',
     },
   },
 }

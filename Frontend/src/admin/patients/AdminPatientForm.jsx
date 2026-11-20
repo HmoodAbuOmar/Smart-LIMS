@@ -30,7 +30,7 @@ export default function AdminPatientForm({ patient, language, onToggleLanguage, 
 
   function close() { if (!submitting.current) onClose() }
   function update(field, value) {
-    setValues(current => ({ ...current, [field]: value }))
+    setValues(current => ({ ...current, [field]: value, ...(service.live && field === 'nameEn' ? { nameAr: value } : {}) }))
     setErrors(current => ({ ...current, [field]: undefined }))
     setFailed(false)
   }
@@ -69,12 +69,12 @@ export default function AdminPatientForm({ patient, language, onToggleLanguage, 
     <form onSubmit={save} noValidate aria-busy={saving}>
       {patient && <div className="ap-form-identity"><AdminPatientAvatar patient={patient} language={language} /><div><strong>{patientName(patient, language)}</strong><bdi className="ap-file-number">{patient.fileNumber}</bdi></div></div>}
       <p id="patient-form-guidance" className="ap-muted">{copy.guidance}</p>
-      {fields.map(field => <div className={`ap-field ap-field-${field}`} key={field}>
-        <label htmlFor={`patient-${field}`}>{copy[field]}{field !== 'address' && <span aria-hidden="true"> *</span>}</label>
+      {fields.filter(field => !service.live || field !== 'nameAr').map(field => <div className={`ap-field ap-field-${field}`} key={field}>
+        <label htmlFor={`patient-${field}`}>{service.live && field === 'nameEn' ? copy.fullName : copy[field]}{field !== 'address' && <span aria-hidden="true"> *</span>}</label>
         {field === 'gender' ? <select id={`patient-${field}`} name={field} value={values[field]} disabled={saving} required aria-invalid={Boolean(errors[field])} aria-describedby={errors[field] ? `patient-error-${field}` : undefined} onChange={event => update(field, event.target.value)}>
           {Object.entries(copy.genders).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select> : field === 'address' ? <textarea id={`patient-${field}`} name={field} rows={3} value={values[field] || ''} disabled={saving} onChange={event => update(field, event.target.value)} /> :
-          <input id={`patient-${field}`} name={field} type={field === 'dateOfBirth' ? 'date' : 'text'} inputMode={field === 'phone' ? 'tel' : undefined} dir={field === 'nameAr' ? 'rtl' : ['nameEn', 'phone'].includes(field) ? 'ltr' : undefined} lang={field === 'nameAr' ? 'ar' : field === 'nameEn' ? 'en' : undefined}
+          <input id={`patient-${field}`} name={field} type={field === 'dateOfBirth' ? 'date' : 'text'} inputMode={field === 'phone' ? 'tel' : undefined} dir={service.live && field === 'nameEn' ? 'auto' : field === 'nameAr' ? 'rtl' : ['nameEn', 'phone'].includes(field) ? 'ltr' : undefined} lang={service.live && field === 'nameEn' ? undefined : field === 'nameAr' ? 'ar' : field === 'nameEn' ? 'en' : undefined}
             autoComplete={['nameAr', 'nameEn'].includes(field) ? 'name' : field === 'phone' ? 'tel' : 'bday'}
             max={field === 'dateOfBirth' ? todayValue() : undefined} min={field === 'dateOfBirth' ? '0001-01-01' : undefined}
             maxLength={['nameAr', 'nameEn'].includes(field) ? 120 : field === 'phone' ? 20 : undefined}

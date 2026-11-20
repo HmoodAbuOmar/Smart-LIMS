@@ -3,15 +3,20 @@ export function localDateValue(date = new Date()) {
   return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0')
 }
 
-// This checkout has no patient schema or identifier contract. These are only
-// the already-authorized temporary demographics, never a patient API payload.
+// The form keeps demographics in memory until the patient submits them.
 export const patientDraftFields = ['name', 'dateOfBirth', 'gender', 'phone']
+
+export function patientPhoneError(phone) {
+  if (!phone.trim()) return 'phoneRequired'
+  if (!/^\+?[\d\s().-]+$/.test(phone.trim()) || !/^[0-9]{7,15}$/.test(phone.replace(/\D/g, ''))) return 'phoneInvalid'
+  return null
+}
 
 export function validatePatientDraft(values, today = localDateValue()) {
   const errors = {}
   if (!values.name.trim()) errors.name = 'nameRequired'
-  if (!values.phone.trim()) errors.phone = 'phoneRequired'
-  else if (!/^\+?[\d\s().-]+$/.test(values.phone.trim()) || !/^[0-9]{7,15}$/.test(values.phone.replace(/\D/g, ''))) errors.phone = 'phoneInvalid'
+  const phoneError = patientPhoneError(values.phone)
+  if (phoneError) errors.phone = phoneError
   if (!values.dateOfBirth) errors.dateOfBirth = 'birthRequired'
   else {
     const parsed = new Date(`${values.dateOfBirth}T00:00:00Z`)
@@ -22,7 +27,7 @@ export function validatePatientDraft(values, today = localDateValue()) {
   return errors
 }
 
-// Mapping draft data does not create a record or establish an account-file link.
+// The Patient API adapter normalizes the backend enum before submission.
 export function toPatientFilePayload(values) {
   return { fullName: values.name.trim(), phoneNumber: values.phone.trim(), dateOfBirth: values.dateOfBirth, gender: values.gender }
 }

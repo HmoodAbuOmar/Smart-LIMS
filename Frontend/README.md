@@ -4,11 +4,23 @@ Smart-LIMS is a React 19 / Vite 8 frontend for laboratory patients. It includes 
 
 ## Current integration status
 
-The UI, routing, validation, and isolated development interactions are implemented. Real authentication, email delivery/verification, patient medical files, authorized patient records, booking persistence, report retrieval, and payment processing still require backend/provider integration.
+The frontend includes real account, Admin, and Patient adapters for the supported backend routes, plus isolated development previews. Live integration requires an explicit authorized backend origin. Payment processing is unavailable on the current backend contract.
 
-`src/services/serviceTransport.js` and the methods in `src/services/portalApi.js` currently reject with `SERVICE_UNAVAILABLE`; no HTTP transport is configured there. Production does not substitute fixtures or claim successful accounts, verification, bookings, or payments after failed operations. This describes frontend code, not backend service or deployment availability.
+Sign in at `/#/login`. Vite dev and preview proxy same-origin `/api` requests only when `SMARTLIMS_API_TARGET` contains an explicit backend origin. Missing or invalid targets return 503 before any upstream connection. Keep using the same frontend hostname (either `localhost` or `127.0.0.1`) for the entire cookie session. A deployed frontend needs an equivalent same-origin `/api` reverse proxy. The browser manages the HttpOnly session cookie and the frontend reads the current CSRF cookie for login and logout.
+
+Staff with the ADMIN role open the Admin workspace at `/#/admin`. It reads Smart-LIMS data through `src/admin/adminLiveApi.js` and labels unsupported features as unavailable. The development Admin preview has its own route and fixtures.
+
+Patient routes check verification and linkage before loading owned records. The Patient portal uses live profile, catalog, order, appointment, notification, result, PDF, archive and trend APIs. Online payments and verification email resend/status remain unavailable. Receptionist workspace data remain unavailable.
 
 See [API requirements](PATIENT_API_REQUIREMENTS.md), the [authentication module](src/auth/README.md), and [hosted payment integration](HOSTED_PAYMENT_INTEGRATION.md).
+
+## API setup
+
+Verify that the backend origin belongs to the authorized Smart-LIMS instance and that its `/api/auth/csrf-token` endpoint responds before entering credentials. For Vite development or preview, set `SMARTLIMS_API_TARGET` in the launching shell to that origin, such as `https://your-authorized-host.example` or an explicitly verified `http://127.0.0.1:<port>`. Remote origins require HTTPS. Do not append `/api`, add a query string, or put credentials in the URL. Restart Vite after changing the environment.
+
+For deployed static builds, configure the HTTPS hosting reverse proxy to forward same-origin `/api/*` requests to the authorized backend and preserve response `Set-Cookie` headers. Route `/verify-email` and `/set-password` to the SPA. Confirm upstream Host and allowed-origin settings, cookie delivery, and login on the actual deployment. Vite's proxy is for development and local production preview. Build into a fresh release directory with `npm run build -- --outDir <release-directory>` and run `node scripts/check-preview-build.mjs <release-directory>` before publishing it. This keeps stale chunks from earlier builds out of the release.
+
+Run `node scripts/check-integration-regressions.mjs` from Frontend for controlled transport, pagination, CSRF, and write-outcome fixtures. These checks do not require a database.
 
 ## Setup
 
@@ -43,7 +55,10 @@ Preview serves the built application; it does not enable the DEV walkthrough or 
 | --- | --- |
 | `src/main.jsx`, `src/i18n.js` | Initialize translations, document language/direction and saved language before rendering React. |
 | `src/App.jsx` | Hash router, registration context, onboarding provider, lazy portal entry and compile-time DEV entries. No React Router dependency is used. |
-| `src/Homepage.jsx` | Homepage using Navbar, ProductShowcase, BrandLogo and HomepageHealthChart. |
+| `src/marketing/Homepage.jsx` | Homepage using Navbar, ProductShowcase, BrandLogo and HomepageHealthChart. |
+| `src/admin/AdminPreview.jsx` | Development-only Admin entry shared by the hash route and standalone Admin page. |
+| `src/receptionist/` | Receptionist feature folders, shared layout, development preview, and regular access entry. |
+| `src/dev/` | Patient walkthrough, portal preview, and browser-test fixtures. |
 | `src/auth/` | Split-card account forms, email-link verification/resend, password recovery/reset, account API and access policy. |
 | `src/components/PatientOnboarding.jsx`, `PatientFileStateProvider.jsx` | Patient-file selection/creation/linking, access checks and in-memory creation draft. |
 | `src/portal/PatientPortal.jsx`, `PortalEntry.jsx` | Shared state/layout/sidebar/navigation and authenticated workspace loading. |
@@ -56,7 +71,7 @@ Preview serves the built application; it does not enable the DEV walkthrough or 
 | `src/services/` | Account, patient-file, workspace, booking and hosted-payment boundaries. |
 | `src/dev/` | Isolated walkthrough, fixture workspace and browser-test harnesses; not real authentication. |
 | `src/locales/`, `src/portal/*Copy.js` | Bundled English/Arabic resources. |
-| `src/index.css`, `App.css`, `Hero.css`, `theme.css`, component CSS | Existing tokens, typography, responsive surfaces and component styles. |
+| `src/index.css`, `App.css`, `src/marketing/HomepageHero.css`, `theme.css`, component CSS | Existing tokens, typography, responsive surfaces and component styles. |
 | `scripts/` | Committed Node/model/rendering/browser checks. |
 
 The logo is `public/images/smart-lims-logo.png`, shared through `BrandLogo.jsx`. Homepage chart measurements are illustrative marketing data, separate from the Medical History chart, which consumes the authorized patient workspace or isolated DEV fixtures. Homepage measurements are not actual patient records or clinical diagnoses.

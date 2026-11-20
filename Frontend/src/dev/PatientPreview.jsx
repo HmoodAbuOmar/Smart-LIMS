@@ -9,7 +9,23 @@ import { patientDraftFields, genderOptions, localDateValue, validatePatientDraft
 import { validateAuth } from '../utils/authValidation.js'
 import './PatientPreview.css'
 import DevelopmentPortal from './DevelopmentPortal.jsx'
-import { flowStep, stepRoutes } from './flowRoutes.js'
+
+// Public auth screens enter the isolated UI flow only in Vite development.
+// Patient URLs remain owned by their real authorization guards.
+const flowRoutes = Object.freeze({
+  '#/signup': 'signup',
+  '#/verify-email': 'verify-email',
+  '#/login': 'login',
+  '#/onboarding/file': 'patient-file',
+  '#/onboarding/file/new': 'create-file',
+  '#/onboarding/file/link': 'link-file',
+  '#/onboarding/dashboard': 'dashboard',
+})
+const stepRoutes = Object.fromEntries(Object.entries(flowRoutes).map(([route, step]) => [step, route]))
+stepRoutes.login = '#/login?preview=1'
+stepRoutes.signup = '#/signup?preview=1'
+stepRoutes['verify-email'] = '#/verify-email?preview=1'
+function flowStep(hash = '') { return flowRoutes[hash.split('?')[0]] }
 
 // Compile-time DEV-only UI state. No API imports, session flags, tokens or storage.
 const Walkthrough = createContext(null)

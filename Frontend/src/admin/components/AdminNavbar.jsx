@@ -1,7 +1,7 @@
 import { Bell, Menu, Search, UserRound, X } from 'lucide-react'
 import '../adminNavbar.css'
 
-export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, menuButtonRef }) {
+export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, menuButtonRef, profile }) {
   return (
     <header className="admin-header">
       <button ref={menuButtonRef} type="button" className="admin-menu-toggle" aria-controls="admin-navigation"
@@ -9,8 +9,8 @@ export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, 
         {mobileOpen ? <X size={21} aria-hidden="true" /> : <Menu size={21} aria-hidden="true" />}
       </button>
 
-      <div className="admin-header-heading"><h1>{['patients', 'tests', 'parameters', 'referenceRanges'].includes(activeId) ? copy.items[activeId] : activeId === 'users' ? copy.usersManagementTitle : copy.title}</h1>
-        {!['overview', 'users', 'patients', 'tests', 'parameters', 'referenceRanges'].includes(activeId) && <span>{copy.items[activeId]}</span>}
+      <div className="admin-header-heading"><h1>{['patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots', 'operationsPayments', 'auditLog', 'reports'].includes(activeId) ? copy.items[activeId] : activeId === 'users' ? copy.usersManagementTitle : copy.title}</h1>
+        {!['overview', 'users', 'patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots', 'operationsPayments', 'auditLog', 'reports'].includes(activeId) && <span>{copy.items[activeId]}</span>}
       </div>
 
       <div className="admin-navbar-search" title={copy.navbar.searchUnavailable}>
@@ -27,7 +27,7 @@ export default function AdminNavbar({ copy, activeId, mobileOpen, onToggleMenu, 
 
         <div className="admin-navbar-profile" role="group" aria-label={copy.navbar.profileUnavailable} title={copy.navbar.profileUnavailable}>
           <span className="admin-profile-avatar" aria-hidden="true"><UserRound size={18} /></span>
-          <div className="admin-profile-copy"><strong>{copy.navbar.profileName}</strong><span>{copy.navbar.profileRole}</span></div>
+          <div className="admin-profile-copy"><strong>{profile ? profile.displayName || '—' : copy.navbar.profileName}</strong><span>{copy.navbar.profileRole}</span></div>
         </div>
       </div>
     </header>

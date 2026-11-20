@@ -16,10 +16,10 @@ export default function RegistrationForm({ onRegistered }) {
   const [visible, setVisible] = useState({})
   const { errors, setErrors, clearField, pending, failure, submit } = useFormAction({
     values, fields: registrationFields, validate: validateRegistration,
-    action: (details, options) => patientApi.registerAccount(toRegistrationPayload(details), options),
+    action: (details, options) => patientApi.registerAccount({ ...toRegistrationPayload(details), confirmPassword: details.confirmPassword }, options),
     onSuccess: result => {
-      if (result?.accountCreated !== true || result.verificationEmailSent !== true || typeof result.verificationId !== 'string' || !result.verificationId.trim()) throw new Error('Registration and verification delivery were not confirmed')
-      onRegistered?.({ email: values.email.trim(), verificationId: result.verificationId, emailSent: true })
+      if (result?.accountCreated !== true) throw new Error('Registration was not confirmed')
+      onRegistered?.({ email: values.email.trim() })
       window.location.hash = '/verify-email'
     },
   })

@@ -1,8 +1,11 @@
 import { useContext, useEffect, useState } from 'react'
 import { FolderPlus, Link as LinkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { patientApi, authenticatedPatientDestination, patientDestination, actionErrorKey } from '../services/patientApi.js'
+import { patientApi } from '../services/patientApi.js'
+import { authApi } from '../auth/api.js'
+import { accountDestination, authenticatedPatientDestination, patientDestination, actionErrorKey } from '../auth/access.js'
 import useFormAction from '../utils/useFormAction.js'
+import SessionSignOut from '../auth/SessionSignOut.jsx'
 import { genderOptions, localDateValue, patientDraftFields, validatePatientDraft, toPatientFilePayload, toFileLinkPayload, prepareFileLink } from '../services/onboarding.js'
 import { emptyPatientFile, PatientFileState } from '../utils/patientFileState.js'
 import './PatientOnboarding.css'
@@ -55,7 +58,7 @@ function ExistingFileLink() {
   return <form noValidate onSubmit={submit} aria-busy={pending}>
     <div className="auth-field">
       <label htmlFor="file-identifier">{t('workflow.identifierLabel')}</label>
-      <input id="file-identifier" name="fileIdentifier" value={values.fileIdentifier} required autoComplete="off" disabled={pending}
+      <input id="file-identifier" maxLength={128} name="fileIdentifier" value={values.fileIdentifier} required autoComplete="off" disabled={pending}
         onChange={event => { setValues({ fileIdentifier: event.target.value }); clearField('fileIdentifier') }}
         aria-invalid={Boolean(errors.fileIdentifier)}
         aria-describedby={errors.fileIdentifier ? 'file-identifier-error' : undefined} />
@@ -82,7 +85,8 @@ function DashboardAccess() {
     async function load() {
       setState('loading')
       try {
-        const destination = patientDestination(await patientApi.getAccess({ signal: controller.signal }))
+        const access = await authApi.getAccess({ signal: controller.signal })
+        const destination = patientDestination(access) || accountDestination(access)
         if (controller.signal.aborted) return
         if (destination === '#/login' || destination === '#/patient/file') {
           window.location.hash = destination.slice(1)
@@ -143,11 +147,11 @@ export default function PatientOnboarding({ step }) {
     async function authorize() {
       setState('loading')
       try {
-        const access = await patientApi.getAccess({ signal: controller.signal })
-        const destination = patientDestination(access)
+        const access = await authApi.getAccess({ signal: controller.signal })
+        const destination = patientDestination(access) || accountDestination(access)
         if (controller.signal.aborted) return
         if (!destination) { clearDraft?.(); setState('denied'); return }
-        if (destination === '#/login' || destination === '#/verify-email' || (step === 'dashboard' && destination !== '#/patient/dashboard') || (step !== 'dashboard' && destination === '#/patient/dashboard')) {
+        if (destination !== (step === 'dashboard' ? '#/patient/dashboard' : '#/patient/file')) {
           clearDraft?.()
           window.location.hash = destination.slice(1)
           return
@@ -159,7 +163,7 @@ export default function PatientOnboarding({ step }) {
     void authorize()
     return () => controller.abort()
   }, [step, attempt, bindOwner, clearDraft])
-  if (state === 'authorized') return <PatientOnboardingContent step={step} />
+  if (state === 'authorized') return <><PatientOnboardingContent step={step} /><SessionSignOut onSignedOut={clearDraft} /></>
   return <div aria-busy={state === 'loading'}>
     <h1 id="auth-heading" tabIndex={-1}>{t('workflow.titles.' + step)}</h1>
     {state === 'loading' ? <p role="status">{t('actions.loading')}</p> : <>
