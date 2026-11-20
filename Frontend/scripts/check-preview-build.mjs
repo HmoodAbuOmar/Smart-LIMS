@@ -8,9 +8,10 @@ function files(directory) {
     return entry.isDirectory() ? files(target) : [target]
   })
 }
-assert.ok(fs.existsSync('dist/index.html'), 'Run the production build first')
-const markers = ['/onboarding/', 'SMARTLIMS_DEV_PREVIEW_ONLY', '/__preview/', '/__walkthrough/', '/__portal/', '/__admin/', 'data-admin-development-preview', 'dev-preview-menu', 'dev-walkthrough-indicator', 'data-walkthrough-step', 'preview.patient@example.invalid', 'SAMPLE-001', 'SAMPLE-P001', 'SAMPLE-R1', 'patient@example.invalid', 'Development simulator is disabled', 'Invalid simulation request', 'SAMPLE-HISTORY', 'History fixtures are development only']
-for (const file of files('dist').filter(file => /\.(html|js|css|map)$/.test(file))) {
+const output = process.argv[2] || 'dist'
+assert.ok(fs.existsSync(path.join(output, 'index.html')), 'Run the production build first')
+const markers = ['/onboarding/', 'SMARTLIMS_DEV_PREVIEW_ONLY', '/__preview/', '/__walkthrough/', '/__portal/', '/__admin/', '#/__receptionist', 'olivia.bennett@example.test', 'Olivia Bennett', 'DEMO-O-', 'slot-appointment-1', 'demo-patient-added-', 'Counts and describes blood cells.', 'data-admin-development-preview', 'dev-preview-menu', 'dev-walkthrough-indicator', 'data-walkthrough-step', 'preview.patient@example.invalid', 'SAMPLE-001', 'SAMPLE-P001', 'SAMPLE-R1', 'patient@example.invalid', 'Development simulator is disabled', 'Invalid simulation request', 'SAMPLE-HISTORY', 'History fixtures are development only']
+for (const file of files(output).filter(file => /\.(html|js|css|map)$/.test(file))) {
   const source = fs.readFileSync(file, 'utf8')
   for (const marker of markers) assert.ok(!source.includes(marker), `${file}: development fixture ${marker} is absent`)
   assert.ok(!path.basename(file).includes('PatientPreview'), 'No development preview chunk')

@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
-import { demoDate } from '../adminDemoData.js'
 import { dashboardCopy } from '../dashboardCopy.js'
-import { dailyOrders, displayOrderId, filterOrders, periodOrders, summarizeOrders, testFor } from '../adminOverviewModel.js'
 import AdminKpiCards from './AdminKpiCards.jsx'
 import AdminCharts from './AdminCharts.jsx'
 import AdminOrders from './AdminOrders.jsx'
 import AdminLaboratoryAlerts from './AdminLaboratoryAlerts.jsx'
-import { laboratoryPreviewAlerts } from '../adminAlertPreviewData.js'
 import '../adminOverview.css'
 
-export default function AdminOverview({ language, service }) {
+export default function AdminOverview({ language, service, preview }) {
   const copy = dashboardCopy[language]
   const [days, setDays] = useState(7)
   const [query, setQuery] = useState('')
@@ -18,6 +15,8 @@ export default function AdminOverview({ language, service }) {
   const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [live, setLive] = useState(null)
+  const [orderPage, setOrderPage] = useState(null)
+  const [ordersAttempt, retryOrders] = useState(0)
   const [failure, setFailure] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const ordersSection = useRef(null)
@@ -32,23 +31,34 @@ export default function AdminOverview({ language, service }) {
   }).format(new Date(`${value}T12:00:00Z`))
   useEffect(() => {
     if (!service) return
-    let current = true
-    service.load(days).then(result => { if (current) setLive(result) }, () => { if (current) setFailure(true) })
-    return () => { current = false }
+    const controller = new AbortController()
+    service.load(days, { signal: controller.signal }).then(result => { if (!controller.signal.aborted) setLive(result) }, () => { if (!controller.signal.aborted) setFailure(true) })
+    return () => controller.abort()
   }, [service, days, attempt])
-  const dashboard = live?.dashboard
-  const orders = service ? (live?.orders || []).filter(entry => entry.date >= dashboard.charts.period.fromDate && entry.date <= dashboard.charts.period.toDate) : periodOrders(days)
+  const dashboard = live
+  const fromDate = dashboard?.charts.period.fromDate, toDate = dashboard?.charts.period.toDate
+  const orderKey = JSON.stringify([page, query, status, fromDate, toDate, ordersAttempt])
+  useEffect(() => {
+    if (!service || !fromDate || !toDate) return
+    const controller = new AbortController()
+    service.orders({ page: page - 1, size: 8, fromDate, toDate, search: query.trim() || undefined,
+      status: { received: 'PENDING', processing: 'IN_PROGRESS', completed: 'COMPLETED', cancelled: 'CANCELLED' }[status] }, { signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setOrderPage({ key: orderKey, result }) },
+        () => { if (!controller.signal.aborted) setOrderPage({ key: orderKey, error: true }) })
+    return () => controller.abort()
+  }, [service, page, query, status, fromDate, toDate, orderKey])
+  const currentOrders = orderPage?.key === orderKey ? orderPage : null
+  const orders = service ? currentOrders?.result?.content || [] : preview.periodOrders(days)
   const summary = service ? dashboard && {
     patients: dashboard.summary.uniquePatients, total: dashboard.summary.orders, appointments: dashboard.summary.scheduledAppointments,
     completedTests: dashboard.summary.completedTests, pendingResults: dashboard.summary.pendingResults, revenue: null,
-  } : summarizeOrders(orders)
+  } : preview.summarizeOrders(orders)
   const liveStatuses = { NEW: 'received', IN_PROGRESS: 'processing', COMPLETED: 'completed', CANCELLED: 'cancelled' }
   const statuses = { ...copy.statuses, cancelled: language === 'ar' ? 'ملغى' : 'Cancelled' }
   const filtered = service ? orders.map(entry => ({
     ...entry, orderNumber: entry.number, patient: entry.patient.nameEn, testNames: entry.tests.map(item => item.nameEn).join(', '),
     amount: entry.totalCents / 100, status: liveStatuses[entry.status],
-  })).filter(entry => (status === 'all' || entry.status === status) &&
-    [entry.orderNumber, entry.patient, entry.testNames].some(text => text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))) : filterOrders(orders, query, status, local)
+  })) : preview.filterOrders(orders, query, status, local).map(entry => ({ ...entry, orderNumber: preview.displayOrderId(entry.id), testNames: local(preview.testFor(entry.testId).name) }))
   const counts = dashboard && {
     rejected: dashboard.alerts.rejectedSamples.count, review: dashboard.alerts.resultsAwaitingReview.count,
     attention: dashboard.alerts.ordersRequiringAttention.count,
@@ -66,24 +76,26 @@ export default function AdminOverview({ language, service }) {
     <p role={failure ? 'alert' : 'status'}>{failure ? unavailable : language === 'ar' ? 'جارٍ التحميل…' : 'Loading…'}</p>
     {failure && <button type="button" onClick={() => { setFailure(false); setAttempt(value => value + 1) }}>{language === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button>}
   </div>
-  const referenceDate = dashboard ? dashboard.charts.period.toDate : demoDate
-  const orderName = entry => entry.orderNumber || displayOrderId(entry.id)
-  const testName = entry => entry.testNames ?? local(testFor(entry.testId).name)
+  const referenceDate = dashboard ? dashboard.charts.period.toDate : preview.demoDate
+  const orderName = entry => entry.orderNumber || unavailable
+  const testName = entry => entry.testNames ?? unavailable
   return <div className="admin-overview">
     <div className="admin-overview-heading"><div><h2>{copy.welcome}</h2><p>{copy.subtitle}</p></div>
       <div className="admin-welcome-meta"><span className="admin-reference-date"><CalendarDays size={15} aria-hidden="true" /><time dateTime={referenceDate}>{date(referenceDate)}</time></span></div>
     </div>
     <AdminKpiCards summary={summary} copy={copy} number={number} money={money} />
-    <AdminCharts daily={dashboard ? dashboard.charts.dailyOrders : dailyOrders(orders, days)}
+    <AdminCharts daily={dashboard ? dashboard.charts.dailyOrders : preview.dailyOrders(orders, days)}
       summary={dashboard ? { total: dashboard.charts.totalOrders, totalTests: dashboard.charts.totalTests, testDistribution: dashboard.charts.testDistribution.map(item => ({
         id: `${item.labTestId}-${item.testCode}-${item.testName}`, name: item.testName, count: item.count,
       })) } : summary} copy={copy} number={number} date={date} local={local} rtl={language === 'ar'} days={days}
       onPeriod={value => { if (days !== value) { if (service) { setLive(null); setFailure(false) } setDays(value); setPage(1) } }} />
     <div className="admin-overview-tables">
-      <AdminOrders orders={filtered} query={query} status={status} page={page} copy={service ? { ...copy, statuses } : copy} choices={service ? Object.values(liveStatuses) : undefined} local={local} number={number} money={money} date={date} sectionRef={ordersSection}
+      <AdminOrders orders={filtered} pagination={service ? currentOrders?.result || { totalElements: 0, totalPages: 0 } : undefined}
+        loadMessage={service && !currentOrders ? (language === 'ar' ? 'جارٍ التحميل…' : 'Loading…') : currentOrders?.error ? unavailable : undefined}
+        retry={currentOrders?.error ? () => retryOrders(value => value + 1) : undefined} query={query} status={status} page={page} copy={service ? { ...copy, statuses } : copy} choices={service ? Object.values(liveStatuses) : undefined} local={local} number={number} money={money} date={date} sectionRef={ordersSection}
         onQuery={value => { setQuery(value); setPage(1) }} onStatus={value => { setStatus(value); setPage(1) }} onPage={setPage}
         onDetails={(order, opener) => { detailOpener.current = opener; setSelectedOrder(order) }} />
-      <AdminLaboratoryAlerts counts={service ? counts : laboratoryPreviewAlerts(orders, days)} copy={copy} number={number} />
+      <AdminLaboratoryAlerts counts={service ? counts : preview.laboratoryPreviewAlerts(orders, days)} copy={copy} number={number} />
     </div>
     <dialog className="admin-order-dialog" ref={dialog} aria-labelledby="admin-order-dialog-title" aria-describedby="admin-order-dialog-notice" onCancel={event => { event.preventDefault(); setSelectedOrder(null) }}>
       <h3 id="admin-order-dialog-title">{copy.detailTitle}</h3><p id="admin-order-dialog-notice">{service ? copy.recent : copy.detailNotice}</p>

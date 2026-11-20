@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { ClipboardList, CreditCard, ReceiptText, Undo2, Clock3, Search, Info } from 'lucide-react'
 import { formatCurrency } from '../../utils/currency.js'
 import { operationsPaymentsCopy } from './operationsPaymentsCopy.js'
-import { operationsPaymentsService } from './operationsPaymentsService.js'
 import { defaultPeriod, filterOrders, filterTransactions, localizedName, ORDER_STATUSES, orderPaymentStatus, periodErrors, periodRecords, reportDate, summarize, TRANSACTION_STATUSES, TRANSACTION_TYPES, transactionDate } from './operationsPaymentsModel.js'
 import './operationsPayments.css'
 
@@ -12,19 +11,35 @@ function ReportingInfo({copy}) {
  return <details className="op-period-info" ref={root} onKeyDown={event=>{if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector('summary').focus()}}}><summary className="op-info-button" aria-label={copy.periodInfo} aria-controls="op-period-explanation" title={copy.periodInfo}><Info size={17} aria-hidden="true"/></summary><p id="op-period-explanation">{copy.periodHint}</p></details>
 }
 
-export default function AdminOperationsPayments({language,service=operationsPaymentsService}){
+export default function AdminOperationsPayments({language,service}){
  const copy=operationsPaymentsCopy[language]
  const unavailable=language==='ar'?'بيانات معاملات الدفع غير متاحة.':'Payment transaction data is unavailable.'
  const [data,setData]=useState({orders:[],transactions:[]}),[load,setLoad]=useState('loading'),[attempt,setAttempt]=useState(0)
  const [tab,setTab]=useState('orders'),[period,setPeriod]=useState(()=>defaultPeriod())
  const [orderFilters,setOrderFilters]=useState({query:'',status:'all',page:1,size:8}),[transactionFilters,setTransactionFilters]=useState({query:'',type:'all',status:'all',page:1,size:8})
- useEffect(()=>{let alive=true;service.load().then(value=>{if(alive){setData(value);setLoad('ready')}}).catch(()=>{if(alive)setLoad('error')});return()=>{alive=false}},[service,attempt])
- const records=periodRecords(data,period),summary=summarize(records),errors=periodErrors(period)
- const orders=filterOrders(records.orders,orderFilters.query,orderFilters.status).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id))
+ const errors=periodErrors(period)
+ const serverQuery=JSON.stringify(service.live ? {
+   page:orderFilters.page-1,size:orderFilters.size,fromDate:period.from||undefined,toDate:period.to||undefined,
+   search:orderFilters.query.trim()||undefined,status:orderFilters.status==='all'?undefined:orderFilters.status==='NEW'?'PENDING':orderFilters.status,
+ } : {})
+ const invalid=Object.keys(errors).length>0
+ const [loadedQuery,setLoadedQuery]=useState(null)
+ useEffect(()=>{
+   if(service.live&&invalid)return
+   const controller=new AbortController()
+   service.load(JSON.parse(serverQuery),{signal:controller.signal}).then(value=>{
+     if(!controller.signal.aborted){setData(value);setLoad('ready');setLoadedQuery(serverQuery)}
+   },()=>{
+     if(!controller.signal.aborted){setLoad(service.live?'ready':'error');setLoadedQuery({key:serverQuery,error:true})}
+   })
+   return()=>controller.abort()
+ },[service,attempt,serverQuery,invalid])
+ const records=periodRecords(data,period),summary=summarize(records)
+ const orders=service.live ? loadedQuery===serverQuery&&!invalid?data.orders:[] : filterOrders(records.orders,orderFilters.query,orderFilters.status).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id))
  const transactions=filterTransactions(records.transactions,data.orders,transactionFilters.query,transactionFilters.type,transactionFilters.status).sort((a,b)=>transactionDate(b).localeCompare(transactionDate(a))||a.id.localeCompare(b.id))
  const byOrder=new Map(data.orders.map(order=>[order.id,order]))
  const filters=tab==='orders'?orderFilters:transactionFilters,rows=tab==='orders'?orders:transactions,setFilters=tab==='orders'?setOrderFilters:setTransactionFilters
- const pages=Math.max(1,Math.ceil(rows.length/filters.size)),page=Math.min(filters.page,pages),visible=rows.slice((page-1)*filters.size,page*filters.size)
+ const pages=Math.max(1,service.live&&tab==='orders'?data.totalPages||1:Math.ceil(rows.length/filters.size)),page=service.live&&tab==='orders'?filters.page:Math.min(filters.page,pages),visible=service.live&&tab==='orders'?rows:rows.slice((page-1)*filters.size,page*filters.size)
  const number=value=>new Intl.NumberFormat(language).format(value),money=cents=>formatCurrency(cents/100,language)
  const date=value=>new Intl.DateTimeFormat(language,{dateStyle:'medium',timeZone:'UTC'}).format(new Date(`${reportDate(value)}T12:00:00Z`))
  function changePeriod(next){setPeriod(next);setOrderFilters(current=>({...current,page:1}));setTransactionFilters(current=>({...current,page:1}))}
@@ -37,7 +52,8 @@ export default function AdminOperationsPayments({language,service=operationsPaym
  return <section className="admin-operations-payments" aria-label={copy.title}>
   <div className="op-heading"><span aria-hidden="true"><CreditCard size={23}/></span><div><h2>{copy.title}</h2><p>{copy.subtitle}</p></div></div>
   {load==='loading'?<p className="op-empty" role="status">{copy.loading}</p>:load==='error'?<div className="op-panel op-empty" role="alert"><p>{copy.loadError}</p><button type="button" onClick={()=>{setLoad('loading');setAttempt(value=>value+1)}}>{copy.retry}</button></div>:<>
-   <div className="op-summary">{[{key:'orders',label:'totalOrders',Icon:ClipboardList},{key:'receiptsCents',label:'receipts',Icon:ReceiptText},{key:'refundsCents',label:'refunds',Icon:Undo2},{key:'pendingCents',label:'pending',Icon:Clock3}].map(({key,label,Icon})=><article className={`op-summary-card op-summary-${key}`} key={key} aria-label={copy[label]}><div className="op-summary-label"><span className="op-summary-icon" aria-hidden="true"><Icon size={18}/></span><h3>{copy[label]}</h3></div><p data-summary={key}>{key==='orders'?number(summary[key]):service.live?'—':<bdi>{money(summary[key])}</bdi>}</p>{label==='receipts'&&<small>{service.live?unavailable:copy.grossHint}</small>}</article>)}</div>
+   {service.live && !invalid && loadedQuery !== serverQuery && (loadedQuery?.key === serverQuery && loadedQuery.error ? <p role="alert">{copy.loadError} <button type="button" onClick={()=>setAttempt(value=>value+1)}>{copy.retry}</button></p> : <p role="status">{copy.loading}</p>)}
+   <div className="op-summary">{[{key:'orders',label:'totalOrders',Icon:ClipboardList},{key:'receiptsCents',label:'receipts',Icon:ReceiptText},{key:'refundsCents',label:'refunds',Icon:Undo2},{key:'pendingCents',label:'pending',Icon:Clock3}].map(({key,label,Icon})=><article className={`op-summary-card op-summary-${key}`} key={key} aria-label={copy[label]}><div className="op-summary-label"><span className="op-summary-icon" aria-hidden="true"><Icon size={18}/></span><h3>{copy[label]}</h3></div><p data-summary={key}>{key==='orders'?(service.live&&loadedQuery!==serverQuery?'—':number(service.live ? data.totalElements||0 : summary[key])):service.live?'—':<bdi>{money(summary[key])}</bdi>}</p>{label==='receipts'&&<small>{service.live?unavailable:copy.grossHint}</small>}</article>)}</div>
    <section className="op-panel op-results"><div className="op-tabs" role="tablist" aria-label={copy.title}>{['orders','transactions'].map(key=><button type="button" role="tab" key={key} id={`op-tab-${key}`} aria-selected={tab===key} tabIndex={tab===key?0:-1} aria-controls="op-table-panel" onKeyDown={tabKey} onClick={()=>setTab(key)}>{copy[key]}</button>)}</div>
     <div id="op-table-panel" role="tabpanel" aria-labelledby={`op-tab-${tab}`}>
      {service.live && tab==='transactions' ? <p className="op-empty" role="status">{unavailable}</p> : <>

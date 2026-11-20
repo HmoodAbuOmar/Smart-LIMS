@@ -18,7 +18,7 @@ function initialLanguage() {
   catch { return 'en' }
 }
 
-export default function AdminLayout({ initialPage = 'overview', developmentPreview = false, live = false, profile }) {
+export default function AdminLayout({ initialPage = 'overview', developmentPreview = false, live = false, profile, preview }) {
   const [language, setLanguage] = useState(initialLanguage)
   const [activeId, setActiveId] = useState(initialPage)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -76,14 +76,14 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
       <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} language={language} live={live}
         onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />
       <main id="admin-main" className={`admin-main${activeId === 'users' ? ' admin-main-users' : ''}`} aria-label={copy.content} tabIndex={-1}>
-        {activeId === 'overview' && <AdminOverview language={language} service={live ? liveOverview : undefined} />}
-        {activeId === 'users' && <AdminUsers language={language} service={live ? liveUsers : undefined} />}
-        {activeId === 'reports' && <AdminReports language={language} service={live ? liveReports : undefined} />}
-        {activeId === 'auditLog' && <AdminAuditLog language={language} service={live ? liveAudit : undefined} />}
-        {activeId === 'operationsPayments' && <AdminOperationsPayments language={language} service={live ? liveOperations : undefined} />}
-        {activeId === 'bookingSlots' && <AdminBookingSlots language={language} service={live ? liveSlots : undefined} />}
-        {activeId === 'patients' && <AdminPatients language={language} service={live ? livePatients : undefined} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
-        {['tests', 'parameters', 'referenceRanges'].includes(activeId) && <AdminTestCatalog language={language} service={live ? liveCatalog : undefined} activePage={activeId} registerNavigationGuard={registerCatalogGuard} onNavigate={id => navigate(id, true)} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
+        {activeId === 'overview' && <AdminOverview language={language} service={live ? liveOverview : undefined} preview={preview?.overview} />}
+        {activeId === 'users' && <AdminUsers language={language} service={live ? liveUsers : undefined} previewUsers={preview?.users} />}
+        {activeId === 'reports' && <AdminReports language={language} service={live ? liveReports : preview?.reports} />}
+        {activeId === 'auditLog' && <AdminAuditLog language={language} service={live ? liveAudit : preview?.audit} />}
+        {activeId === 'operationsPayments' && <AdminOperationsPayments language={language} service={live ? liveOperations : preview?.operations} />}
+        {activeId === 'bookingSlots' && <AdminBookingSlots language={language} service={live ? liveSlots : preview?.slots} />}
+        {activeId === 'patients' && <AdminPatients language={language} service={live ? livePatients : preview?.patients} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
+        {['tests', 'parameters', 'referenceRanges'].includes(activeId) && <AdminTestCatalog language={language} service={live ? liveCatalog : preview?.catalog} activePage={activeId} registerNavigationGuard={registerCatalogGuard} onNavigate={id => navigate(id, true)} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
       </main>
     </div>
   )

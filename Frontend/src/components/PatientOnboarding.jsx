@@ -1,8 +1,9 @@
 import { useContext, useEffect, useState } from 'react'
 import { FolderPlus, Link as LinkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { patientApi, authenticatedPatientDestination, patientDestination, actionErrorKey } from '../services/patientApi.js'
-import { accountDestination } from '../auth/access.js'
+import { patientApi } from '../services/patientApi.js'
+import { authApi } from '../auth/api.js'
+import { accountDestination, authenticatedPatientDestination, patientDestination, actionErrorKey } from '../auth/access.js'
 import useFormAction from '../utils/useFormAction.js'
 import SessionSignOut from '../auth/SessionSignOut.jsx'
 import { genderOptions, localDateValue, patientDraftFields, validatePatientDraft, toPatientFilePayload, toFileLinkPayload, prepareFileLink } from '../services/onboarding.js'
@@ -84,7 +85,7 @@ function DashboardAccess() {
     async function load() {
       setState('loading')
       try {
-        const access = await patientApi.getAccess({ signal: controller.signal })
+        const access = await authApi.getAccess({ signal: controller.signal })
         const destination = patientDestination(access) || accountDestination(access)
         if (controller.signal.aborted) return
         if (destination === '#/login' || destination === '#/patient/file') {
@@ -146,7 +147,7 @@ export default function PatientOnboarding({ step }) {
     async function authorize() {
       setState('loading')
       try {
-        const access = await patientApi.getAccess({ signal: controller.signal })
+        const access = await authApi.getAccess({ signal: controller.signal })
         const destination = patientDestination(access) || accountDestination(access)
         if (controller.signal.aborted) return
         if (!destination) { clearDraft?.(); setState('denied'); return }

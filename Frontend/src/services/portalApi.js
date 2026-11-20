@@ -1,20 +1,9 @@
 import { authenticatedRequest } from '../auth/cookieSession.js'
+import { queryApi as get, listApi as list } from './apiQuery.js'
 
-async function unavailable() { const error = new Error('Portal transport is not configured'); error.code = 'SERVICE_UNAVAILABLE'; throw error }
 const request = authenticatedRequest
 const id = encodeURIComponent
 const write = (path, body, method = 'POST', requestId) => request(path, { method, body, requestId })
-const get = (path, params, options) => request(path + '?' + new URLSearchParams(params), options)
-
-async function list(path, params, options) {
-  const rows = []
-  for (let page = 0; ; page++) {
-    const result = await get(path, { ...params, page, size: 50 }, options)
-    if (Array.isArray(result)) return result
-    rows.push(...result.content)
-    if (result.last || page + 1 >= result.totalPages || !result.content.length) return rows
-  }
-}
 
 const day = value => value?.slice(0, 10)
 const status = value => value.toLowerCase().replace('in_progress', 'inProgress')
@@ -42,7 +31,7 @@ const result = row => ({
   id: row.currentResultId || row.orderItemId, orderId: row.orderId, orderNumber: row.orderNumber,
   orderItemId: row.orderItemId, testName: row.testName, category: category(row.categories?.[0]),
   date: row.reportDate || day(row.publishedAt), status: row.canViewResult ? 'published' : 'pending',
-  canDownloadReport: row.canDownloadReport,
+  canDownloadReport: row.canDownloadReport, visit: row.visitIds?.[0] ? { id: row.visitIds[0] } : undefined,
 })
 const notification = row => ({
   ...row, category: row.category.toLowerCase(), date: row.createdAt,
@@ -68,34 +57,62 @@ const visit = row => {
   }
 }
 const trendPoint = row => ({
-  id: row.valueId, reportId: row.resultId, visitId: row.visits[0]?.id,
-  date: row.measuredAt, value: Number(row.chartValue), displayValue: (row.numericComparator || '') + row.numericValue,
+  id: row.valueId, reportId: row.resultId, visitId: row.visits?.[0]?.id,
+  date: row.measuredAt, value: row.chartValue, displayValue: row.numericValue == null ? row.textValue : (row.numericComparator || '') + row.numericValue,
   flag: flag(row.flag), range: row.referenceText ?? [row.referenceMin, row.referenceMax].filter(bound => bound != null).join(' – '),
 })
 function trendSeries(series, rows) {
   return {
     key: series.seriesId, biomarkerId: series.parameterId, name: series.name, unit: series.unit, method: series.method,
-    points: rows.filter(row => row.chartValue != null).map(trendPoint).sort((a, b) => a.date.localeCompare(b.date)),
+    points: rows.filter(row => !row.numericComparator && Number.isFinite(row.numericValue) && Number.isFinite(row.chartValue)).map(trendPoint).sort((a, b) => a.date.localeCompare(b.date)),
   }
 }
 export const portalApi = Object.freeze({
-  async loadWorkspace(options) {
-    const [person, dashboard, tests, orders, upcoming, past, results, notifications, archive] = await Promise.all([
-      request('/api/patients/me/profile', options), request('/api/patients/me/dashboard', options),
-      list('/api/lab-tests', {}, options), list('/api/orders/me', {}, options),
-      list('/api/appointments/me', { tab: 'UPCOMING' }, options), list('/api/appointments/me', { tab: 'PAST' }, options),
-      list('/api/results/me', {}, options), list('/api/notifications/me', {}, options),
-      list('/api/visits/me/archive', {}, options),
-    ])
-    const patient = profile(person)
+  async loadProfile(options) { return profile(await request('/api/patients/me/profile', options)) },
+  async loadDashboard(patient, options) {
+    const dashboard = await request('/api/patients/me/dashboard', options)
     return {
-      profile: patient, dashboard, tests: tests.filter(row => row.active && row.currency === 'ILS').map(test),
+      dashboard,
+      recentOrders: dashboard.recentOrders.map(entry => ({ ...order(entry.order, patient), visit: entry.visits?.[0] })),
+      latestResults: dashboard.latestResults.map(row => result({ ...row, currentResultId: row.resultId, reportDate: row.publicationDate, canViewResult: true })),
+      nextAppointment: dashboard.nextAppointment ? appointment(dashboard.nextAppointment, patient) : null,
       suggestedTests: dashboard.catalogSuggestions.filter(row => row.active && row.currency === 'ILS').map(test),
-      orders: orders.map(row => order(row, patient)),
-      appointments: [...upcoming, ...past].map(row => appointment(row, patient)),
-      results: results.map(result), notifications: notifications.map(notification),
-      visits: archive.map(visit),
       trendPreview: dashboard.healthTrendPreview && trendSeries(dashboard.healthTrendPreview.series, dashboard.healthTrendPreview.chartData),
+    }
+  },
+  async loadOrders(patient, { page = 0, size = 20, search, status } = {}, options) {
+    const data = await get('/api/orders/me', { page, size, search, status }, options)
+    return { ...data, content: data.content.map(row => order(row, patient)) }
+  },
+  async loadTests({ page, search, category }, options) {
+    const data = await get('/api/lab-tests', { page, size: 12, search, category, active: true }, options)
+    return { ...data, content: data.content.filter(row => row.active && row.currency === 'ILS').map(test) }
+  },
+  async loadResults({ page, search, category, tab }, options) {
+    const data = await get('/api/results/me', { page, size: 20, search, category, tab }, options)
+    return { ...data, content: data.content.map(result) }
+  },
+  async loadAppointments(patient, { page, tab }, options) {
+    const data = await get('/api/appointments/me', { page, size: 20, tab }, options)
+    return { ...data, content: data.content.map(row => appointment(row, patient)) }
+  },
+  async testDetail(testId, options) {
+    const row = await request('/api/lab-tests/' + id(testId), options)
+    return row.active && row.currency === 'ILS' ? test(row) : null
+  },
+  async loadSection(section, patient, options) {
+    switch (section) {
+      case 'dashboard': return this.loadDashboard(patient, options)
+      case 'order': return { results: (await list('/api/results/me', { tab: 'AVAILABLE' }, options)).map(result) }
+      case 'notifications': return { notifications: (await list('/api/notifications/me', {}, options)).map(notification) }
+      case 'history': return { visits: (await list('/api/visits/me/archive', {}, options)).map(visit) }
+      case 'book': {
+        const [orders, upcoming] = await Promise.all([
+          list('/api/orders/me', { status: 'PENDING' }, options), list('/api/appointments/me', { tab: 'UPCOMING' }, options),
+        ])
+        return { orders: orders.map(row => order(row, patient)), appointments: upcoming.map(row => appointment(row, patient)) }
+      }
+      default: return {}
     }
   },
   async saveProfile({ profile: values }) {
@@ -136,16 +153,16 @@ export const portalApi = Object.freeze({
     await write('/api/notifications/me/' + (notificationId === 'all' ? 'read-all' : id(notificationId) + '/read'), {})
     return { confirmed: true }
   },
-  async activity() {
-    const [results, notifications] = await Promise.all([list('/api/results/me'), list('/api/notifications/me')])
-    return { results: results.map(result), notifications: notifications.map(notification) }
+  unreadCount: options => request('/api/notifications/me/unread-count', options),
+  async appointmentDetail(appointmentId, patient, options) {
+    return appointment(await request('/api/appointments/me/' + id(appointmentId), options), patient)
   },
   async resultDetail(resultId, options) {
     const row = await request('/api/results/me/' + id(resultId), options)
     return {
       id: row.id, testName: row.testName, orderId: row.orderId, orderNumber: row.orderNumber,
       status: status(row.status), date: day(row.publishedAt), sampleDate: day(row.specimens[0]?.collectedAt),
-      canDownloadReport: true,
+      canDownloadReport: true, visit: row.visitIds?.[0] ? { id: row.visitIds[0] } : undefined,
       values: resultValues(row),
     }
   },
@@ -158,12 +175,10 @@ export const portalApi = Object.freeze({
     }) }
   },
   biomarkerSeries: options => list('/api/results/me/trends/biomarkers', {}, options),
-  async healthTrend(seriesId, period, options) {
-    const response = await get('/api/results/me/trends', { seriesId, period }, options)
-    return trendSeries(response.series, response.chartData)
+  async healthTrend(seriesId, period, page, options) {
+    const response = await get('/api/results/me/trends', { seriesId, period, page, size: 20 }, options)
+    const { content, ...pagination } = response.measurements
+    return { ...trendSeries(response.series, response.chartData), measurements: content.map(trendPoint), pagination }
   },
   downloadReport: ({ resultId }) => request('/api/results/me/' + id(resultId) + '/report', { pdf: true }),
-  logout: unavailable,
 })
-// Hosted session creation must never itself count as verified payment success.
-export const bookingApi = Object.freeze({ createHostedPayment: unavailable, verifyPaymentAndBooking: unavailable, confirmPayAtLaboratory: unavailable })

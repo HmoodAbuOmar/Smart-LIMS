@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { CalendarClock, ChevronLeft, ChevronRight, Pencil, Power } from 'lucide-react'
 import { bookingSlotsCopy } from './bookingSlotsCopy.js'
-import { bookingSlotsService } from './bookingSlotsService.js'
 import { available, formatSlotTime, localDate, schedulingDate, occupancy, shiftDate, slotStatus } from './bookingSlotsModel.js'
 import BookingSlotForm, { SlotDialog } from './BookingSlotForm.jsx'
 import './bookingSlots.css'
 
-export default function AdminBookingSlots({language,service=bookingSlotsService}) {
+export default function AdminBookingSlots({language,service}) {
   const copy=bookingSlotsCopy[language],rtl=language==='ar',today=schedulingDate()
   const [selected,setSelected]=useState(today),[month,setMonth]=useState(today.slice(0,7)),[data,setData]=useState({slots:[],appointments:[]}),[load,setLoad]=useState('loading'),[attempt,setAttempt]=useState(0)
   const [dialog,setDialog]=useState(null),[createdSlot,setCreatedSlot]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[failed,setFailed]=useState(false)
@@ -15,7 +14,11 @@ export default function AdminBookingSlots({language,service=bookingSlotsService}
   const time=value=>formatSlotTime(value,language)
   const number=value=>new Intl.NumberFormat(language).format(value)
   const loadedMonth = service.live ? month : undefined
-  useEffect(()=>{let alive=true;service.load(loadedMonth).then(value=>{if(alive){setData(value);setLoad('ready')}}).catch(()=>{if(alive)setLoad('error')});return()=>{alive=false}},[service,attempt,loadedMonth])
+  useEffect(()=>{
+    const controller=new AbortController()
+    service.load(loadedMonth,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted){setData(value);setLoad('ready')}},()=>{if(!controller.signal.aborted)setLoad('error')})
+    return()=>controller.abort()
+  },[service,attempt,loadedMonth])
   useEffect(()=>{if(focusDate.current){calendar.current?.querySelector(`[data-date="${selected}"]`)?.focus({preventScroll:true});focusDate.current=false}},[selected])
   useEffect(()=>{if(!notice)return undefined;const timer=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(timer)},[notice])
   const daySlots=data.slots.filter(slot=>slot.date===selected).sort((a,b)=>a.startTime.localeCompare(b.startTime)||a.id.localeCompare(b.id))

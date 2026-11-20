@@ -45,6 +45,7 @@ function LiveHealthTrends({ api, ui }) {
   const [series, setSeries] = useState(null)
   const [selected, setSelected] = useState('')
   const [period, setPeriod] = useState('6M')
+  const [page, setPage] = useState(0)
   const [data, setData] = useState(null)
   const id = selected || series?.[0]?.seriesId
   useEffect(() => {
@@ -55,18 +56,18 @@ function LiveHealthTrends({ api, ui }) {
   useEffect(() => {
     if (!id) return
     const controller = new AbortController()
-    portalApi.healthTrend(id, period, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) setData({ id, period, value }) }, () => { if (!controller.signal.aborted) setData({ id, period, error: true }) })
+    portalApi.healthTrend(id, period, page, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) setData({ id, period, page, value }) }, () => { if (!controller.signal.aborted) setData({ id, period, page, error: true }) })
     return () => controller.abort()
-  }, [id, period])
-  const result = data?.id === id && data?.period === period ? data : null
+  }, [id, period, page])
+  const result = data?.id === id && data?.period === period && data.page === page ? data : null
   const current = result?.value
   if (series === false) return <p role="alert">{t('unavailable')}</p>
   if (!series) return <p role="status">{t('loading')}</p>
   if (!series.length) return <p>{t('trendEmpty')}</p>
   return <><section className="history-trends-card"><div className="history-trends-controls">
-    <ui.Field label="biomarker" name="history-biomarker" value={id} onChange={event => setSelected(event.target.value)}>{series.map(item => <option key={item.seriesId} value={item.seriesId}>{item.name} ({item.unit})</option>)}</ui.Field>
-    <ui.Field label="period" name="history-period" value={period} onChange={event => setPeriod(event.target.value)}>{[['3M', 'months3'], ['6M', 'months6'], ['1Y', 'year1'], ['ALL', 'allTime']].map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</ui.Field>
-  </div>{current ? <MeasurementChart key={id + period} api={api} points={current.points} series={current} /> : <p role={result?.error ? 'alert' : 'status'}>{t(result?.error ? 'unavailable' : 'loading')}</p>}</section>{current && <MeasurementHistory api={api} ui={ui} points={current.points} series={current} />}</>
+    <ui.Field label="biomarker" name="history-biomarker" value={id} onChange={event => { setSelected(event.target.value); setPage(0) }}>{series.map(item => <option key={item.seriesId} value={item.seriesId}>{item.name} ({item.unit})</option>)}</ui.Field>
+    <ui.Field label="period" name="history-period" value={period} onChange={event => { setPeriod(event.target.value); setPage(0) }}>{[['3M', 'months3'], ['6M', 'months6'], ['1Y', 'year1'], ['ALL', 'allTime']].map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</ui.Field>
+  </div>{current ? <MeasurementChart key={id + period} api={api} points={current.points} series={current} /> : <p role={result?.error ? 'alert' : 'status'}>{t(result?.error ? 'unavailable' : 'loading')}</p>}</section>{current && <><MeasurementHistory api={api} ui={ui} points={current.measurements} series={current} serverOrder /><div className="portal-actions"><ui.Button secondary disabled={page === 0} onClick={() => setPage(page - 1)}>{t('previous')}</ui.Button><ui.Button secondary disabled={current.pagination.last || page + 1 >= current.pagination.totalPages} onClick={() => setPage(page + 1)}>{t('next')}</ui.Button></div></>}</>
 }
 
 function HealthTrends({ api, ui, visits }) {
@@ -84,9 +85,9 @@ function HealthTrends({ api, ui, visits }) {
   return <><section className="history-trends-card"><div className="history-trends-heading"><div><h2>{t('healthTrends')}</h2>{selectedName && <p>{local(selectedName)}{current && <> · <bdi>{current.unit}</bdi></>}</p>}</div><TrendingUp size={26} aria-hidden="true" /></div><div className="history-trends-controls"><ui.Field label="biomarker" name="history-biomarker" value={selectedValue} disabled={!series.length && !emptyTests.length} onChange={e => setSelected(e.target.value)}>{series.map(s => <option key={s.key} value={s.key}>{local(s.name)} ({s.unit} · {local(s.method)})</option>)}{emptyTests.map(test => <option key={test.id} value={JSON.stringify(['empty', test.id])}>{local(test.name)}</option>)}{!series.length && !emptyTests.length && <option value="">{t('noVisits')}</option>}</ui.Field><ui.Field label="period" name="history-period" value={period} onChange={e => setPeriod(e.target.value)}>{['months3', 'months6', 'year1', 'allTime'].map(key => <option key={key} value={key}>{t(key)}</option>)}</ui.Field></div><div className="history-latest"><span>{t('latestMeasurement')}</span><strong><bdi>{stats.latest?.displayValue ?? String.fromCharCode(8212)}</bdi><small>{current?.unit}</small></strong><span>{stats.latest ? date(stats.latest.date) : '—'}</span></div>{current ? <MeasurementChart key={`${current.key}:${period}`} api={api} points={points} series={current} /> : <p className="history-chart-empty">{t('trendEmpty')}</p>}<div className="history-trend-statistics">{[['previousMeasurement', stats.previous ? `${stats.previous.displayValue} ${current.unit}` : '—'], ['absoluteChange', stats.change === null ? '—' : `${stats.change > 0 ? '+' : ''}${resultNumber(api, stats.change)} ${current.unit}`], ['percentageChange', stats.percent === null ? '—' : `${stats.percent > 0 ? '+' : ''}${resultNumber(api, stats.percent)}%`], ['measurementCount', api.number(points.length)]].map(([key, value]) => <div key={key}><span>{t(key)}</span><strong><bdi>{value}</bdi></strong></div>)}</div>{points.length === 1 && <p>{t('singleMeasurement')}</p>}<p className="history-comparison-note">{t('comparisonNote')}</p></section><MeasurementHistory api={api} ui={ui} points={points} series={current} /><section className="portal-card history-understanding"><h2>{t('understanding')}</h2><p>{t(information?.[0] || 'genericBiomarkerAbout')}</p>{stats.latest && <><ui.Status value={resultFlag(stats.latest)} /><p>{t(interpretation)}</p><p>{t('applicableRange')}: <bdi>{referenceText(stats.latest)} {current.unit}</bdi></p><ui.Button secondary onClick={() => navigate(`history/${stats.latest.visitId}`)}>{t('viewVisit')}</ui.Button></>}{information && <a href={information[1]} target="_blank" rel="noopener noreferrer">{t('aboutBiomarker')}</a>}<p className="history-disclaimer">{t('historyDisclaimer')}</p></section></>
 }
 
-function MeasurementHistory({ api, ui, points, series }) {
+function MeasurementHistory({ api, ui, points, series, serverOrder }) {
   const { t, local, date, navigate } = api
-  return <section className="portal-card history-measurements"><h2>{t('measurementCount')}</h2>{points.length ? <div className="portal-table-wrap" tabIndex={0}><table><thead><tr>{['date', 'test', 'result', 'unit', 'range', 'flag', 'actions'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{[...points].reverse().map(point => <tr key={point.id}><td>{date(point.date)}</td><th scope="row">{local(series.name)}</th><td><bdi>{point.displayValue}</bdi></td><td><bdi>{series.unit}</bdi></td><td><bdi>{referenceText(point)}</bdi></td><td><ui.Status value={resultFlag(point)} /></td><td><div className="portal-row-actions"><ui.Button secondary onClick={() => navigate(`results/${point.reportId}`)}>{t('viewResult')}</ui.Button><ui.Button secondary onClick={() => navigate(`history/${point.visitId}`)}>{t('viewVisit')}</ui.Button></div></td></tr>)}</tbody></table></div> : <p>{t('trendEmpty')}</p>}</section>
+  return <section className="portal-card history-measurements"><h2>{t('measurementCount')}</h2>{points.length ? <div className="portal-table-wrap" tabIndex={0}><table><thead><tr>{['date', 'test', 'result', 'unit', 'range', 'flag', 'actions'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{(serverOrder ? points : [...points].reverse()).map(point => <tr key={point.id}><td>{date(point.date)}</td><th scope="row">{local(series.name)}</th><td><bdi>{point.displayValue}</bdi></td><td><bdi>{series.unit}</bdi></td><td><bdi>{referenceText(point)}</bdi></td><td><ui.Status value={resultFlag(point)} /></td><td><div className="portal-row-actions"><ui.Button secondary onClick={() => navigate(`results/${point.reportId}`)}>{t('viewResult')}</ui.Button><ui.Button secondary disabled={!point.visitId} onClick={() => navigate(`history/${point.visitId}`)}>{t('viewVisit')}</ui.Button></div></td></tr>)}</tbody></table></div> : <p>{t('trendEmpty')}</p>}</section>
 }
 
 function VisitCard({ api, ui, visit, initiallyOpen = false }) {

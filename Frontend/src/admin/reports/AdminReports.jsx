@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { ChartNoAxesCombined, FileSearch, Printer, X, CalendarCheck, FlaskConical, Receipt, Undo2, Wallet } from 'lucide-react'
 import { formatCurrency } from '../../utils/currency.js'
 import { reportsCopy } from './reportsCopy.js'
-import { reportsService } from './reportsService.js'
 import { buildReport, defaultPeriod, periodErrors } from './reportsModel.js'
 import './reports.css'
 
-function SourceDetails({ copy, onClose, opener }) {
+function SourceDetails({ copy, onClose, opener, live, details }) {
   const dialog = useRef(null)
   useEffect(() => {
     const element = dialog.current
@@ -15,7 +14,7 @@ function SourceDetails({ copy, onClose, opener }) {
   }, [opener])
   return <dialog ref={dialog} className="rp-sources" aria-labelledby="rp-sources-title" onCancel={event => { event.preventDefault(); onClose() }}>
     <header><h3 id="rp-sources-title">{copy.sources}</h3><button autoFocus type="button" aria-label={copy.close} onClick={onClose}><X size={19} /></button></header>
-    <p>{copy.sourceIntro}</p><ul>{['sourceOrders', 'sourceTests', 'sourceAppointments', 'sourceSamples', 'sourceFinancial'].map(key => <li key={key}>{copy[key]}</li>)}</ul><p>{copy.timezone}</p><p>{copy.sourceExport}</p>
+    {live ? (details?.length ? <ul lang="en" dir="ltr">{details.map(item => <li key={item.metric}><strong>{item.metric}</strong><br />{item.source}<br />{item.dateField}<br />{item.rule}</li>)}</ul> : <p>{copy.sectionUnavailable}</p>) : <><p>{copy.sourceIntro}</p><ul>{['sourceOrders', 'sourceTests', 'sourceAppointments', 'sourceSamples', 'sourceFinancial'].map(key => <li key={key}>{copy[key]}</li>)}</ul><p>{copy.timezone}</p><p>{copy.sourceExport}</p></>}
   </dialog>
 }
 function StatusTable({ title, countLabel, rows, copy, language }) {
@@ -26,7 +25,7 @@ function StatusTable({ title, countLabel, rows, copy, language }) {
 function displayDate(value, language) {
   return new Intl.DateTimeFormat(language === 'ar' ? 'ar-PS' : 'en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`))
 }
-export default function AdminReports({ language = 'en', service = reportsService }) {
+export default function AdminReports({ language = 'en', service }) {
   const copy = reportsCopy[language]
   const [draft, setDraft] = useState(defaultPeriod)
   const [applied, setApplied] = useState(defaultPeriod)
@@ -36,9 +35,11 @@ export default function AdminReports({ language = 'en', service = reportsService
   const [attempt, setAttempt] = useState(0)
   const [sourceOpener, setSourceOpener] = useState(null)
   useEffect(() => {
-    let live = true
-    service.load(applied).then(value => { if (live) { setData(value); setStatus('ready') } }, error => { if (live) setStatus(error.code === 'REPORTS_UNAVAILABLE' ? 'unavailable' : 'error') })
-    return () => { live = false }
+    const controller = new AbortController()
+    service.load(applied, { signal: controller.signal }).then(value => {
+      if (!controller.signal.aborted) { setData(value); setStatus('ready') }
+    }, error => { if (!controller.signal.aborted) setStatus(error.code === 'REPORTS_UNAVAILABLE' ? 'unavailable' : 'error') })
+    return () => controller.abort()
   }, [attempt, service, applied])
   const report = data && status === 'ready' ? service.live ? data : buildReport(data, applied) : null
   const changed = draft.from !== applied.from || draft.to !== applied.to
@@ -67,6 +68,6 @@ export default function AdminReports({ language = 'en', service = reportsService
         { label: 'receipts', key: 'receiptsCents', Icon: Receipt }, { label: 'refunds', key: 'refundsCents', Icon: Undo2 }, { label: 'net', key: 'netCents', Icon: Wallet },
       ].map(({ label, key, Icon }) => <div key={key}><h4><Icon size={18} aria-hidden="true" />{copy[label]}</h4><p><bdi>{report.financial ? formatCurrency(report.financial[key] / 100, language) : copy.sectionUnavailable}</bdi></p></div>)}</div></section>
     </>}
-    {sourceOpener && <SourceDetails copy={copy} opener={sourceOpener} onClose={() => setSourceOpener(null)} />}
+    {sourceOpener && <SourceDetails live={service.live} details={report?.sourceDetails} copy={copy} opener={sourceOpener} onClose={() => setSourceOpener(null)} />}
   </section>
 }

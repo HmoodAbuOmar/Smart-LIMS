@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Ellipsis, FlaskConical, Headset, Plus, Search, ShieldCheck, UserRound, UsersRound, X } from 'lucide-react'
 import AdminFilterDropdown from './AdminFilterDropdown.jsx'
 import { adminUsersCopy } from '../adminUsersCopy.js'
-import { adminUsersData } from '../adminUsersData.js'
 import './adminUsers.css'
 
 const pageSizeOptions = [7, 10, 25]
@@ -78,13 +77,13 @@ function UserActions({ user, name, copy, onEdit, onToggleBlock, onDelete }) {
   </span>
 }
 
-export default function AdminUsers({ language, service }) {
+export default function AdminUsers({ language, service, previewUsers = [] }) {
   const copy = adminUsersCopy[language]
   const rtl = language === 'ar'
   const local = useCallback(value => Array.isArray(value) ? value[rtl ? 1 : 0] : value, [rtl])
   const number = value => new Intl.NumberFormat(language).format(value)
   const dateFormatter = useMemo(() => new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }), [language])
-  const [users, setUsers] = useState(() => service ? [] : adminUsersData.map(user => ({ ...user })))
+  const [users, setUsers] = useState(() => service ? [] : previewUsers.map(user => ({ ...user })))
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -117,16 +116,16 @@ export default function AdminUsers({ language, service }) {
   const statuses = { ...copy.statuses, PENDING_VERIFICATION: words.pending }
   useEffect(() => {
     if (!service) return
-    let active = true
+    const controller = new AbortController()
     service.load({
       page: page - 1, size: pageSize, search: query.trim(), role: roleFilter, status: statusFilter,
       sort: `${{ name: 'fullName', lastLogin: 'lastLoginAt' }[sort.key] || sort.key},${sort.direction}`, recent: dateFilter === '30',
-    }).then(data => {
-      if (!active) return
+    }, { signal: controller.signal }).then(data => {
+      if (controller.signal.aborted) return
       if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return }
       setResult(data); setLoadError(false)
-    }, () => { if (active) { setResult(null); setLoadError(true) } })
-    return () => { active = false }
+    }, () => { if (!controller.signal.aborted) setLoadError(true) })
+    return () => controller.abort()
   }, [service, page, pageSize, query, roleFilter, statusFilter, sort, dateFilter, revision])
 
   useEffect(() => {
@@ -193,12 +192,23 @@ export default function AdminUsers({ language, service }) {
   function openEdit(user) { setEditRole(user.role); setFormError(''); setDialogState({ type: 'edit', user }) }
   function openDelete(user) { setFormError(''); setDialogState({ type: 'delete', user }) }
 
-  async function saveLive(action, message, inDialog = false) {
+  async function saveLive(action, message, inDialog = false, { removedId, invited } = {}) {
     if (lock.current) return
     lock.current = true
     setSaving(true); setFormError(''); setNotice('')
     try {
-      await action()
+      const record = await action()
+      setResult(current => {
+        if (!current) return current
+        if (removedId) return { ...current, content: current.content.filter(user => user.id !== removedId) }
+        if (!record?.id) return current
+        const previous = current.content.find(user => user.id === record.id)
+        if (!previous && !invited) return current
+        const status = record.blocked ? 'BLOCKED' : record.emailConfirmed ? 'ACTIVE' : invited ? 'INVITED'
+          : previous?.status === 'BLOCKED' ? undefined : previous?.status
+        const saved = { ...previous, ...record, name: record.fullName, status }
+        return { ...current, content: previous ? current.content.map(user => user.id === saved.id ? saved : user) : [saved, ...current.content] }
+      })
       setRevision(value => value + 1)
       setSelectedIds(new Set())
       setDialogState(null)
@@ -215,7 +225,7 @@ export default function AdminUsers({ language, service }) {
       if (!name) { setFormError(copy.nameRequired); return }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setFormError(copy.emailInvalid); return }
       if (service) {
-        void saveLive(() => service.invite({ fullName: name, email, userName: inviteUsername.trim(), phoneNumber: invitePhone.trim(), role: inviteRole }), words.invited, true)
+        void saveLive(() => service.invite({ fullName: name, email, userName: inviteUsername.trim(), phoneNumber: invitePhone.trim(), role: inviteRole }), words.invited, true, { invited: true })
         return
       }
       if (users.some(user => user.email.toLowerCase() === email)) { setFormError(copy.emailExists); return }
@@ -243,7 +253,7 @@ export default function AdminUsers({ language, service }) {
 
   function confirmDelete() {
     if (!dialogState?.user) return
-    if (service) { void saveLive(() => service.delete(dialogState.user.id), words.saved, true); return }
+    if (service) { void saveLive(() => service.delete(dialogState.user.id), words.saved, true, { removedId: dialogState.user.id }); return }
     setUsers(current => current.filter(user => user.id !== dialogState.user.id))
     setSelectedIds(current => { const next = new Set(current); next.delete(dialogState.user.id); return next })
     setNotice(copy.deletedLocal)
@@ -310,7 +320,7 @@ export default function AdminUsers({ language, service }) {
               <td className="admin-users-select-cell"><input type="checkbox" checked={selectedIds.has(user.id)} onChange={() => toggleSelected(user.id)} aria-label={copy.selectUser(name)} /></td>
               <th scope="row"><span className="admin-users-person"><span className="admin-users-avatar" aria-hidden="true">{initials}</span><span className="admin-users-person-copy"><span className="admin-users-name">{name}</span><bdi>{user.email}</bdi></span></span></th>
               <td><span className={`admin-users-role admin-users-role-${user.role.toLowerCase()}`}><RoleIcon size={13} aria-hidden="true" />{copy.roles[user.role]}</span></td>
-              <td><span className={`admin-users-status admin-users-status-${user.status.toLowerCase()}`}><span aria-hidden="true" />{statuses[user.status]}</span></td>
+              <td><span className={`admin-users-status admin-users-status-${user.status?.toLowerCase() || 'unknown'}`}><span aria-hidden="true" />{statuses[user.status] || '—'}</span></td>
               <td className="admin-users-last-login">{user.lastLogin ? <span><CalendarDays size={14} aria-hidden="true" /><time dateTime={user.lastLogin}>{dateFormatter.format(new Date(user.lastLogin))}</time></span> : copy.never}</td>
               <td className="admin-users-actions-cell"><UserActions user={user} name={name} copy={copy} onEdit={() => openEdit(user)}
                 onToggleBlock={() => toggleBlock(user)} onDelete={() => openDelete(user)} /></td>

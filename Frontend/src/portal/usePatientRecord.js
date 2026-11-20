@@ -7,7 +7,8 @@ export function usePatientRecord(kind, id, profile, development) {
     if (development || !id) return
     const controller = new AbortController()
     const options = { signal: controller.signal }
-    const read = kind === 'order' ? portalApi.orderDetail(id, profile, options) : portalApi.resultDetail(id, options)
+    const read = kind === 'order' ? portalApi.orderDetail(id, profile, options)
+      : kind === 'test' ? portalApi.testDetail(id, options) : portalApi.resultDetail(id, options)
     read.then(record => {
       if (!controller.signal.aborted) setResult({ id, record })
     }, error => {

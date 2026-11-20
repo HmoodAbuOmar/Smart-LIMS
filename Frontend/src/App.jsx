@@ -1,4 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
+import { getCookieAccess } from './auth/cookieSession.js'
+import { sessionIdentity, sessionRevision, subscribeSession } from './auth/sessionState.js'
 // Preserve the existing shared CSS cascade after moving the homepage module.
 import './components/LanguageSwitcher.css'
 import './marketing/Navbar.css'
@@ -65,5 +67,28 @@ function AppRouter() {
 
 
 export default function App() {
-  return <PatientFileStateProvider><AppRouter /></PatientFileStateProvider>
+  const revision = useSyncExternalStore(subscribeSession, sessionRevision, sessionRevision)
+  useEffect(() => {
+    const protectedRoute = () => /^#\/(patient\/|admin(?:[?/]|$)|receptionist(?:[?/]|$)|lab-technician(?:[?/]|$))/.test(window.location.hash)
+    const unsubscribe = subscribeSession(reason => {
+      if (reason === 'signed-out' && protectedRoute()) window.location.replace('/#/login')
+    })
+    const controller = new AbortController()
+    function revalidate() {
+      if (document.visibilityState === 'visible' && protectedRoute() && sessionIdentity()) {
+        void getCookieAccess({ signal: controller.signal }).catch(() => {})
+      }
+    }
+    window.addEventListener('focus', revalidate)
+    document.addEventListener('visibilitychange', revalidate)
+    const timer = window.setInterval(revalidate, 60_000)
+    return () => {
+      controller.abort()
+      unsubscribe()
+      window.clearInterval(timer)
+      window.removeEventListener('focus', revalidate)
+      document.removeEventListener('visibilitychange', revalidate)
+    }
+  }, [])
+  return <PatientFileStateProvider key={revision}><AppRouter /></PatientFileStateProvider>
 }

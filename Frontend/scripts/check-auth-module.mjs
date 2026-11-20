@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { authApi } from '../src/auth/api.js'
-import { patientApi, requestPatientOperation } from '../src/services/patientApi.js'
+import { patientApi } from '../src/services/patientApi.js'
 import { accountDestination, actionErrorKey, patientDestination } from '../src/auth/access.js'
 
 const visited = new Set()
@@ -20,13 +20,12 @@ inspect('src/auth/index.js')
 assert.ok(visited.size > 12)
 assert.ok(!('createFile' in authApi) && !('linkFile' in authApi))
 for (const [method, operation] of Object.entries(authApi)) {
-  assert.equal(patientApi[method], operation, `Compatibility service changed: ${method}`)
   if (['resendVerification', 'verificationStatus'].includes(method)) await assert.rejects(operation(), error => error.code === 'SERVICE_UNAVAILABLE')
 }
 const controller = new AbortController()
 controller.abort()
 await assert.rejects(authApi.getAccess({ signal: controller.signal }), error => error.name === 'AbortError')
-await assert.rejects(requestPatientOperation('unsupported'), /Unknown patient operation/)
+assert.deepEqual(Object.keys(patientApi).sort(), ['createFile', 'linkFile'])
 assert.equal(patientDestination({ authenticated: false }), '#/login')
 assert.equal(patientDestination({ authenticated: true, role: 'patient', emailVerified: false }), '#/verify-email')
 assert.equal(patientDestination({ authenticated: true, role: 'patient', emailVerified: true, hasLinkedMedicalFile: false }), '#/patient/file')

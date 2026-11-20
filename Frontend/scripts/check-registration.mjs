@@ -4,7 +4,8 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { prepareRegistration, registrationFields, toRegistrationPayload } from '../src/services/registration.js'
 import { genderOptions, validatePatientDraft, toPatientFilePayload, prepareFileLink, toFileLinkPayload } from '../src/services/onboarding.js'
-import { patientApi, patientDestination } from '../src/services/patientApi.js'
+import { authApi } from '../src/auth/api.js'
+import { patientDestination } from '../src/auth/access.js'
 import { readLinkToken, validateEmail, validatePasswordReset } from '../src/services/emailFlow.js'
 
 const account = { name: ' Patient Name ', email: ' patient@example.com ', password: 'StrongPass9!', confirmPassword: 'StrongPass9!' }
@@ -34,12 +35,12 @@ assert.deepEqual(validateEmail({ email: ' ' }), { email: 'emailRequired' })
 assert.deepEqual(validateEmail({ email: 'bad' }), { email: 'emailInvalid' })
 assert.deepEqual(validatePasswordReset({ password: account.password, confirmPassword: account.password }), {})
 assert.equal(validatePasswordReset({ password: account.password, confirmPassword: 'different' }).confirmPassword, 'passwordMismatch')
-for (const [name, operation] of Object.entries(patientApi)) {
+for (const [name, operation] of Object.entries(authApi)) {
   if (['resendVerification', 'verificationStatus'].includes(name)) await assert.rejects(operation(), error => error.code === 'SERVICE_UNAVAILABLE')
 }
 const controller = new AbortController()
 controller.abort()
-await assert.rejects(patientApi.getAccess({ signal: controller.signal }), error => error.name === 'AbortError')
+await assert.rejects(authApi.getAccess({ signal: controller.signal }), error => error.name === 'AbortError')
 
 globalThis.window = { location: { hash: '' }, localStorage: { getItem: () => 'en', setItem() {} } }
 globalThis.document = { documentElement: {}, querySelector: () => null }

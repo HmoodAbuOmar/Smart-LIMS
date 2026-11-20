@@ -18,7 +18,6 @@ export default function PatientAppointmentForm({ query }) {
   const [availability, setAvailability] = useState(null)
   const [slotId, setSlotId] = useState('')
   const [typeError, setTypeError] = useState(false)
-  const [requestId, setRequestId] = useState(null)
   const key = JSON.stringify([existing?.id, orderId, typeId, day])
   useEffect(() => {
     if (existing) return
@@ -40,13 +39,11 @@ export default function PatientAppointmentForm({ query }) {
   }, [key, day, existing, orderId, typeId])
   const loaded = availability?.key === key ? availability : null
   const selected = loaded?.slots?.find(slot => slot.id === slotId)
-  function change(update, value) { update(value); setSlotId(''); setRequestId(null) }
+  function change(update, value) { update(value); setSlotId('') }
   async function save(event) {
     event.preventDefault()
     if (!selected || busy) return
-    const key = requestId || crypto.randomUUID()
-    setRequestId(key)
-    const response = await commit({ type: 'APPOINTMENT', existing: existing?.id, requestId: key,
+    const response = await commit({ type: 'APPOINTMENT', existing: existing?.id,
       appointment: { orderId, typeId, slotId, version: existing?.version } })
     if (response?.appointment) navigate('appointments/' + response.appointment.id)
   }
@@ -69,7 +66,7 @@ export default function PatientAppointmentForm({ query }) {
           {existing || (orderId && typeId) ? <div>{loaded?.error ? <p role="alert">{t('unavailable')}</p> :
             !loaded ? <p role="status">{t('loading')}</p> : !loaded.slots.length ? <p>{t('noSlots')}</p> :
               loaded.slots.map(slot => <button key={slot.id} type="button" value={slot.id} aria-pressed={slotId === slot.id}
-                onClick={() => { setSlotId(slot.id); setRequestId(null) }}><bdi>{clock.format(new Date(slot.startsAt))}</bdi></button>)}</div> : null}
+                onClick={() => { setSlotId(slot.id) }}><bdi>{clock.format(new Date(slot.startsAt))}</bdi></button>)}</div> : null}
         </fieldset></div>
       <div className="portal-book-summary"><h2>{t('summary')}</h2><p>{date(day)} {selected && <bdi>{clock.format(new Date(selected.startsAt))}</bdi>}</p></div>
       <div className="portal-actions"><Button type="submit" disabled={!selected || busy}>{t(existing ? 'saveReschedule' : 'confirmAppointment')}</Button></div>

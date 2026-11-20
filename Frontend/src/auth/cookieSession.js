@@ -1,5 +1,7 @@
-function authError(code) {
-  return Object.assign(new Error(code), { code })
+import { coordinateRequest, invalidateSession, rememberSession, sessionIdentity, sessionSignal, sessionStarted } from './sessionState.js'
+
+function authError(code, status) {
+  return Object.assign(new Error(code), { code, status })
 }
 
 async function read(path, { signal, method = 'GET', body, csrf, requestId, pdf } = {}) {
@@ -15,11 +17,12 @@ async function read(path, { signal, method = 'GET', body, csrf, requestId, pdf }
   const type = response.headers.get('content-type')
   const data = type?.includes('application/json') ? await response.json()
     : pdf && response.ok && type?.includes('application/pdf') ? await response.blob() : null
+  signal?.throwIfAborted()
   return { response, data }
 }
 
 function requireSuccess({ response, data }, fallback = 'SERVICE_UNAVAILABLE') {
-  if (!response.ok || !data) throw authError(data?.code || fallback)
+  if (!response.ok || !data) throw authError(data?.code || fallback, response.status)
   return data
 }
 
@@ -36,26 +39,47 @@ async function initializeCsrf(signal) {
   return token
 }
 
-export async function getCookieAccess({ signal } = {}) {
+function protectedSignal(signal) {
+  return signal ? AbortSignal.any([signal, sessionSignal()]) : sessionSignal()
+}
+
+export function getCookieAccess({ signal } = {}) {
+  const scope = protectedSignal(signal)
+  return coordinateRequest(false, scope, () => readCookieAccess(scope))
+}
+
+function signedOut() {
+  if (sessionIdentity()) invalidateSession()
+  return { authenticated: false }
+}
+
+async function readCookieAccess(signal) {
   signal?.throwIfAborted()
   const account = await read('/api/auth/me', { signal })
-  if (account.response.status === 401) return { authenticated: false }
+  if (account.response.status === 401) return signedOut()
   const user = requireSuccess(account)
   if (typeof user.id !== 'string' || !user.id || typeof user.role !== 'string') throw authError('SERVICE_UNAVAILABLE')
   const access = { authenticated: true, role: user.role.toLowerCase(), userId: user.id, displayName: user.fullName }
   if (access.role === 'patient') {
     access.emailVerified = user.emailConfirmed === true
-    if (!access.emailVerified) return access
-    const profile = await read('/api/patients/me', { signal })
-    if (profile.response.status === 401) return { authenticated: false }
-    access.hasLinkedMedicalFile = profile.response.status === 404 && profile.data?.code === 'PATIENT_PROFILE_NOT_LINKED'
-      ? false : Boolean(requireSuccess(profile))
+    if (access.emailVerified) {
+      const profile = await read('/api/patients/me', { signal })
+      if (profile.response.status === 401) return signedOut()
+      access.hasLinkedMedicalFile = profile.response.status === 404 && profile.data?.code === 'PATIENT_PROFILE_NOT_LINKED'
+        ? false : Boolean(requireSuccess(profile))
+    }
   }
+  const previous = sessionIdentity()
+  rememberSession(access)
+  if (previous && previous !== sessionIdentity()) invalidateSession('changed')
   return access
 }
 
-export async function loginWithCookie({ email, password }, { signal } = {}) {
-  signal?.throwIfAborted()
+export function loginWithCookie(credentials, { signal } = {}) {
+  return coordinateRequest(true, signal, () => submitLogin(credentials, signal))
+}
+
+async function submitLogin({ email, password }, signal) {
   const csrf = await initializeCsrf(signal)
   const result = await read('/api/auth/cookie-login', {
     method: 'POST', body: { emailOrUserName: email, password }, csrf, signal,
@@ -63,28 +87,37 @@ export async function loginWithCookie({ email, password }, { signal } = {}) {
   const status = result.response.status
   if (status === 429) throw authError('RATE_LIMITED')
   if (requireSuccess(result, status === 401 ? 'INVALID_CREDENTIALS' : 'SERVICE_UNAVAILABLE').success !== true) throw authError('SERVICE_UNAVAILABLE')
+  sessionStarted()
 }
 
-export async function logoutWithCookie({ signal } = {}) {
-  signal?.throwIfAborted()
+export function logoutWithCookie({ signal } = {}) {
+  const scope = protectedSignal(signal)
+  return coordinateRequest(true, scope, () => submitLogout(scope))
+}
+
+async function submitLogout(signal) {
   const csrf = await initializeCsrf(signal)
   const result = await read('/api/auth/logout', { method: 'POST', csrf, signal })
-  if (requireSuccess(result).success !== true) throw authError('SERVICE_UNAVAILABLE')
+  if (result.response.status !== 401 && requireSuccess(result).success !== true) throw authError('SERVICE_UNAVAILABLE')
   // The server clears the HttpOnly session. Remove any readable CSRF cookie
   // left behind when the response carries only the session Set-Cookie header.
   if (currentCsrf()) document.cookie = 'XSRF-TOKEN=; Max-Age=0; Path=/'
+  invalidateSession()
 }
 
 export async function acceptAccountInvitation(body, { signal } = {}) {
-  signal?.throwIfAborted()
-  const csrf = await initializeCsrf(signal)
-  const result = requireSuccess(await read('/api/auth/set-password', { method: 'POST', body, csrf, signal }))
+  const result = await authenticatedRequest('/api/auth/set-password', { method: 'POST', body, signal, publicRequest: true })
   if (typeof result.message !== 'string') throw authError('SERVICE_UNAVAILABLE')
 }
 
-export async function authenticatedRequest(path, { method = 'GET', body, signal, requestId, pdf } = {}) {
-  const csrf = method === 'GET' ? undefined : await initializeCsrf(signal)
-  const result = await read(path, { method, body, signal, csrf, requestId, pdf })
-  if (result.response.status === 204) return
-  return requireSuccess(result)
+export function authenticatedRequest(path, { method = 'GET', body, signal, requestId, pdf, publicRequest = false } = {}) {
+  if (!/^\/api\//.test(path)) return Promise.reject(authError('INVALID_API_PATH'))
+  const scope = publicRequest ? signal : protectedSignal(signal)
+  return coordinateRequest(method !== 'GET', scope, async () => {
+    const csrf = method === 'GET' ? undefined : await initializeCsrf(scope)
+    const result = await read(path, { method, body, signal: scope, csrf, requestId, pdf })
+    if (!publicRequest && result.response.status === 401) invalidateSession()
+    if (result.response.status === 204) return
+    return requireSuccess(result)
+  })
 }

@@ -150,6 +150,8 @@ try {
   await click('.auth-tabs a[href="#/signup"]');await step('signup')
   assert.equal(await evaluate('location.hash'),routes.signup,'Tabs stay in the walkthrough')
   await evaluate("location.hash='#/patient/file'")
+  await waitFor("location.hash==='#/login' || !!document.querySelector('.auth-form-panel [role=alert]')")
+  if (await evaluate("location.hash!=='#/login'")) await click('.auth-form-panel a[href="#/login"]')
   await waitFor("location.hash==='#/login' && !!document.querySelector('#auth-email')")
   assert.equal(await evaluate("document.querySelectorAll('table,.workflow-choices,[data-walkthrough-step]').length"),0)
   assert.ok(await evaluate("Object.keys(localStorage).every(k=>k==='smart-lims.language') && Object.keys(sessionStorage).every(k=>k==='smart-lims.dev-portal.v1')"))

@@ -3,13 +3,13 @@ import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ContactRound, Eye, Li
 import AdminPatientForm from './AdminPatientForm.jsx'
 import AdminPatientAvatar from './AdminPatientAvatar.jsx'
 import { adminPatientsCopy } from './adminPatientsCopy.js'
-import { adminPatientsService } from './adminPatientsService.js'
 import { patientFinancials, patientName, searchPatients } from './adminPatientsModel.js'
 import { formatCurrency } from '../../utils/currency.js'
 import './adminPatients.css'
 
 function Status({ value, labels }) { return <span className={`ap-badge ap-status-${value.toLowerCase()}`}>{labels[value]}</span> }
 function AccountStatus({ patient, copy }) {
+  if (!patient.linkStatus && !Object.hasOwn(patient, 'linkedAccountId')) return <span>{copy.missing}</span>
   const linked = patient.linkStatus ? patient.linkStatus === 'LINKED' : Boolean(patient.linkedAccountId)
   const Icon = linked ? Link2 : Unlink2
   return <span className={`ap-badge ap-account-status ${linked ? 'ap-linked' : 'ap-unlinked'}`}><Icon size={12} aria-hidden="true" />{linked ? copy.linked : copy.unlinked}</span>
@@ -20,12 +20,13 @@ function Demographics({ patient, copy, date }) {
   </div>)}</dl>
 }
 
-export default function AdminPatients({ language, onToggleLanguage, service = adminPatientsService }) {
+export default function AdminPatients({ language, onToggleLanguage, service }) {
   const copy = adminPatientsCopy[language]
   const rtl = language === 'ar'
   const unavailable = rtl ? 'هذه السجلات غير متاحة من الواجهة البرمجية الحالية.' : 'These records are unavailable from the current API.'
   const [data, setData] = useState({ patients: [], orders: [], appointments: [], transactions: [] })
   const [loadState, setLoadState] = useState('loading')
+  const [listError, setListError] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -34,6 +35,8 @@ export default function AdminPatients({ language, onToggleLanguage, service = ad
   const [tab, setTab] = useState('overview')
   const [editor, setEditor] = useState(null)
   const [notice, setNotice] = useState(false)
+  const [refreshId, setRefreshId] = useState(null), [refreshError, setRefreshError] = useState(false)
+  const [orderLoad, setOrderLoad] = useState(null)
   const profileHeading = useRef(null)
   const listHeading = useRef(null)
   const returnTo = useRef(null)
@@ -42,11 +45,28 @@ export default function AdminPatients({ language, onToggleLanguage, service = ad
   const date = value => value ? new Intl.DateTimeFormat(language, { dateStyle: 'medium' }).format(new Date(`${value}T12:00:00`)) : copy.missing
   const money = value => formatCurrency(value, language)
 
+  const serverPage = service.live ? page - 1 : 0
+  const serverSize = service.live ? pageSize : 7
+  const serverSearch = service.live ? query.trim() || undefined : undefined
   useEffect(() => {
-    let active = true
-    service.load().then(result => { if (active) { setData(result); setLoadState('ready') } }).catch(() => { if (active) setLoadState('error') })
-    return () => { active = false }
-  }, [service, attempt])
+    const controller = new AbortController()
+    service.load({ page: serverPage, size: serverSize, search: serverSearch }, { signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) { setData(result); setListError(false); setLoadState('ready') } },
+        () => {
+          if (controller.signal.aborted) return
+          setListError(true)
+          setLoadState(current => current === 'ready' ? current : 'error')
+        })
+    return () => controller.abort()
+  }, [service, attempt, serverPage, serverSize, serverSearch])
+  useEffect(() => {
+    if (!service.live || !refreshId) return
+    const controller = new AbortController()
+    service.refresh(refreshId.id, { signal: controller.signal }).then(record => {
+      if (!controller.signal.aborted) setData(current => ({ ...current, patients: current.patients.map(item => item.id === record.id ? record : item) }))
+    }, () => { if (!controller.signal.aborted) setRefreshError(true) })
+    return () => controller.abort()
+  }, [service, refreshId])
 
   useEffect(() => {
     if (selectedId) profileHeading.current?.focus()
@@ -63,27 +83,40 @@ export default function AdminPatients({ language, onToggleLanguage, service = ad
   }, [notice])
 
   const filtered = useMemo(() => searchPatients(data.patients, query), [data.patients, query])
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, pages)
-  const patients = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const pages = Math.max(1, service.live ? data.totalPages || 1 : Math.ceil(filtered.length / pageSize))
+  const currentPage = service.live ? page : Math.min(page, pages)
+  const patients = service.live ? data.patients : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const selected = data.patients.find(patient => patient.id === selectedId)
-  const orders = data.orders.filter(order => order.patientId === selectedId)
+  useEffect(() => {
+    if (!service.live || tab !== 'orders' || !selected) return
+    const controller = new AbortController()
+    service.orders(selected, { signal: controller.signal }).then(rows => {
+      if (!controller.signal.aborted) setOrderLoad({ id: selected.id, rows })
+    }, () => { if (!controller.signal.aborted) setOrderLoad({ id: selected.id, error: true }) })
+    return () => controller.abort()
+  }, [service, tab, selected])
+  const liveOrders = orderLoad?.id === selectedId ? orderLoad : null
+  const orders = service.live ? liveOrders?.rows || [] : data.orders.filter(order => order.patientId === selectedId)
   const appointments = data.appointments.filter(item => item.patientId === selectedId)
   const financials = patientFinancials(selectedId, data.orders, data.transactions)
   const tabs = ['overview', 'orders', 'appointments', 'financial']
 
   function openProfile(patient, trigger) { returnTo.current = trigger; setSelectedId(patient.id); setTab('overview'); setNotice(false) }
   function saved(patient) {
-    setData(current => ({ ...current, patients: current.patients.some(item => item.id === patient.id) ? current.patients.map(item => item.id === patient.id ? patient : item) : [patient, ...current.patients] }))
+    setData(current => ({ ...current, patients: current.patients.some(item => item.id === patient.id)
+      ? current.patients.map(item => item.id === patient.id ? { ...item, ...patient } : item) : [patient, ...current.patients] }))
     if (editor?.mode === 'add') { setQuery(''); setPage(1) }
     setEditor(null)
     setNotice(true)
+    if (service.live) { setRefreshError(false); setRefreshId({ id: patient.id }) }
   }
 
   return <section className="admin-patients" aria-label={copy.title}>
     <div className="ap-heading"><div className="ap-heading-copy"><span className="ap-title-icon" aria-hidden="true"><ContactRound size={23} /></span><div><h2 ref={listHeading} tabIndex={-1}>{copy.title}</h2><p>{copy.description}</p></div></div>
       {!selected && <button type="button" className="ap-primary" disabled={loadState !== 'ready'} onClick={() => { setNotice(false); setEditor({ mode: 'add' }) }}><Plus size={17} aria-hidden="true" />{copy.add}</button>}
     </div>
+    {refreshError && <p className="ap-muted" role="status">{rtl ? 'تم الحفظ، لكن تعذّر تحديث السجل.' : 'Saved, but the record could not be refreshed.'}</p>}
+    {listError && loadState === 'ready' && <p className="ap-muted" role="status">{copy.error} <button type="button" onClick={() => setAttempt(value => value + 1)}>{copy.retry}</button></p>}
     {notice && <p className="ap-notice" role="status">{copy.saved}</p>}
     {loadState === 'loading' ? <div className="ap-card ap-empty" role="status" aria-busy="true">{copy.loading}</div> : loadState === 'error' ? <div className="ap-card ap-empty"><p role="alert">{copy.error}</p><button type="button" onClick={() => { setLoadState('loading'); setAttempt(value => value + 1) }}>{copy.retry}</button></div> : selected ? <>
       <div className="ap-profile-nav"><button type="button" onClick={() => setSelectedId(null)}>{rtl ? <ArrowRight size={16} aria-hidden="true" /> : <ArrowLeft size={16} aria-hidden="true" />}{copy.back}</button></div>
@@ -102,13 +135,13 @@ export default function AdminPatients({ language, onToggleLanguage, service = ad
         <div role="tabpanel" id={`patient-panel-${tab}`} aria-labelledby={`patient-tab-${tab}`} tabIndex={0} className="ap-tab-content">
           {tab === 'overview' && <><h3>{copy.overview}</h3><p className="ap-profile-fullname">{patientName(selected, language)}</p><Demographics patient={selected} copy={copy} date={date} /></>}
           {tab === 'orders' && <><div className="ap-section-heading"><h3>{copy.orders}</h3><button type="button" disabled aria-describedby="patient-order-unavailable">{copy.newOrder}</button></div><p id="patient-order-unavailable" className="ap-muted">{copy.orderUnavailable}</p>
-            {!orders.length ? <p className="ap-empty">{copy.noOrders}</p> : <div className="ap-table-scroll" tabIndex={0} role="region" aria-label={copy.orders}><table><caption className="ap-sr-only">{copy.orders}</caption><thead><tr>{[copy.orderNumber, copy.date, copy.status, copy.total, copy.actions].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{orders.map(order => <tr key={order.id}><th scope="row"><bdi>{order.number}</bdi></th><td>{date(order.date)}</td><td><Status value={order.status} labels={copy.orderStatuses} /></td><td><bdi>{money(order.total)}</bdi></td><td><button type="button" disabled aria-describedby="patient-order-unavailable">{copy.openOrder}</button></td></tr>)}</tbody></table></div>}</>}
+            {service.live && !liveOrders ? <p role="status">{copy.loading}</p> : liveOrders?.error ? <p role="alert">{copy.error}</p> : !orders.length ? <p className="ap-empty">{copy.noOrders}</p> : <div className="ap-table-scroll" tabIndex={0} role="region" aria-label={copy.orders}><table><caption className="ap-sr-only">{copy.orders}</caption><thead><tr>{[copy.orderNumber, copy.date, copy.status, copy.total, copy.actions].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{orders.map(order => <tr key={order.id}><th scope="row"><bdi>{order.number}</bdi></th><td>{date(order.date)}</td><td><Status value={order.status} labels={copy.orderStatuses} /></td><td><bdi>{money(order.total)}</bdi></td><td><button type="button" disabled aria-describedby="patient-order-unavailable">{copy.openOrder}</button></td></tr>)}</tbody></table></div>}</>}
           {tab === 'appointments' && <><h3>{copy.appointments}</h3>{service.live ? <p className="ap-empty">{unavailable}</p> : !appointments.length ? <p className="ap-empty">{copy.noAppointments}</p> : <div className="ap-table-scroll" tabIndex={0} role="region" aria-label={copy.appointments}><table><caption className="ap-sr-only">{copy.appointments}</caption><thead><tr>{[copy.date, copy.orderNumber, copy.status].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{appointments.map(item => <tr key={item.id}><td><time dateTime={`${item.date}T${item.time}`}>{date(item.date)} · <bdi>{item.time}</bdi></time></td><td><bdi>{data.orders.find(order => order.id === item.orderId)?.number || copy.missing}</bdi></td><td><Status value={item.status} labels={copy.appointmentStatuses} /></td></tr>)}</tbody></table></div>}</>}
           {tab === 'financial' && <><h3>{copy.financial}</h3>{!service.live && financials.available ? <><dl className="ap-financial">{['charges', 'payments', 'outstanding'].map(key => <div key={key}><dt>{copy[key]}</dt><dd><bdi>{money(financials[key])}</bdi></dd></div>)}</dl><p className="ap-muted">{copy.financeNote}</p></> : <p className="ap-empty">{service.live ? unavailable : copy.noFinancial}</p>}</>}
         </div>
       </section>
     </> : <>
-      <div className="ap-card ap-list-card"><div className="ap-toolbar"><label className="ap-search"><Search size={18} aria-hidden="true" /><span className="ap-sr-only">{copy.search}</span><input type="search" placeholder={copy.search} value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} /></label><p role="status">{copy.results}: <strong>{number(filtered.length)}</strong></p></div>
+      <div className="ap-card ap-list-card"><div className="ap-toolbar"><label className="ap-search"><Search size={18} aria-hidden="true" /><span className="ap-sr-only">{copy.search}</span><input type="search" maxLength={120} placeholder={copy.search} value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} /></label><p role="status">{copy.results}: <strong>{number(service.live ? data.totalElements ?? data.patients.length : filtered.length)}</strong></p></div>
       <div className="ap-table-scroll" role="region" aria-label={copy.title} tabIndex={0}><table><caption className="ap-sr-only">{copy.title}</caption><thead><tr>{['fileNumber', 'fullName', 'dateOfBirth', 'gender', 'phone', 'account', 'actions'].map(key => <th scope="col" key={key}>{copy[key]}</th>)}</tr></thead><tbody>{patients.map(patient => <tr key={patient.id}>
         <th scope="row"><bdi className="ap-file-number">{patient.fileNumber}</bdi></th><td className="ap-name"><span className="ap-person"><AdminPatientAvatar patient={patient} language={language} /><span>{patientName(patient, language)}</span></span></td><td className="ap-date-cell">{date(patient.dateOfBirth)}</td><td>{copy.genders[patient.gender]}</td><td className="ap-phone-cell"><bdi>{patient.phone || copy.missing}</bdi></td><td><AccountStatus patient={patient} copy={copy} /></td><td><div className="ap-row-actions"><button type="button" aria-label={`${copy.view}: ${patientName(patient, language)}, ${patient.fileNumber}`} onClick={event => openProfile(patient, event.currentTarget)}><Eye size={15} aria-hidden="true" />{copy.view}</button><button type="button" aria-label={`${copy.edit}: ${patientName(patient, language)}, ${patient.fileNumber}`} onClick={() => { setNotice(false); setEditor({ mode: 'edit', patient }) }}><Pencil size={14} aria-hidden="true" />{copy.editAction}</button></div></td>
       </tr>)}</tbody></table></div>

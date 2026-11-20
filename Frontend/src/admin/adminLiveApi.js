@@ -1,23 +1,11 @@
 import { authenticatedRequest } from '../auth/cookieSession.js'
+import { queryApi as get, listApi as list } from '../services/apiQuery.js'
 import { schedulingDate, schedulingInstant, SCHEDULING_TIME_ZONE } from './bookingSlots/bookingSlotsModel.js'
 import { rangeFields } from './catalog/adminCatalogModel.js'
 import { reportDate } from './operationsPayments/operationsPaymentsModel.js'
 
-function get(path, params = {}) {
-  const query = new URLSearchParams(params).toString()
-  return authenticatedRequest(path + (query ? `?${query}` : ''))
-}
 const write = (path, method, body) => authenticatedRequest(path, { method, body })
 
-async function list(path, params) {
-  const items = []
-  for (let page = 0; ; page++) {
-    const response = await get(path, { ...params, page, size: 100 })
-    if (Array.isArray(response)) return response
-    items.push(...response.content)
-    if (response.last || page + 1 >= response.totalPages || !response.content.length) return items
-  }
-}
 
 const names = (name, field = 'name') => ({ [field + 'En']: name || '', [field + 'Ar']: name || '' })
 const orderStatus = status => status === 'PENDING' ? 'NEW' : status
@@ -27,20 +15,21 @@ const order = entry => ({
   status: orderStatus(entry.status), totalCents: Math.round(entry.totalAmount * 100),
   createdAt: entry.createdAt, date: reportDate(entry.createdAt),
 })
-const orders = async () => (await list('/api/orders')).map(order)
+async function orderPage(params, options) {
+  const response = await get('/api/orders', params, options)
+  return { ...response, content: response.content.map(order) }
+}
 const patient = record => ({
   ...record, ...names(record.fullName), fileNumber: record.patientNumber, phone: record.phoneNumber,
 })
 
 export const liveOverview = {
-  async load(days) {
-    const [dashboard, records] = await Promise.all([get('/api/admin/dashboard', { days }), orders()])
-    return { dashboard, orders: records }
-  },
+  load: (days, options) => get('/api/admin/dashboard', { days }, options),
+  orders: orderPage,
 }
 
 export const liveUsers = {
-  async load({ page, size, search, role, status, sort, recent }) {
+  async load({ page, size, search, role, status, sort, recent }, options) {
     const now = new Date()
     const query = { page, size, sort }
     if (search) query.search = search
@@ -50,7 +39,7 @@ export const liveUsers = {
       query.createdTo = now.toISOString()
       query.createdFrom = new Date(now.getTime() - 30 * 86400000).toISOString()
     }
-    const result = await get('/api/users/page', query)
+    const result = await get('/api/users/page', query, options)
     return { ...result, content: result.content.map(user => ({ ...user, name: user.fullName, lastLogin: user.lastLoginAt })) }
   },
   invite: values => write('/api/users', 'POST', values),
@@ -61,32 +50,41 @@ export const liveUsers = {
 
 export const livePatients = {
   live: true,
-  async load() {
-    const [patients, records] = await Promise.all([list('/api/patients'), orders()])
-    return { patients: patients.map(patient), orders: records.map(entry => ({ ...entry, total: entry.totalCents / 100 })), appointments: [], transactions: [] }
+  async load(params, options) {
+    const response = await get('/api/patients', params, options)
+    return { patients: response.content.map(patient), totalElements: response.totalElements, totalPages: response.totalPages, orders: [], appointments: [], transactions: [] }
   },
+  async orders(person, options) {
+    // The staff order contract has text search but no patient-ID filter.
+    const records = await list('/api/orders', { search: person.nameEn }, options)
+    return records.filter(row => row.patientId === person.id).map(row => ({ ...order(row), total: Number(row.totalAmount) }))
+  },
+  async refresh(id, options) { return patient(await get(`/api/patients/${id}`, {}, options)) },
   async save(values, id) {
     const saved = await write('/api/patients' + (id ? `/${id}` : ''), id ? 'PUT' : 'POST', {
       fullName: values.nameEn.trim(), dateOfBirth: values.dateOfBirth, gender: values.gender,
       phoneNumber: values.phone.trim(), address: values.address?.trim() || null,
     })
-    return patient(await get(`/api/patients/${saved.id}`))
+    return patient(saved)
   },
 }
 
 export const liveOperations = {
   live: true,
-  async load() { return { orders: await orders(), transactions: [] } },
+  async load(params, options) {
+    const response = await orderPage(params, options)
+    return { orders: response.content, transactions: [], totalElements: response.totalElements, totalPages: response.totalPages, summary: response.summary }
+  },
 }
 
 export const liveReports = {
   live: true,
-  async load({ from, to }) {
-    const report = await get('/api/reports/operations', { fromDate: from, toDate: to })
+  async load({ from, to }, options) {
+    const report = await get('/api/reports/operations', { fromDate: from, toDate: to }, options)
     const counts = rows => rows.map(row => ({ ...row, status: orderStatus(row.status) }))
     return {
       ordersByStatus: counts(report.ordersByStatus), testsByStatus: counts(report.testsByStatus),
-      attendance: report.appointments, rejected: report.rejectedSamples, financial: null,
+      attendance: report.appointments, rejected: report.rejectedSamples, financial: null, sourceDetails: report.sourceDetails,
       empty: !report.ordersByStatus.some(row => row.count) && !report.appointments.scheduled && !report.rejectedSamples,
     }
   },
@@ -94,12 +92,13 @@ export const liveReports = {
 
 export const liveAudit = {
   live: true,
-  async load() {
-    return (await list('/api/audit-logs')).map(event => ({
+  async load(params, options) {
+    const response = await get('/api/audit-logs', params, options)
+    return { ...response, content: response.content.map(event => ({
       ...event, timestamp: event.occurredAt || event.recordedAt, actorId: event.actor?.id,
       ...names(event.actor?.name, 'actor'), ...names(event.entityName, 'entity'), ...names(event.details, 'details'),
       entityId: event.entityId || '', requestId: null,
-    }))
+    })) }
   },
 }
 
@@ -111,14 +110,14 @@ const slot = record => ({
 })
 export const liveSlots = {
   live: true,
-  async load(month) {
+  async load(month, options) {
     const first = `${month}-01`
     const midpoint = `${month}-16`
     const date = new Date(`${first}T12:00:00Z`)
     date.setUTCMonth(date.getUTCMonth() + 1)
     const next = date.toISOString().slice(0, 10)
-    const firstHalf = await list('/api/appointment-slots/schedule', { from: iso(first, '00:00'), to: iso(midpoint, '00:00') })
-    const secondHalf = await list('/api/appointment-slots/schedule', { from: iso(midpoint, '00:00'), to: iso(next, '00:00') })
+    const firstHalf = await list('/api/appointment-slots/schedule', { from: iso(first, '00:00'), to: iso(midpoint, '00:00') }, options)
+    const secondHalf = await list('/api/appointment-slots/schedule', { from: iso(midpoint, '00:00'), to: iso(next, '00:00') }, options)
     return { slots: [...firstHalf, ...secondHalf].map(slot), appointments: [] }
   },
   async save(values, id, original) {
@@ -148,17 +147,12 @@ const parameter = record => ({
 const range = record => ({ ...record, sex: record.applicability, lower: record.lowerLimit, upper: record.upperLimit })
 export const liveCatalog = {
   live: true,
-  async load() {
-    const tests = (await list(testPath)).map(test)
-    const parameters = []
-    const ranges = []
-    for (const entry of tests) {
-      const entries = (await list(parameterPath(entry.id), { includeInactive: true })).map(parameter)
-      parameters.push(...entries)
-      for (const item of entries) ranges.push(...(await list(rangePath(entry.id, item.id), { includeExpired: true })).map(range))
-    }
-    return { tests, parameters, ranges }
+  async load(params, options) {
+    const response = await get(testPath, params, options)
+    return { tests: response.content.map(test), totalElements: response.totalElements, totalPages: response.totalPages }
   },
+  async parameters(testId, options) { return (await list(parameterPath(testId), { includeInactive: true }, options)).map(parameter) },
+  async ranges(testId, parameterId, options) { return (await list(rangePath(testId, parameterId), { includeExpired: true }, options)).map(range) },
   async saveTest(values, id) {
     const payload = {
       code: values.code, name: values.nameEn, description: values.descriptionEn,

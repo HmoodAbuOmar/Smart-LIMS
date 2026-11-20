@@ -33,7 +33,7 @@ export default function AdminCharts({ daily, summary, copy, number, date, local,
       <svg className="admin-activity-chart" viewBox="0 24 640 200" preserveAspectRatio="none" aria-hidden="true">
         <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#12645f" stopOpacity=".24" /><stop offset="100%" stopColor="#d9eee9" stopOpacity=".12" /></linearGradient></defs>
         {[0, 1, 2, 3].map(tick => <g key={tick}><line className="admin-chart-gridline" x1="44" x2="596" y1={182 - tick * 44} y2={182 - tick * 44} /><text className="admin-chart-axis" x={rtl ? 620 : 20} y={186 - tick * 44} textAnchor="middle">{number(Math.round(maximum * tick / 3))}</text></g>)}
-        <path className="admin-chart-area" fill={`url(#${areaGradientId})`} d={`${line} L ${points.at(-1).x} 182 L ${points[0].x} 182 Z`} />
+        {points.length > 0 && <path className="admin-chart-area" fill={`url(#${areaGradientId})`} d={`${line} L ${points.at(-1).x} 182 L ${points[0].x} 182 Z`} />}
         <path className="admin-chart-line" d={line} />
         {points.map((point, index) => <g className="admin-activity-column" key={point.date}>
           <circle cx={point.x} cy={point.y} r={activeDate === point.date ? 5 : 4} className="admin-chart-point" />

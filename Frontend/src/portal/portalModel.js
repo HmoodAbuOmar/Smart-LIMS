@@ -24,6 +24,8 @@ export function portalReducer(state, action) {
   if (action.type.startsWith('CHECKOUT_')) return reduceCheckout(state, action)
   if (checkoutDraft(state).stage === 'processing' && ['ADD', 'REMOVE', 'ORDER'].includes(action.type)) return state
   switch (action.type) {
+    case 'CART_TEST': return state.tests.some(test => test.id === action.test.id)
+      ? state : { ...state, tests: [...state.tests, action.test] }
     case 'SERVER_ACTIVITY': return { ...state, ...action.activity }
     case 'SERVER_RECORD': {
       const records = state[action.collection]

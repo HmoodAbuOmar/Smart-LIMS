@@ -1,7 +1,7 @@
 import { requestServiceOperation } from '../services/serviceTransport.js'
 import { authenticatedRequest, getCookieAccess, loginWithCookie, logoutWithCookie } from './cookieSession.js'
 
-const post = (path, body, { signal } = {}) => authenticatedRequest(path, { method: 'POST', body, signal })
+const post = (path, body, { signal } = {}) => authenticatedRequest(path, { method: 'POST', body, signal, publicRequest: true })
 
 // Account/session operations only; patient-file writes remain outside auth.
 export const authApi = Object.freeze({
@@ -13,7 +13,7 @@ export const authApi = Object.freeze({
   getAccess: getCookieAccess,
   logout: logoutWithCookie,
   verifyEmail: async ({ userId, token }, options) => {
-    await authenticatedRequest('/api/auth/confirm-email?' + new URLSearchParams({ userId, token }), options)
+    await authenticatedRequest('/api/auth/confirm-email?' + new URLSearchParams({ userId, token }), { ...options, publicRequest: true })
     return { status: 'verified' }
   },
   resendVerification: (payload, options) => requestServiceOperation('resendVerification', payload, options),
