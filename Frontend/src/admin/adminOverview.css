@@ -19,9 +19,13 @@
 .admin-period-control button[aria-pressed='true'] { background: var(--admin-white); border-color: var(--admin-border); color: var(--admin-deep); box-shadow: 0 1px 3px #083f3d0a; font-weight: 600; }
 .admin-period-control button:hover { color: var(--admin-deep); background: #edf6f3; }
 .admin-overview-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-block-end: 12px; }
-.admin-overview-kpi { position: relative; overflow: hidden; display: flex; flex-direction: column; min-inline-size: 0; padding: 12px; border: 1px solid #d2e7df; border-radius: 12px; background: var(--admin-white); box-shadow: 0 2px 8px #083f3d06; transition: transform 160ms ease, box-shadow 160ms ease; }
+.admin-overview-kpi { position: relative; overflow: hidden; display: flex; flex-direction: column; min-inline-size: 0; padding: 12px; border: 1px solid #d2e7df; border-radius: 12px; background: var(--admin-white); box-shadow: 0 2px 8px #083f3d06; }
+a.admin-overview-kpi { color: inherit; text-decoration: none; cursor: pointer; }
+a.admin-overview-kpi:hover { background: #edf6f3; border-color: #a7d8c7; }
+a.admin-overview-kpi:focus-visible { outline: 2px solid var(--admin-green); outline-offset: 2px; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .admin-overview-kpi:hover { transform: translateY(-2px); box-shadow: 0 5px 14px #083f3d0d; }
+  a.admin-overview-kpi { transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease; }
+  a.admin-overview-kpi:hover { transform: translateY(-2px); box-shadow: 0 5px 14px #083f3d0d; }
 }
 .admin-kpi-icon { position: absolute; inset-block-start: -9px; inset-inline-end: -9px; display: grid; place-items: center; inline-size: 54px; block-size: 52px; border-start-start-radius: 42%; border-start-end-radius: 38%; border-end-end-radius: 48%; border-end-start-radius: 62%; color: #fff; background: var(--admin-green); }
 .admin-kpi-icon svg { inline-size: 18px; block-size: 18px; margin-block-start: 6px; margin-inline-end: 5px; }

@@ -1,0 +1,8 @@
+.workspace-role-label {
+  min-inline-size: 0;
+  color: var(--medical-deep);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: start;
+}

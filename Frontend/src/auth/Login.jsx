@@ -34,7 +34,7 @@ export default function Login({ mode = 'login' }) {
     <div className="eyebrow">{t(`auth:${mode}.label`)}</div>
     <h1 id="auth-heading" tabIndex={-1}>{t(`auth:${mode}.heading`)}</h1>
     <p id="auth-description">{t(`auth:${mode}.description`)}</p>
-    <form noValidate onSubmit={submit} aria-busy={pending}>
+    <form className="auth-login-form" noValidate onSubmit={submit} aria-busy={pending}>
       {fields.map((field, index) => {
         const password = field === 'password' || field === 'confirmPassword'
         const id = `auth-${field}`

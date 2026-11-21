@@ -12,18 +12,20 @@ const decorativeWaves = [
   { path: 'M2 14 C16 14 22 5 36 5 C50 5 56 17 72 17 C88 17 94 10 110 10 C128 10 138 6 154 6', endY: 6 },
 ]
 
-export default function AdminKpiCards({ summary, copy, number, money }) {
+export default function AdminKpiCards({ summary, copy, number, money, links }) {
   const gradientId = useId()
   const metrics = [
-    { label: copy.patients, value: number(summary.patients), note: copy.uniquePatients, Icon: Users },
-    { label: copy.totalOrders, value: number(summary.total), note: copy.totalOrdersNote, Icon: ClipboardList },
+    { label: copy.patients, value: number(summary.patients), note: copy.uniquePatients, Icon: Users, href: links.patients },
+    { label: copy.totalOrders, value: number(summary.total), note: copy.totalOrdersNote, Icon: ClipboardList, href: links.total },
     { label: copy.upcoming, value: number(summary.appointments), note: copy.scheduled, Icon: CalendarClock },
     { label: copy.completedTests, value: number(summary.completedTests), note: copy.completedNote, Icon: FileCheck2 },
     { label: copy.pendingResults, value: number(summary.pendingResults), note: copy.pendingNote, Icon: Clock3 },
-    { label: copy.revenue, value: money(summary.revenue), note: copy.paidOnly, Icon: CreditCard },
+    { label: copy.revenue, value: money(summary.revenue), note: copy.paidOnly, Icon: CreditCard, href: links.revenue },
   ]
   return <section className="admin-overview-kpis" aria-label={copy.title}>
-    {metrics.map(({ label, value, note, Icon }, index) => <article className={`admin-overview-kpi admin-kpi-tone-${index % 3}`} key={label}>
+    {metrics.map(({ label, value, note, Icon, href }, index) => {
+      const Card = href ? 'a' : 'article'
+      return <Card href={href} className={`admin-overview-kpi admin-kpi-tone-${index % 3}`} key={label}>
       <span className="admin-kpi-icon"><Icon size={23} strokeWidth={1.8} aria-hidden="true" /></span>
       <div className="admin-kpi-content"><span className="admin-kpi-label">{label}</span><strong>{value}</strong><small>{note}</small></div>
       <div className="admin-kpi-sparkline" aria-hidden="true">
@@ -37,6 +39,7 @@ export default function AdminKpiCards({ summary, copy, number, money }) {
           <circle className="admin-kpi-wave-endpoint" cx="154" cy={decorativeWaves[index].endY} r="2.2" />
         </svg>
       </div>
-    </article>)}
+      </Card>
+    })}
   </section>
 }

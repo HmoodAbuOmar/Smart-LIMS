@@ -1,0 +1,16 @@
+.workspace-account { position: relative; }
+.workspace-account > button { display: flex; align-items: center; gap: 9px; background: transparent; color: var(--medical-deep); padding: 0; font-size: 12px; }
+.workspace-account-name { max-inline-size: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-account-avatar { display: grid; place-items: center; inline-size: 32px; block-size: 32px; flex-shrink: 0; background: var(--medical-mint); color: var(--medical-deep); border-radius: 50%; }
+.workspace-account-menu { position: absolute; z-index: 20; inset-block-start: calc(100% + 14px); inset-inline-end: 0; min-inline-size: 170px; display: grid; padding: 7px; border: 1px solid var(--medical-border-light); border-radius: 10px; background: var(--medical-off-white); box-shadow: 0 8px 28px #083f3d15; }
+.workspace-account-menu button { display: flex; align-items: center; gap: 9px; padding: 10px; color: var(--medical-deep); background: transparent; border-radius: 7px; text-align: start; }
+.workspace-account-menu button:not(:disabled):hover { background: var(--medical-mint); }
+.workspace-account-menu p { margin: 6px; }
+.workspace-account button:focus-visible { outline: 2px solid var(--medical-green); outline-offset: 2px; }
+.workspace-profile-dialog { inline-size: min(420px, calc(100% - 32px)); padding: 22px; border: 1px solid var(--medical-border-light); border-radius: 12px; color: var(--medical-deep); background: var(--medical-off-white); }
+.workspace-profile-dialog::backdrop { background: #083f3d66; }
+.workspace-profile-dialog dt { font-weight: 600; }
+.workspace-profile-dialog dd { margin-inline-start: 0; margin-block-end: 10px; overflow-wrap: anywhere; }
+.workspace-profile-dialog > button { padding: 8px 14px; border-radius: 7px; color: #fff; background: var(--medical-green); }
+@media (max-width: 900px) { .workspace-account-name { display: none; } }
+@media (max-width: 540px) { .workspace-account > button > svg { display: none; } }

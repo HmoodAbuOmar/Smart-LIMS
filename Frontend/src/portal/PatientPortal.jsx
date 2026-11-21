@@ -1,7 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, Bell, CalendarDays, ChevronDown, ClipboardList, FileText, FlaskConical, History, LayoutDashboard, LogOut, Menu, Search, UserRound, X } from 'lucide-react'
+import { Bell, CalendarDays, ChevronDown, ClipboardList, FileText, FlaskConical, History, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.jsx'
+import WorkspaceRoleLabel from '../components/WorkspaceRoleLabel.jsx'
 import MedicalHistory from './history/MedicalHistory.jsx'
 import { portalReducer, todayValue } from './portalModel.js'
 import { formatCurrency } from '../utils/currency.js'
@@ -49,7 +50,6 @@ export default function PatientPortal({ initialData, development = false, previe
   })
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
-  const [globalSearch, setGlobalSearch] = useState('')
   const [busy, setBusy] = useState(false)
   const [transactionBusy, setTransactionBusy] = useState(false)
   const bookingLock = useRef(false)
@@ -192,21 +192,20 @@ export default function PatientPortal({ initialData, development = false, previe
   const requiredSection = ['dashboard', 'appointment', 'notifications', 'history', 'book'].includes(section)
   const loadedSection = sectionLoad?.key === sectionKey && sectionLoad?.attempt === sectionAttempt
   const rootPage = ['book', 'payment', 'booking-confirmation'].includes(page) ? 'appointments' : page === 'review' ? 'orders' : page
-  function submitSearch(event) { event.preventDefault(); navigate(`tests?q=${encodeURIComponent(globalSearch.trim())}`) }
   return <Portal.Provider value={value}><div className="patient-portal" dir={language === 'ar' ? 'rtl' : 'ltr'}>
     <a href="#portal-content" className="portal-skip" onClick={e => { e.preventDefault(); document.querySelector('.portal-page-title')?.focus() }}>{t('skip')}</a>
     <WorkspaceSidebar id="portal-navigation" prefix="portal" classes={{sidebar:'portal-sidebar',brand:'portal-logo',logo:'portal-logo-image',footer:'portal-sidebar-bottom',logout:'portal-sidebar-logout',language:'portal-sidebar-language'}} items={navItems.map(([key,Icon])=>({id:key,label:t(key),Icon,dataPage:key,...(key==='notifications'&&unread>0?{badge:number(unread)}:{})}))} activeId={rootPage} onNavigate={navigate} mobileOpen={mobileOpen} language={language} onLanguageChange={next=>void i18n.changeLanguage(next)} navigationLabel={t('menu')} logoutLabel={t('logout')} onLogout={onExit} onLogoClick={()=>navigate('dashboard')} />
     <div className="portal-workspace">
       <header className="portal-topbar">
         <button type="button" className="portal-menu" aria-controls="portal-navigation" aria-label={t('menu')} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}><Menu /></button>
-        <form role="search" className="portal-search" onSubmit={submitSearch}><Search size={16} aria-hidden="true" /><input name="portal-search" aria-label={t('search')} placeholder={t('search')} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} /><button type="submit" aria-label={t('search')}><ArrowRight size={17} /></button></form>
+        <WorkspaceRoleLabel role="patient" language={language} />
         <button className="portal-bell" onClick={() => navigate('notifications')} aria-label={`${t('notifications')}: ${number(unread)}`}><Bell size={20} />{unread > 0 && <span>{number(unread)}</span>}</button>
         <div className="portal-account" ref={accountRef}><button type="button" aria-label={t('account')} aria-expanded={accountOpen} onClick={() => setAccountOpen(!accountOpen)}><span className="portal-avatar"><UserRound size={18} /></span><span className="portal-account-name">{name}</span><ChevronDown size={14} /></button>
           {accountOpen && <div className="portal-account-menu"><button onClick={() => navigate('profile')}><UserRound size={16} />{t('profile')}</button><button onClick={() => void Promise.resolve().then(onExit).catch(() => setNotice('logoutFailed'))}><LogOut size={16} />{t('logout')}</button></div>}
         </div>
       </header>
       <main id="portal-content" className="portal-main">
-        <nav className="portal-breadcrumb" aria-label={t('home')}>{onBack && page === 'dashboard' && <><button className="portal-onboarding-back" onClick={onBack}>{t('back')}</button><span>·</span></>}<button onClick={() => navigate('dashboard')}>{t('home')}</button><span>/</span><span>{t(rootPage === 'tests' && id ? 'test' : rootPage === 'results' && id ? 'resultReport' : page === 'review' ? 'reviewTitle' : page === 'book' ? 'bookTitle' : page === 'payment' ? 'payment' : page === 'booking-confirmation' ? 'bookingConfirmation' : rootPage)}</span></nav>
+        <nav className="portal-breadcrumb" aria-label={t('home')}>{onBack && page === 'dashboard' && <><button className="portal-onboarding-back" onClick={onBack}>{t('back')}</button><span>·</span></>}<button onClick={() => navigate('dashboard')}>{t('home')}</button><span>/</span><span>{t(rootPage === 'tests' && id ? 'test' : rootPage === 'results' && id ? 'resultReport' : page === 'review' ? 'reviewTitle' : page === 'book' ? (appointmentId ? 'rescheduleTitle' : 'bookTitle') : page === 'payment' ? 'payment' : page === 'booking-confirmation' ? 'bookingConfirmation' : rootPage)}</span></nav>
         {notice && <div className={`portal-notice ${['unavailable', 'pdfError', 'logoutFailed'].includes(notice) ? 'is-error' : ''}`} role="status">{t(notice)}<button aria-label={t('close')} onClick={() => setNotice('')}><X size={16} /></button></div>}
         {refreshError && <p className="portal-notice is-error" role="status">{t('refreshError')}</p>}
         {!development && requiredSection && (!loadedSection || sectionLoad.error) ? (

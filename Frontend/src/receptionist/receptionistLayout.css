@@ -7,7 +7,6 @@
   --r01-border: var(--medical-border-light);
   --reception-sidebar-size: 256px;
   --reception-topbar-padding: 18px;
-  /* Portal search control: 12px × 1.6 line height + 14px padding + 2px border. */
   --reception-topbar-control-size: 35.2px;
   display: grid;
   grid-template-columns: var(--reception-sidebar-size) minmax(0, 1fr);
@@ -29,7 +28,7 @@ body:has(.reception-today-layout) { margin: 0; }
   padding: var(--reception-topbar-padding) 32px;
   background: var(--medical-off-white); border-block-end: 1px solid var(--r01-border);
 }
-.reception-today-layout .r01-header > strong { font-size: 20px; }
+.reception-today-layout .r01-header .workspace-account { margin-inline-start: auto; }
 .reception-today-layout .r01-main { grid-column: 2; grid-row: 2; inline-size: 100%; max-inline-size: 1500px; margin-inline: auto; min-inline-size: 0; padding: 22px 32px 44px; }
 .reception-today-layout .r01-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-block-end: 24px; }
 .reception-today-layout h1 { font: 700 clamp(24px, 2.5vw, 32px)/1.4 var(--font-ui); letter-spacing: -.02em; margin: 0; }
@@ -53,7 +52,6 @@ body:has(.reception-today-layout) { margin: 0; }
   .reception-today-layout .r01-main { grid-column:1; grid-row:3; }
   .reception-today-layout .r01-header { grid-column: 1; grid-row: 1; gap: 12px; }
   .reception-today-layout .r01-menu-button { display: inline-flex; align-items: center; padding: 6px; color: var(--r01-teal); background: white; border: 1px solid var(--r01-border); border-radius: 7px; }
-  .reception-today-layout .r01-header > strong { margin-inline-end: auto; }
 }
 @media(max-width:540px) {
   .reception-today-layout { --reception-topbar-padding: 14px; }

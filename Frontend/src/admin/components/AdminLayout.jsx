@@ -9,10 +9,14 @@ import AdminBookingSlots from '../bookingSlots/AdminBookingSlots.jsx'
 import AdminReports from '../reports/AdminReports.jsx'
 import AdminAuditLog from '../auditLog/AdminAuditLog.jsx'
 import AdminOperationsPayments from '../operationsPayments/AdminOperationsPayments.jsx'
+import AdminNotifications from './AdminNotifications.jsx'
 import { adminCopy } from '../adminCopy.js'
+import { adminNavigation } from '../adminNavigation.js'
 import { liveAudit, liveCatalog, liveOperations, liveOverview, livePatients, liveReports, liveSlots, liveUsers } from '../adminLiveApi.js'
 
 const languageKey = 'smart-lims.admin.language'
+const pageIds = new Set(adminNavigation.flatMap(item => item.children ? item.children.map(child => child.id) : [item.id]))
+pageIds.add('notifications')
 function initialLanguage() {
   try { return localStorage.getItem(languageKey) === 'ar' ? 'ar' : 'en' }
   catch { return 'en' }
@@ -20,13 +24,28 @@ function initialLanguage() {
 
 export default function AdminLayout({ initialPage = 'overview', developmentPreview = false, live = false, profile, preview }) {
   const [language, setLanguage] = useState(initialLanguage)
-  const [activeId, setActiveId] = useState(initialPage)
+  const [hash, setHash] = useState(() => window.location.hash)
   const [mobileOpen, setMobileOpen] = useState(false)
   const menuButton = useRef(null)
   const catalogGuard = useRef(null)
   const registerCatalogGuard = useCallback(guard => { catalogGuard.current = guard }, [])
   const copy = adminCopy[language]
   const direction = language === 'ar' ? 'rtl' : 'ltr'
+  const [route, query] = hash.split('?')
+  const params = new URLSearchParams(query)
+  const requestedPage = params.get('page')
+  const activeId = pageIds.has(requestedPage) ? requestedPage : initialPage
+  const ordersTarget = activeId === 'overview' && params.get('section') === 'orders'
+
+  useEffect(() => {
+    function readHash() { setHash(window.location.hash) }
+    window.addEventListener('hashchange', readHash)
+    return () => window.removeEventListener('hashchange', readHash)
+  }, [])
+
+  function pageHref(id) {
+    return `${route || '#'}?page=${encodeURIComponent(id)}`
+  }
 
   useEffect(() => {
     try { localStorage.setItem(languageKey, language) }
@@ -38,7 +57,7 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
     const previous = { lang: root.lang, dir: root.dir, title: document.title }
     root.lang = language
     root.dir = direction
-    document.title = 'Smart-LIMS | ' + (['patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots', 'operationsPayments', 'auditLog', 'reports'].includes(activeId) ? copy.items[activeId] : copy.title)
+    document.title = 'Smart-LIMS | ' + (['patients', 'tests', 'parameters', 'referenceRanges', 'bookingSlots', 'operationsPayments', 'auditLog', 'reports', 'notifications'].includes(activeId) ? copy.items[activeId] : copy.title)
     return () => {
       root.lang = previous.lang
       root.dir = previous.dir
@@ -59,7 +78,7 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
   }
   function navigate(id, checked = false) {
     if (!checked && catalogGuard.current) { catalogGuard.current(() => navigate(id, true)); return }
-    setActiveId(id)
+    window.location.hash = pageHref(id)
     if (mobileOpen) closeMenu()
   }
 
@@ -71,17 +90,22 @@ export default function AdminLayout({ initialPage = 'overview', developmentPrevi
         event.preventDefault()
         document.getElementById('admin-main')?.focus()
       }}>{copy.skip}</a>
-      <AdminNavbar copy={copy} activeId={activeId} mobileOpen={mobileOpen} menuButtonRef={menuButton} profile={profile}
+      <AdminNavbar copy={copy} language={language} mobileOpen={mobileOpen} menuButtonRef={menuButton} profile={profile} live={live}
         onToggleMenu={() => setMobileOpen(open => !open)} />
       <AdminSidebar copy={copy} activeId={activeId} onNavigate={navigate} mobileOpen={mobileOpen} language={language} live={live}
         onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />
       <main id="admin-main" className={`admin-main${activeId === 'users' ? ' admin-main-users' : ''}`} aria-label={copy.content} tabIndex={-1}>
-        {activeId === 'overview' && <AdminOverview language={language} service={live ? liveOverview : undefined} preview={preview?.overview} />}
+        <div className="admin-page-heading">
+          <h1 id="admin-page-title">{activeId === 'users' ? copy.usersManagementTitle : activeId === 'overview' ? copy.title : copy.items[activeId]}</h1>
+        </div>
+        {activeId === 'overview' && <AdminOverview language={language} service={live ? liveOverview : undefined} preview={preview?.overview}
+          ordersTarget={ordersTarget} cardLinks={{ patients: pageHref('patients'), total: pageHref('overview') + '&section=orders', revenue: pageHref('operationsPayments') }} />}
         {activeId === 'users' && <AdminUsers language={language} service={live ? liveUsers : undefined} previewUsers={preview?.users} />}
         {activeId === 'reports' && <AdminReports language={language} service={live ? liveReports : preview?.reports} />}
         {activeId === 'auditLog' && <AdminAuditLog language={language} service={live ? liveAudit : preview?.audit} />}
         {activeId === 'operationsPayments' && <AdminOperationsPayments language={language} service={live ? liveOperations : preview?.operations} />}
         {activeId === 'bookingSlots' && <AdminBookingSlots language={language} service={live ? liveSlots : preview?.slots} />}
+        {activeId === 'notifications' && <AdminNotifications language={language} copy={copy.notifications} live={live} />}
         {activeId === 'patients' && <AdminPatients language={language} service={live ? livePatients : preview?.patients} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
         {['tests', 'parameters', 'referenceRanges'].includes(activeId) && <AdminTestCatalog language={language} service={live ? liveCatalog : preview?.catalog} activePage={activeId} registerNavigationGuard={registerCatalogGuard} onNavigate={id => navigate(id, true)} onToggleLanguage={() => setLanguage(current => current === 'en' ? 'ar' : 'en')} />}
       </main>

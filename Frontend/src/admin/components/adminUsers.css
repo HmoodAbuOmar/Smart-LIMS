@@ -284,15 +284,15 @@
   padding: 8px 10px;
   border: 0;
   border-radius: 6px;
-  background: transparent;
-  color: var(--users-deep);
+  background: var(--medical-off-white);
+  color: var(--medical-deep);
   font-size: 12px;
   text-align: start;
   white-space: nowrap;
 }
-.admin-users-action-menu button:hover, .admin-users-action-menu button:focus-visible { outline: 0; background: #eaf5f1; }
-.admin-users-action-menu button.is-danger { color: #754e4b; }
-.admin-users-action-menu button.is-danger:hover, .admin-users-action-menu button.is-danger:focus-visible { background: #f8eeee; }
+.admin-users-action-menu button:not(:disabled):hover { background: var(--medical-mint); }
+.admin-users-action-menu button:focus-visible { outline: 2px solid var(--medical-green); outline-offset: -2px; }
+.admin-users-action-menu button:disabled { color: #526663; background: #edf1ef; opacity: 1; cursor: not-allowed; }
 .admin-users-empty { padding: 32px 20px; color: #67817a; font-size: 13px; text-align: center; }
 .admin-users-footer {
   display: flex;
