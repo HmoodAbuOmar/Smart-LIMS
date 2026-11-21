@@ -7,7 +7,7 @@ import AdminOrders from './AdminOrders.jsx'
 import AdminLaboratoryAlerts from './AdminLaboratoryAlerts.jsx'
 import '../adminOverview.css'
 
-export default function AdminOverview({ language, service, preview }) {
+export default function AdminOverview({ language, service, preview, cardLinks, ordersTarget }) {
   const copy = dashboardCopy[language]
   const [days, setDays] = useState(7)
   const [query, setQuery] = useState('')
@@ -36,6 +36,15 @@ export default function AdminOverview({ language, service, preview }) {
     return () => controller.abort()
   }, [service, days, attempt])
   const dashboard = live
+  const dashboardReady = !service || Boolean(dashboard)
+  useEffect(() => {
+    if (!ordersTarget || !dashboardReady) return
+    const frame = requestAnimationFrame(() => {
+      ordersSection.current?.focus({ preventScroll: true })
+      ordersSection.current?.scrollIntoView({ block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [ordersTarget, dashboardReady])
   const fromDate = dashboard?.charts.period.fromDate, toDate = dashboard?.charts.period.toDate
   const orderKey = JSON.stringify([page, query, status, fromDate, toDate, ordersAttempt])
   useEffect(() => {
@@ -59,10 +68,6 @@ export default function AdminOverview({ language, service, preview }) {
     ...entry, orderNumber: entry.number, patient: entry.patient.nameEn, testNames: entry.tests.map(item => item.nameEn).join(', '),
     amount: entry.totalCents / 100, status: liveStatuses[entry.status],
   })) : preview.filterOrders(orders, query, status, local).map(entry => ({ ...entry, orderNumber: preview.displayOrderId(entry.id), testNames: local(preview.testFor(entry.testId).name) }))
-  const counts = dashboard && {
-    rejected: dashboard.alerts.rejectedSamples.count, review: dashboard.alerts.resultsAwaitingReview.count,
-    attention: dashboard.alerts.ordersRequiringAttention.count,
-  }
 
   useEffect(() => {
     if (selectedOrder) dialog.current?.showModal()
@@ -83,7 +88,7 @@ export default function AdminOverview({ language, service, preview }) {
     <div className="admin-overview-heading"><div><h2>{copy.welcome}</h2><p>{copy.subtitle}</p></div>
       <div className="admin-welcome-meta"><span className="admin-reference-date"><CalendarDays size={15} aria-hidden="true" /><time dateTime={referenceDate}>{date(referenceDate)}</time></span></div>
     </div>
-    <AdminKpiCards summary={summary} copy={copy} number={number} money={money} />
+    <AdminKpiCards summary={summary} copy={copy} number={number} money={money} links={cardLinks} />
     <AdminCharts daily={dashboard ? dashboard.charts.dailyOrders : preview.dailyOrders(orders, days)}
       summary={dashboard ? { total: dashboard.charts.totalOrders, totalTests: dashboard.charts.totalTests, testDistribution: dashboard.charts.testDistribution.map(item => ({
         id: `${item.labTestId}-${item.testCode}-${item.testName}`, name: item.testName, count: item.count,
@@ -95,7 +100,7 @@ export default function AdminOverview({ language, service, preview }) {
         retry={currentOrders?.error ? () => retryOrders(value => value + 1) : undefined} query={query} status={status} page={page} copy={service ? { ...copy, statuses } : copy} choices={service ? Object.values(liveStatuses) : undefined} local={local} number={number} money={money} date={date} sectionRef={ordersSection}
         onQuery={value => { setQuery(value); setPage(1) }} onStatus={value => { setStatus(value); setPage(1) }} onPage={setPage}
         onDetails={(order, opener) => { detailOpener.current = opener; setSelectedOrder(order) }} />
-      <AdminLaboratoryAlerts counts={service ? counts : preview.laboratoryPreviewAlerts(orders, days)} copy={copy} number={number} />
+      <AdminLaboratoryAlerts alerts={dashboard?.alerts} counts={service ? undefined : preview.laboratoryPreviewAlerts(orders, days)} copy={copy} number={number} />
     </div>
     <dialog className="admin-order-dialog" ref={dialog} aria-labelledby="admin-order-dialog-title" aria-describedby="admin-order-dialog-notice" onCancel={event => { event.preventDefault(); setSelectedOrder(null) }}>
       <h3 id="admin-order-dialog-title">{copy.detailTitle}</h3><p id="admin-order-dialog-notice">{service ? copy.recent : copy.detailNotice}</p>

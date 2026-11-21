@@ -95,6 +95,18 @@ assert.equal(calls.length, 3)
 const report = await liveReports.load({ from: '2026-01-01', to: '2026-01-07' })
 assert.equal(report.sourceDetails[0].source, 'Unavailable')
 
+const slotQuery = { orderId: 'order', typeId: 'type', from: '2026-11-22T22:00:00Z', to: '2026-11-23T22:00:00Z' }
+calls.length = 0
+respond = path => {
+  const { pathname, searchParams } = new URL(path, 'http://fixture.invalid')
+  assert.equal(pathname, '/api/appointment-slots')
+  for (const [key, value] of Object.entries(slotQuery)) assert.equal(searchParams.get(key), value)
+  const pageNumber = Number(searchParams.get('page'))
+  return ok({ content: [{ id: `slot-${pageNumber}` }], last: pageNumber === 1, totalPages: 2 })
+}
+assert.deepEqual((await portalApi.slots(slotQuery)).map(slot => slot.id), ['slot-0', 'slot-1'])
+assert.equal(calls.length, 2)
+
 respond = path => path === '/api/forbidden' ? denied(403) : denied(401)
 const originalScope = sessionSignal()
 await assert.rejects(authenticatedRequest('/api/forbidden'), { status: 403 })

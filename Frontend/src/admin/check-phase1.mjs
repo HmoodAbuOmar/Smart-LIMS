@@ -77,20 +77,20 @@ try {
     assert.fail(`Condition not met: ${expression}`)
   }
   async function inspectNavbar() {
-    assert.equal(await evaluate("document.querySelector('.admin-navbar-search input').disabled"), true)
-    assert.equal(await evaluate("document.querySelector('.admin-notifications').disabled"), true)
+    assert.equal(await evaluate("!document.querySelector('.admin-header input')"), true)
+    assert.ok(await evaluate("!document.querySelector('.admin-header .lucide-bell')"))
     assert.equal(await evaluate("document.querySelectorAll('.admin-notification-indicator').length"), 0)
     assert.equal(await evaluate("document.querySelectorAll('.admin-language-control .language-switcher__segment').length"), 2)
     assert.equal(await evaluate("document.querySelectorAll('.admin-header .language-switcher').length"), 0)
     assert.equal(await evaluate("document.querySelectorAll('.admin-sidebar-footer .language-switcher').length"), 1)
-    assert.ok(await evaluate("document.querySelector('.admin-navbar-profile').getAttribute('aria-label').length > 0"))
-    assert.ok(await evaluate("document.querySelector('.admin-profile-copy strong').textContent.length > 0"))
+    assert.ok(await evaluate("document.querySelector('.admin-header .workspace-account > button').getAttribute('aria-label').length > 0"))
+    assert.ok(await evaluate("document.querySelector('.admin-header .workspace-account-name').textContent.length > 0"))
     for (const width of [1440, 1280, 1024, 901, 900, 768, 650, 390, 320]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false })
       assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), `Navbar fits ${width}px`)
       assert.ok(await evaluate(`(() => {
         const header = document.querySelector('.admin-header').getBoundingClientRect()
-        return [...document.querySelectorAll('.admin-header > *, .admin-navbar-actions > *')]
+        return [...document.querySelectorAll('.admin-header > *')]
           .filter(element => element.getClientRects().length)
           .every(element => { const box = element.getBoundingClientRect(); return box.left >= header.left && box.right <= header.right && box.top >= header.top && box.bottom <= header.bottom })
       })()`), `Navbar controls remain inside header at ${width}px`)
@@ -211,8 +211,8 @@ try {
   }
   async function inspectOverview() {
     await waitFor("document.querySelectorAll('.admin-overview-kpi').length === 6")
-    assert.equal(await evaluate("document.querySelector('.admin-header-heading > span')"), null)
-    assert.equal(await evaluate("document.querySelector('.admin-header-heading h1').textContent"), await evaluate("document.documentElement.lang === 'ar' ? 'لوحة تحكم المسؤول' : 'Admin Dashboard'"))
+    assert.equal(await evaluate("document.querySelector('.admin-header .workspace-role-label').textContent"), await evaluate("document.documentElement.lang === 'ar' ? 'المسؤول' : 'Admin'"))
+    assert.equal(await evaluate("document.querySelector('.admin-page-heading h1').textContent"), await evaluate("document.documentElement.lang === 'ar' ? 'لوحة تحكم المسؤول' : 'Admin Dashboard'"))
     assert.equal(await evaluate("document.querySelectorAll('.admin-quick-actions, #admin-quick-heading, .admin-overview-bottom').length"), 0)
     assert.equal(await evaluate("document.querySelectorAll('.admin-operations-summary').length"), 0)
     assert.equal(await evaluate("document.querySelector('.admin-overview-kpis').nextElementSibling.className"), 'admin-overview-charts')
@@ -397,13 +397,12 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' })
   await waitFor("document.querySelector('.admin-menu-toggle').getAttribute('aria-expanded') === 'false'")
   // Compare the actual Portal controls, rather than relying on copied declarations.
-  async function controlStyles(languageSelector, bellSelector) {
+  async function controlStyles(languageSelector) {
     return evaluate(`(() => {
       const read = (element, keys) => { const style = getComputedStyle(element); return Object.fromEntries(keys.map(key => [key, style[key]])) }
       const root = document.querySelector(${JSON.stringify(languageSelector)})
-      const bell = document.querySelector(${JSON.stringify(bellSelector)})
       const keys = ['display', 'padding', 'borderWidth', 'borderColor', 'borderRadius', 'backgroundColor', 'color']
-      return { language: read(root, keys), segments: [...root.querySelectorAll('button')].map(button => read(button, [...keys, 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'minWidth', 'minHeight', 'transition'])), bell: read(bell, ['display', 'padding', 'borderWidth', 'borderRadius', 'backgroundColor', 'color']), icon: { width: bell.querySelector('svg').getAttribute('width'), stroke: bell.querySelector('svg').getAttribute('stroke-width') } }
+      return { language: read(root, keys), segments: [...root.querySelectorAll('button')].map(button => read(button, [...keys, 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'minWidth', 'minHeight', 'transition'])) }
     })()`)
   }
   async function navigationStyles(selector) {
@@ -431,14 +430,14 @@ try {
   await send('CSS.enable')
   await send('Emulation.setDeviceMetricsOverride', { width: 1650, height: 900, deviceScaleFactor: 1, mobile: false })
   await pause(250)
-  const adminControls = await controlStyles('.admin-language-control .language-switcher', '.admin-notifications')
+  const adminControls = await controlStyles('.admin-language-control .language-switcher')
   const adminNavigation = await navigationStyles('.admin-navigation')
   const adminHover = await hoveredNavigation('.admin-navigation')
   await send('Page.navigate', { url: url.replace('/admin/index.html', '/#/__portal/dashboard') })
   await waitFor("!!document.querySelector('.portal-bell') && !!document.querySelector('.portal-sidebar .language-switcher')")
   await pause(250)
-  const portalControls = await controlStyles('.portal-sidebar .language-switcher', '.portal-bell')
-  assert.deepEqual(adminControls, portalControls, 'Language and bell control styles match the actual Patient Portal')
+  const portalControls = await controlStyles('.portal-sidebar .language-switcher')
+  assert.deepEqual(adminControls, portalControls, 'Language control styles match the actual Patient Portal')
   assert.deepEqual(adminNavigation, await navigationStyles('.portal-sidebar nav'), 'Active and inactive navigation styles match the Patient Portal')
   assert.deepEqual(adminHover, await hoveredNavigation('.portal-sidebar nav'), 'Navigation hover styles match the Patient Portal')
   if (process.env.ADMIN_SCREENSHOTS) {
@@ -450,7 +449,7 @@ try {
   await evaluate("document.querySelector('.portal-sidebar .language-switcher [lang=ar]').click()")
   await waitFor("document.documentElement.dir === 'rtl'")
   await pause(250)
-  const portalArabicControls = await controlStyles('.portal-sidebar .language-switcher', '.portal-bell')
+  const portalArabicControls = await controlStyles('.portal-sidebar .language-switcher')
   const portalArabicNavigation = await navigationStyles('.portal-sidebar nav')
   await send('Page.navigate', { url })
   await waitFor("!!document.querySelector('.admin-language-control') && document.documentElement.lang === 'en'")
@@ -458,7 +457,7 @@ try {
   await changeAdminLanguage('ar')
   await waitFor("document.documentElement.dir === 'rtl'")
   await pause(250)
-  assert.deepEqual(await controlStyles('.admin-language-control .language-switcher', '.admin-notifications'), portalArabicControls, 'Arabic controls match the Portal too')
+  assert.deepEqual(await controlStyles('.admin-language-control .language-switcher'), portalArabicControls, 'Arabic controls match the Portal too')
   assert.deepEqual(await navigationStyles('.admin-navigation'), portalArabicNavigation, 'Arabic navigation and mirrored accent match the Portal too')
   await changeAdminLanguage('en')
   await waitFor("document.documentElement.lang === 'en'")

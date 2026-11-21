@@ -10,7 +10,7 @@ const roleValues = ['ADMIN', 'RECEPTIONIST', 'LAB_TECHNICIAN', 'PATIENT']
 const statusValues = ['ACTIVE', 'INVITED', 'BLOCKED']
 const roleIcons = { ADMIN: ShieldCheck, RECEPTIONIST: Headset, LAB_TECHNICIAN: FlaskConical, PATIENT: UserRound }
 
-function UserActions({ user, name, copy, onEdit, onToggleBlock, onDelete }) {
+function UserActions({ user, name, copy, onEdit, onToggleBlock, onDelete, disabled }) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState(null)
   const root = useRef(null)
@@ -66,13 +66,13 @@ function UserActions({ user, name, copy, onEdit, onToggleBlock, onDelete }) {
 
   return <span className="admin-users-actions" ref={root}>
     <button ref={trigger} type="button" className="admin-users-more" aria-label={copy.openActions(name)}
-      aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(value => !value)}>
+      aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}>
       <Ellipsis size={19} aria-hidden="true" />
     </button>
     {open && createPortal(<div ref={menu} className="admin-users-action-menu" role="menu" style={position || { visibility: 'hidden' }}>
-      <button type="button" role="menuitem" onClick={() => select(onEdit)}>{copy.editRole}</button>
-      <button type="button" role="menuitem" onClick={() => select(onToggleBlock)}>{user.status === 'BLOCKED' ? copy.unblock : copy.block}</button>
-      <button type="button" role="menuitem" className="is-danger" onClick={() => select(onDelete)}>{copy.delete}</button>
+      <button type="button" role="menuitem" className="is-edit" disabled={disabled} onClick={() => select(onEdit)}>{copy.editRole}</button>
+      <button type="button" role="menuitem" className={user.status === 'BLOCKED' ? 'is-unblock' : 'is-block'} disabled={disabled} onClick={() => select(onToggleBlock)}>{user.status === 'BLOCKED' ? copy.unblock : copy.block}</button>
+      <button type="button" role="menuitem" className="is-danger" disabled={disabled} onClick={() => select(onDelete)}>{copy.delete}</button>
     </div>, document.body)}
   </span>
 }
@@ -213,7 +213,17 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
       setSelectedIds(new Set())
       setDialogState(null)
       setNotice(message)
-    } catch { if (inDialog) setFormError(words.error); else setNotice(words.error) }
+    } catch (error) {
+      const invitationError = invited && ({
+        EMAIL_IN_USE: copy.emailExists,
+        USERNAME_IN_USE: copy.usernameExists,
+        VALIDATION_ERROR: copy.invitationInvalid,
+        EMAIL_UNAVAILABLE: copy.invitationEmailUnavailable,
+        FORBIDDEN: copy.invitationForbidden,
+      }[error.code] || (error.status === 403 ? copy.invitationForbidden : copy.invitationUnconfirmed))
+      if (inDialog) setFormError(invitationError || words.error)
+      else setNotice(words.error)
+    }
     finally { lock.current = false; setSaving(false) }
   }
 
@@ -225,7 +235,12 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
       if (!name) { setFormError(copy.nameRequired); return }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setFormError(copy.emailInvalid); return }
       if (service) {
-        void saveLive(() => service.invite({ fullName: name, email, userName: inviteUsername.trim(), phoneNumber: invitePhone.trim(), role: inviteRole }), words.invited, true, { invited: true })
+        const userName = inviteUsername.trim(), phoneNumber = invitePhone.trim()
+        if (name.length < 3 || name.length > 80) { setFormError(copy.invitationNameInvalid); return }
+        if (email.length > 120) { setFormError(copy.emailInvalid); return }
+        if (userName.length < 3 || userName.length > 30) { setFormError(copy.invitationUsernameInvalid); return }
+        if (!/^[+0-9 ()-]{3,20}$/.test(phoneNumber)) { setFormError(copy.invitationPhoneInvalid); return }
+        void saveLive(() => service.invite({ fullName: name, email, userName, phoneNumber, role: inviteRole }), words.invited, true, { invited: true })
         return
       }
       if (users.some(user => user.email.toLowerCase() === email)) { setFormError(copy.emailExists); return }
@@ -322,7 +337,7 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
               <td><span className={`admin-users-role admin-users-role-${user.role.toLowerCase()}`}><RoleIcon size={13} aria-hidden="true" />{copy.roles[user.role]}</span></td>
               <td><span className={`admin-users-status admin-users-status-${user.status?.toLowerCase() || 'unknown'}`}><span aria-hidden="true" />{statuses[user.status] || '—'}</span></td>
               <td className="admin-users-last-login">{user.lastLogin ? <span><CalendarDays size={14} aria-hidden="true" /><time dateTime={user.lastLogin}>{dateFormatter.format(new Date(user.lastLogin))}</time></span> : copy.never}</td>
-              <td className="admin-users-actions-cell"><UserActions user={user} name={name} copy={copy} onEdit={() => openEdit(user)}
+              <td className="admin-users-actions-cell"><UserActions user={user} name={name} copy={copy} disabled={saving} onEdit={() => openEdit(user)}
                 onToggleBlock={() => toggleBlock(user)} onDelete={() => openDelete(user)} /></td>
             </tr>
           })}</tbody>
@@ -359,9 +374,9 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
           <button type="button" className="admin-users-danger" disabled={saving} onClick={confirmDelete}>{copy.confirmDelete}</button></div>
       </div> : dialogState && <form className="admin-users-form" onSubmit={submitForm} noValidate>
         {dialogState?.type === 'invite' ? <>
-          <label>{copy.fullName}<input autoFocus type="text" autoComplete="name" value={inviteName} onChange={event => { setInviteName(event.target.value); setFormError('') }} placeholder={copy.namePlaceholder} /></label>
-          <label>{copy.email}<input type="email" autoComplete="email" dir="ltr" value={inviteEmail} onChange={event => { setInviteEmail(event.target.value); setFormError('') }} placeholder={copy.emailPlaceholder} /></label>
-          {service && <><label>{words.username}<input value={inviteUsername} onChange={event => setInviteUsername(event.target.value)} /></label><label>{words.phone}<input type="tel" dir="ltr" value={invitePhone} onChange={event => setInvitePhone(event.target.value)} /></label></>}
+          <label>{copy.fullName}<input autoFocus type="text" autoComplete="name" required value={inviteName} onChange={event => { setInviteName(event.target.value); setFormError('') }} placeholder={copy.namePlaceholder} /></label>
+          <label>{copy.email}<input type="email" autoComplete="email" dir="ltr" required value={inviteEmail} onChange={event => { setInviteEmail(event.target.value); setFormError('') }} placeholder={copy.emailPlaceholder} /></label>
+          {service && <><label>{words.username}<input required value={inviteUsername} onChange={event => setInviteUsername(event.target.value)} /></label><label>{words.phone}<input type="tel" dir="ltr" required value={invitePhone} onChange={event => setInvitePhone(event.target.value)} /></label></>}
           <label>{copy.role}<select value={inviteRole} onChange={event => setInviteRole(event.target.value)}>
             {roleValues.map(value => <option key={value} value={value}>{copy.roles[value]}</option>)}
           </select></label>
