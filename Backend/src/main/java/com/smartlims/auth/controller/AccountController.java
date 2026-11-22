@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +25,11 @@ public class AccountController {
     @GetMapping
     public List<AccountResponse> all() {
         return accounts.all();
+    }
+
+    @GetMapping("/page")
+    public UserPageResponse page(@RequestParam MultiValueMap<String, String> parameters) {
+        return accounts.page(parameters);
     }
 
     @GetMapping("/{id}")

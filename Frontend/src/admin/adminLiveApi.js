@@ -42,7 +42,7 @@ export const liveUsers = {
     const result = await get('/api/users/page', query, options)
     return { ...result, content: result.content.map(user => ({ ...user, name: user.fullName, lastLogin: user.lastLoginAt })) }
   },
-  invite: values => write('/api/users', 'POST', values),
+  invite: ({ email, role }) => write('/api/users', 'POST', { email, role }),
   role: (id, role) => write(`/api/users/${id}/role`, 'PUT', { role }),
   block: (id, blocked) => write(`/api/users/${id}/${blocked ? 'block' : 'unblock'}`, 'PATCH'),
   delete: id => write(`/api/users/${id}`, 'DELETE'),
@@ -164,6 +164,9 @@ export const liveCatalog = {
   },
   async setTestActive(id, active) {
     return test(await write(`${testPath}/${id}/status`, 'PATCH', { active }))
+  },
+  async deleteTest(id) {
+    await write(`${testPath}/${id}`, 'DELETE')
   },
   async saveParameter(values, testId, id) {
     const path = parameterPath(testId)

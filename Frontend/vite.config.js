@@ -4,7 +4,7 @@ import { apiTarget } from './apiTarget.js'
 
 // Serve the browser's API calls from the frontend origin so it can receive and
 // read the CSRF cookie alongside the HttpOnly session cookie.
-const target = apiTarget(process.env.SMARTLIMS_API_TARGET)
+const target = apiTarget(process.env.SMARTLIMS_API_TARGET ?? 'http://127.0.0.1:8090')
 const proxy = target ? { '^/api(?:/|\\?|$)': { target, changeOrigin: true } } : undefined
 
 function rejectUnconfiguredApi({ middlewares }) {

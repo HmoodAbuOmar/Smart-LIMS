@@ -46,4 +46,10 @@ public class LabTestController {
     public LabTestResponse status(@PathVariable String id, @Valid @RequestBody LabTestStatusRequest request, JwtAuthenticationToken actor) {
         return tests.changeStatus(actor, id, request);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id, JwtAuthenticationToken actor) {
+        tests.delete(actor, id);
+        return ResponseEntity.noContent().header("Cache-Control", "no-store").build();
+    }
 }

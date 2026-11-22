@@ -42,6 +42,13 @@ export function createCatalogService(initial = createCatalogData(), { delay = 16
       return structuredClone(record)
     },
     async setTestActive(id, active) { await wait(); const test = find('tests', id); test.active = Boolean(active); test.updatedAt = new Date().toISOString(); return structuredClone(test) },
+    async deleteTest(id) {
+      await wait(); find('tests', id)
+      const parameterIds = new Set(data.parameters.filter(item => item.testId === id).map(item => item.id))
+      data.tests = data.tests.filter(item => item.id !== id)
+      data.parameters = data.parameters.filter(item => item.testId !== id)
+      data.ranges = data.ranges.filter(item => !parameterIds.has(item.parameterId))
+    },
     async saveParameter(values, testId, id) {
       await wait(); find('tests', testId)
       const original = id ? find('parameters', id) : null

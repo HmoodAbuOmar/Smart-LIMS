@@ -14,7 +14,7 @@ export default function Login({ mode = 'login' }) {
   const [values, setValues] = useState({ email: '', password: '' })
   const [visible, setVisible] = useState({})
   const fields = ['email', 'password']
-  const { errors, setErrors, clearField, pending, failure, submit } = useFormAction({
+  const { errors, clearField, pending, failure, submit } = useFormAction({
     values, fields, validate: validateLogin,
     action: (details, options) => authApi.login({ email: details.email.trim(), password: details.password }, options),
     onSuccess: async (_result, options) => {
@@ -49,7 +49,6 @@ export default function Login({ mode = 'login' }) {
               type={password && !visible[field] ? 'password' : 'text'}
               value={values[field]}
               onChange={event => updateValue(field, event.target.value)}
-              onBlur={() => setErrors(previous => ({ ...previous, [field]: validateLogin(values)[field] }))}
               required
               disabled={pending}
               autoFocus={index === 0}
@@ -79,10 +78,10 @@ export default function Login({ mode = 'login' }) {
       </button>
       {failure && <p className="auth-error" role="alert">{t(actionErrorKey(failure, 'errors.loginUnavailable'))}</p>}
     </form>
-    <a className="auth-switch" href="#/forgot-password">{t('auth:recovery.forgotLink')}</a>
-    <a className="auth-switch" href="#/signup">
-      {t(`auth:${mode}.switch`)}
-    </a>
+    <div className="auth-login-links">
+      <a className="auth-switch" href="#/forgot-password">{t('auth:recovery.forgotLink')}</a>
+      <a className="auth-switch" href="#/signup">{t(`auth:${mode}.switch`)}</a>
+    </div>
   </>
 }
 

@@ -194,6 +194,57 @@ class AuthenticationRegressionTest extends IsolatedPostgresTest {
                 "other@example.invalid", " a ", "0000000000", Role.RECEPTIONIST)));
     }
 
+    @Test
+    void invitationSucceedsWithEmailAndRoleAndStillHonorsSuppliedProfile() throws Exception {
+        UserAccount admin = active("admin", Role.ADMIN);
+        String jwt = login.login(new LoginRequest("admin", "oldpass1")).accessToken();
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\" ab@example.invalid \",\"role\":\"LAB_TECHNICIAN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("ab@example.invalid"))
+                .andExpect(jsonPath("$.fullName").value("abb"))
+                .andExpect(jsonPath("$.userName").value("abb"))
+                .andExpect(jsonPath("$.phoneNumber").value("0000000000"))
+                .andExpect(jsonPath("$.role").value("LAB_TECHNICIAN"))
+                .andExpect(jsonPath("$.emailConfirmed").value(false));
+        var stored = jdbc.queryForMap("SELECT full_name, user_name, phone_number, role FROM users WHERE email = ?",
+                "ab@example.invalid");
+        assertEquals("abb", stored.get("full_name"));
+        assertEquals("abb", stored.get("user_name"));
+        assertEquals("0000000000", stored.get("phone_number"));
+        assertEquals("LAB_TECHNICIAN", stored.get("role"));
+        verify(email).sendSetPassword(eq("ab@example.invalid"), any(UUID.class), anyString());
+
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ab@other.invalid\",\"role\":\"PATIENT\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userName").value("abb2"))
+                .andExpect(jsonPath("$.fullName").value("abb"));
+
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Supplied Name\",\"email\":\"supplied@example.invalid\","
+                                + "\"userName\":\" supplied \",\"phoneNumber\":\"0000011111\",\"role\":\"RECEPTIONIST\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Supplied Name"))
+                .andExpect(jsonPath("$.userName").value("supplied"))
+                .andExpect(jsonPath("$.phoneNumber").value("0000011111"))
+                .andExpect(jsonPath("$.role").value("RECEPTIONIST"));
+
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ab@example.invalid\",\"role\":\"PATIENT\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EMAIL_IN_USE"));
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"ab\",\"email\":\"tiny@example.invalid\",\"userName\":\"tinyname\","
+                                + "\"phoneNumber\":\"0000000000\",\"role\":\"PATIENT\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors.fullName").exists());
+        mvc.perform(post("/api/users").header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Valid Name\",\"email\":\"short-user@example.invalid\",\"userName\":\"a\","
+                                + "\"phoneNumber\":\"0000000000\",\"role\":\"PATIENT\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors.userName").exists());
+    }
+
     private MockHttpServletRequestBuilder csrf(MockHttpServletRequestBuilder request, String access) throws Exception {
         Cookie token = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");
         assertNotNull(token);

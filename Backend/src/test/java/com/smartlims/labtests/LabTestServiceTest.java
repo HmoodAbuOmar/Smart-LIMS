@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.persistence.EntityManager;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,11 +24,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class LabTestServiceTest {
     private final LabTestRepository repository = mock(LabTestRepository.class);
-    private final LabTestService service = new LabTestService(repository, new LabTestMapper());
+    private final EntityManager entities = mock(EntityManager.class);
+    private final LabTestService service = new LabTestService(repository, new LabTestMapper(), entities);
     private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null, List.of());
 
     private Authentication actor(String role) {
@@ -42,6 +45,7 @@ class LabTestServiceTest {
                     () -> service.create(actor(role), request)).getStatus());
             assertThrows(LabTestException.class, () -> service.update(actor(role), UUID.randomUUID().toString(), request));
             assertThrows(LabTestException.class, () -> service.changeStatus(actor(role), UUID.randomUUID().toString(), new LabTestStatusRequest(false)));
+            assertThrows(LabTestException.class, () -> service.delete(actor(role), UUID.randomUUID().toString()));
         }
         assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(LabTestException.class,
                 () -> service.get(null, UUID.randomUUID().toString())).getStatus());
@@ -134,7 +138,7 @@ class LabTestServiceTest {
         test.setActive(false);
         when(repository.findById(id)).thenReturn(Optional.of(test));
         LabTestMapper protectedMapper = mock(LabTestMapper.class);
-        var protectedService = new LabTestService(repository, protectedMapper);
+        var protectedService = new LabTestService(repository, protectedMapper, entities);
         var hidden = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), id.toString()));
         var missing = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), UUID.randomUUID().toString()));
         assertEquals(HttpStatus.NOT_FOUND, hidden.getStatus());
@@ -149,5 +153,40 @@ class LabTestServiceTest {
         assertEquals("DETAIL", service.get(actor("PATIENT"), id.toString()).code());
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(LabTestException.class,
                 () -> service.get(actor("UNSUPPORTED"), id.toString())).getStatus());
+    }
+
+    @Test
+    void adminDeletesAnUnusedTest() {
+        UUID id = UUID.randomUUID();
+        LabTest test = new LabTest("GONE", "Unused", null, BigDecimal.ONE, "BLOOD", null);
+        when(repository.findForUpdate(id)).thenReturn(Optional.of(test));
+        var counts = mock(jakarta.persistence.TypedQuery.class);
+        var updates = mock(jakarta.persistence.Query.class);
+        when(entities.createQuery(anyString(), eq(Long.class))).thenReturn(counts);
+        when(entities.createQuery(anyString())).thenReturn(updates);
+        when(counts.setParameter(anyString(), any())).thenReturn(counts);
+        when(updates.setParameter(anyString(), any())).thenReturn(updates);
+        when(counts.getSingleResult()).thenReturn(0L);
+
+        service.delete(actor("ADMIN"), id.toString());
+
+        verify(repository).delete(test);
+        verify(repository).flush();
+    }
+
+    @Test
+    void orderedTestCannotBeDeleted() {
+        UUID id = UUID.randomUUID();
+        when(repository.findForUpdate(id)).thenReturn(Optional.of(new LabTest("USED", "Used", null, BigDecimal.ONE, "BLOOD", null)));
+        var counts = mock(jakarta.persistence.TypedQuery.class);
+        when(entities.createQuery(anyString(), eq(Long.class))).thenReturn(counts);
+        when(counts.setParameter(anyString(), any())).thenReturn(counts);
+        when(counts.getSingleResult()).thenReturn(1L);
+
+        LabTestException error = assertThrows(LabTestException.class, () -> service.delete(actor("ADMIN"), id.toString()));
+
+        assertEquals(HttpStatus.CONFLICT, error.getStatus());
+        assertEquals("LAB_TEST_IN_USE", error.getCode());
+        verify(repository, never()).delete(any(LabTest.class));
     }
 }

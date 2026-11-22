@@ -7,6 +7,7 @@ import com.smartlims.labtests.exception.LabTestException;
 import com.smartlims.labtests.mapper.LabTestMapper;
 import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.specification.LabTestSpecifications;
+import jakarta.persistence.EntityManager;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -29,10 +30,12 @@ import org.springframework.validation.annotation.Validated;
 public class LabTestService {
     private final LabTestRepository tests;
     private final LabTestMapper mapper;
+    private final EntityManager entities;
 
-    public LabTestService(LabTestRepository tests, LabTestMapper mapper) {
+    public LabTestService(LabTestRepository tests, LabTestMapper mapper, EntityManager entities) {
         this.tests = tests;
         this.mapper = mapper;
+        this.entities = entities;
     }
 
     @Transactional
@@ -103,6 +106,43 @@ public class LabTestService {
         test.setActive(request.active());
         test.setUpdatedAt(Instant.now());
         return mapper.toResponse(save(test));
+    }
+
+    @Transactional
+    public void delete(Authentication actor, String id) {
+        requireRole(actor, "ADMIN");
+        UUID testId = identifier(id);
+        LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
+        if (count("select count(item) from OrderItem item where item.labTest.id = :id", testId) > 0
+                || count("select count(value) from ResultValue value where value.parameter.labTest.id = :id", testId) > 0)
+            throw LabTestException.inUse();
+        entities.createQuery("delete from ReferenceRange range where range.parameter.labTest.id = :id")
+                .setParameter("id", testId).executeUpdate();
+        entities.createQuery("delete from TestParameter parameter where parameter.labTest.id = :id")
+                .setParameter("id", testId).executeUpdate();
+        test.getCategories().clear();
+        tests.delete(test);
+        try {
+            tests.flush();
+        } catch (DataIntegrityViolationException error) {
+            if (foreignKey(error))
+                throw LabTestException.inUse();
+            throw error;
+        }
+    }
+
+    private long count(String query, UUID id) {
+        return entities.createQuery(query, Long.class).setParameter("id", id).getSingleResult();
+    }
+
+    private boolean foreignKey(DataIntegrityViolationException error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState()))
+                return true;
+            if (cause instanceof ConstraintViolationException constraint && "23503".equals(constraint.getSQLState()))
+                return true;
+        }
+        return false;
     }
 
     private LabTest save(LabTest test) {

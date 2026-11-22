@@ -3,16 +3,20 @@ package com.smartlims.auth.service;
 import com.smartlims.auth.dto.AccountResponse;
 import com.smartlims.auth.dto.CreateAccountRequest;
 import com.smartlims.auth.dto.UpdateAccountRequest;
+import com.smartlims.auth.dto.UserPageResponse;
+import com.smartlims.auth.dto.UserQueryRequest;
 import com.smartlims.auth.email.VerificationEmailSender;
 import com.smartlims.auth.entity.EmailActionPurpose;
 import com.smartlims.auth.entity.EmailActionToken;
 import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.EmailActionTokenRepository;
+import com.smartlims.auth.repository.UserAccountQueries;
 import com.smartlims.auth.repository.UserAccountRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
@@ -33,11 +37,12 @@ public class AccountManagementService {
     private final PasswordEncoder passwords;
     private final UserNames userNames;
     private final AdministratorCoordination administrators;
+    private final UserAccountQueries listings;
 
     public AccountManagementService(UserAccountRepository users, EmailActionTokenRepository tokens,
                                     VerificationTokens values, VerificationEmailSender email, EmailIdentity identities,
                                     PasswordPolicy policy, PasswordEncoder passwords, UserNames userNames,
-                                    AdministratorCoordination administrators) {
+                                    AdministratorCoordination administrators, UserAccountQueries listings) {
         this.users = users;
         this.tokens = tokens;
         this.values = values;
@@ -47,13 +52,18 @@ public class AccountManagementService {
         this.passwords = passwords;
         this.userNames = userNames;
         this.administrators = administrators;
+        this.listings = listings;
     }
 
     @Transactional
     public AccountResponse create(CreateAccountRequest request) {
         administrators.lock();
         String canonical = identities.canonicalize(request.email());
-        String name = userNames.normalize(request.userName());
+        String name = request.userName() == null
+                ? InvitationProfile.uniqueUserName(canonical, users::existsByUserNameIgnoreCase)
+                : userNames.normalize(request.userName());
+        String fullName = request.fullName() == null ? InvitationProfile.fullName(canonical) : suppliedName(request.fullName());
+        String phone = request.phoneNumber() == null ? InvitationProfile.UNCOLLECTED_PHONE : suppliedPhone(request.phoneNumber());
         if (users.existsByEmail(canonical)) {
             throw new AuthRequestException(HttpStatus.CONFLICT, "EMAIL_IN_USE", "Email already exists.", "email");
         }
@@ -61,8 +71,7 @@ public class AccountManagementService {
             throw UserNames.conflict();
         UserAccount user;
         try {
-            user = users.saveAndFlush(UserAccount.invite(request.fullName().strip(), canonical,
-                    name, request.phoneNumber().strip(), request.role()));
+            user = users.saveAndFlush(UserAccount.invite(fullName, canonical, name, phone, request.role()));
         } catch (DataIntegrityViolationException error) {
             throw AccountConstraintErrors.translate(error);
         }
@@ -119,6 +128,11 @@ public class AccountManagementService {
     @Transactional(readOnly = true)
     public List<AccountResponse> all() {
         return users.findAll(Sort.by("userName")).stream().map(AccountResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public UserPageResponse page(Map<String, List<String>> parameters) {
+        return listings.page(UserQueryRequest.from(parameters));
     }
 
     @Transactional(readOnly = true)
@@ -181,6 +195,24 @@ public class AccountManagementService {
             throw protectedAdmin();
         guardLastAdmin(user, true);
         users.delete(user);
+    }
+
+    private static String suppliedName(String fullName) {
+        String name = fullName.strip();
+        if (name.isEmpty()) {
+            throw new AuthRequestException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Please correct the request fields.", "fullName");
+        }
+        return name;
+    }
+
+    private static String suppliedPhone(String phoneNumber) {
+        String phone = phoneNumber.strip();
+        if (phone.isEmpty()) {
+            throw new AuthRequestException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Please correct the request fields.", "phoneNumber");
+        }
+        return phone;
     }
 
     private void guardLastAdmin(UserAccount user, boolean removing) {

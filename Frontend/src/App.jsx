@@ -23,6 +23,8 @@ const AdminPreview = import.meta.env.DEV ? lazy(() => import('./admin/AdminPrevi
 const AdminAccessEntry = lazy(() => import('./admin/AdminAccessEntry.jsx'))
 const ReceptionistPreview = import.meta.env.DEV ? lazy(() => import('./receptionist/ReceptionistPreview.jsx')) : null
 const ReceptionistAccessEntry = lazy(() => import('./receptionist/ReceptionistAccessEntry.jsx'))
+const LabTechnicianAccess = lazy(() => import('./lab/LabTechnicianAccess.jsx'))
+const LabPreview = import.meta.env.DEV ? lazy(() => import('./lab/LabPreview.jsx')) : null
 const PortalEntry = lazy(() => import('./portal/PortalEntry.jsx'))
 
 function AppRouter() {
@@ -55,8 +57,9 @@ function AppRouter() {
   if (import.meta.env.DEV && route.startsWith('#/__portal/')) return <Suspense fallback={null}><DevelopmentPortal route={hash.slice('#/__portal/'.length)} onNavigate={path => { window.location.hash = `/__portal/${path}` }} /></Suspense>
   if (import.meta.env.DEV && (route === '#/__admin' || route.startsWith('#/__admin/'))) return <Suspense fallback={null}><AdminPreview key={route} page={route.slice('#/__admin/'.length)} /></Suspense>
   if (import.meta.env.DEV && (route === '#/__receptionist' || route === '#/__receptionist/today' || route === '#/__receptionist/patients' || route === '#/__receptionist/walk-in' || route === '#/__receptionist/orders' || route === '#/__receptionist/appointments' || route === '#/__receptionist/payments')) return <Suspense fallback={null}><ReceptionistPreview key={hash} page={route.endsWith('/payments') ? 'payments' : route.endsWith('/appointments') ? 'appointments' : route.endsWith('/orders') ? 'orders' : route.endsWith('/walk-in') ? 'walkIn' : route.endsWith('/patients') ? 'patients' : 'today'} /></Suspense>
+  if (import.meta.env.DEV && route === '#/__lab') return <Suspense fallback={null}><LabPreview /></Suspense>
   if (route === '#/admin') return <Suspense fallback={null}><AdminAccessEntry /></Suspense>
-  if (route === '#/lab-technician') return <Suspense fallback={null}><ReceptionistAccessEntry role="lab_technician" /></Suspense>
+  if (route === '#/lab-technician') return <Suspense fallback={null}><LabTechnicianAccess /></Suspense>
   if (route === '#/receptionist' || route === '#/receptionist/today' || route === '#/receptionist/patients' || route === '#/receptionist/walk-in' || route === '#/receptionist/orders' || route === '#/receptionist/appointments' || route === '#/receptionist/payments') return <Suspense fallback={null}><ReceptionistAccessEntry key={route} page={route.endsWith('/payments') ? 'payments' : route.endsWith('/appointments') ? 'appointments' : route.endsWith('/orders') ? 'orders' : route.endsWith('/walk-in') ? 'walkIn' : route.endsWith('/patients') ? 'patients' : 'today'} /></Suspense>
   if (/^#\/patient\/(dashboard|profile|tests|review|orders|book|payment|booking-confirmation|appointments|results|history|notifications)(\/|$)/.test(route)) return <Suspense fallback={null}><PortalEntry route={hash.slice('#/patient/'.length)} /></Suspense>
   if (Object.hasOwn(emailRoutes, route)) return <AuthPage key={hash} mode="login" step={emailRoutes[route]} registration={registration} />

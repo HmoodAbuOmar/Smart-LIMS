@@ -117,6 +117,8 @@ main.auth-content { display: grid; place-items: center; min-height: 100svh; padd
 .auth-notice { margin-block-start: 22px; padding: 12px 14px; border: 1px solid var(--medical-border-light); border-inline-start: 3px solid var(--medical-fresh); border-radius: 10px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; line-height: 1.8; }
 .patient-auth .auth-supporting { font-size: 12px; margin-block-start: 16px; }
 .auth-switch { display: inline-block; margin-block-start: 20px; border: 0; padding: 0; background: transparent; color: var(--medical-green); font-size: 12px; line-height: 1.8; text-decoration: underline; text-underline-offset: 4px; }
+.auth-login-links { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-block-start: 20px; min-width: 0; }
+.auth-login-links .auth-switch { display: inline-block; max-width: 100%; margin-block-start: 0; padding: 6px 2px; overflow-wrap: anywhere; }
 .patient-auth .registration-success { border: 1px solid var(--medical-border-light); border-radius: 12px; padding: 12px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; }
 .auth-secondary { display: inline-block; margin-block-start: 16px; padding: 11px 15px; border: 1px solid #a8cfc7; border-radius: 10px; background: var(--medical-mint); color: var(--medical-deep); font-size: 12px; line-height: 1.7; }
 .workflow-preview-nav { padding-block-end: 14px; margin-block-end: 22px; border-bottom: 1px solid var(--medical-border-light); }

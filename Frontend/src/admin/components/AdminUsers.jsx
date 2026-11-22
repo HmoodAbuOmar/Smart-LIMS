@@ -9,6 +9,15 @@ const pageSizeOptions = [7, 10, 25]
 const roleValues = ['ADMIN', 'RECEPTIONIST', 'LAB_TECHNICIAN', 'PATIENT']
 const statusValues = ['ACTIVE', 'INVITED', 'BLOCKED']
 const roleIcons = { ADMIN: ShieldCheck, RECEPTIONIST: Headset, LAB_TECHNICIAN: FlaskConical, PATIENT: UserRound }
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function invitedName(email) {
+  const local = email.split('@')[0] ?? ''
+  const base = local.slice(0, 80)
+  if (base.length >= 3) return base
+  const fill = base.at(-1) || 'x'
+  return base + fill.repeat(3 - base.length)
+}
 
 function UserActions({ user, name, copy, onEdit, onToggleBlock, onDelete, disabled }) {
   const [open, setOpen] = useState(false)
@@ -94,11 +103,8 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
   const [page, setPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [dialogState, setDialogState] = useState(null)
-  const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('PATIENT')
-  const [inviteUsername, setInviteUsername] = useState('')
-  const [invitePhone, setInvitePhone] = useState('')
   const [editRole, setEditRole] = useState('PATIENT')
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
@@ -111,8 +117,8 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
   const [revision, setRevision] = useState(0)
   const [saving, setSaving] = useState(false)
   const words = rtl
-    ? { username: 'اسم المستخدم', phone: 'رقم الهاتف', created: 'تاريخ إنشاء الحساب', pending: 'بانتظار التحقق', loading: 'جارٍ التحميل…', failed: 'تعذّر تحميل الحسابات.', retry: 'إعادة المحاولة', saved: 'تم حفظ التغيير.', invited: 'أُرسلت الدعوة.', error: 'تعذّر حفظ التغيير.' }
-    : { username: 'Username', phone: 'Phone number', created: 'Account creation date', pending: 'Pending verification', loading: 'Loading…', failed: 'Accounts could not be loaded.', retry: 'Retry', saved: 'Change saved.', invited: 'Invitation sent.', error: 'The change could not be saved.' }
+    ? { created: 'تاريخ إنشاء الحساب', pending: 'بانتظار التحقق', loading: 'جارٍ التحميل…', failed: 'تعذّر تحميل الحسابات.', retry: 'إعادة المحاولة', saved: 'تم حفظ التغيير.', invited: 'أُرسلت الدعوة.', error: 'تعذّر حفظ التغيير.' }
+    : { created: 'Account creation date', pending: 'Pending verification', loading: 'Loading…', failed: 'Accounts could not be loaded.', retry: 'Retry', saved: 'Change saved.', invited: 'Invitation sent.', error: 'The change could not be saved.' }
   const statuses = { ...copy.statuses, PENDING_VERIFICATION: words.pending }
   useEffect(() => {
     if (!service) return
@@ -187,7 +193,7 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
     })
   }
   function openInvite() {
-    setInviteName(''); setInviteEmail(''); setInviteUsername(''); setInvitePhone(''); setInviteRole('PATIENT'); setFormError(''); setDialogState({ type: 'invite' })
+    setInviteEmail(''); setInviteRole('PATIENT'); setFormError(''); setDialogState({ type: 'invite' })
   }
   function openEdit(user) { setEditRole(user.role); setFormError(''); setDialogState({ type: 'edit', user }) }
   function openDelete(user) { setFormError(''); setDialogState({ type: 'delete', user }) }
@@ -230,20 +236,16 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
   function submitForm(event) {
     event.preventDefault()
     if (dialogState?.type === 'invite') {
-      const name = inviteName.trim()
       const email = inviteEmail.trim().toLowerCase()
-      if (!name) { setFormError(copy.nameRequired); return }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setFormError(copy.emailInvalid); return }
+      if (!email || email.length > 120 || !emailPattern.test(email)) { setFormError(copy.emailInvalid); return }
+      if (!roleValues.includes(inviteRole)) { setFormError(copy.roleRequired); return }
+      const known = service ? result?.content ?? [] : users
+      if (known.some(user => user.email.toLowerCase() === email)) { setFormError(copy.emailExists); return }
       if (service) {
-        const userName = inviteUsername.trim(), phoneNumber = invitePhone.trim()
-        if (name.length < 3 || name.length > 80) { setFormError(copy.invitationNameInvalid); return }
-        if (email.length > 120) { setFormError(copy.emailInvalid); return }
-        if (userName.length < 3 || userName.length > 30) { setFormError(copy.invitationUsernameInvalid); return }
-        if (!/^[+0-9 ()-]{3,20}$/.test(phoneNumber)) { setFormError(copy.invitationPhoneInvalid); return }
-        void saveLive(() => service.invite({ fullName: name, email, userName, phoneNumber, role: inviteRole }), words.invited, true, { invited: true })
+        void saveLive(() => service.invite({ email, role: inviteRole }), words.invited, true, { invited: true })
         return
       }
-      if (users.some(user => user.email.toLowerCase() === email)) { setFormError(copy.emailExists); return }
+      const name = invitedName(email)
       const newUser = { id: `user-${nextId.current++}`, name: [name, name], email, role: inviteRole, status: 'INVITED', lastLogin: null }
       setUsers(current => [...current, newUser])
       setQuery(''); setRoleFilter('all'); setStatusFilter('all'); setDateFilter('all'); setPage(Math.floor(users.length / pageSize) + 1)
@@ -374,12 +376,10 @@ export default function AdminUsers({ language, service, previewUsers = [] }) {
           <button type="button" className="admin-users-danger" disabled={saving} onClick={confirmDelete}>{copy.confirmDelete}</button></div>
       </div> : dialogState && <form className="admin-users-form" onSubmit={submitForm} noValidate>
         {dialogState?.type === 'invite' ? <>
-          <label>{copy.fullName}<input autoFocus type="text" autoComplete="name" required value={inviteName} onChange={event => { setInviteName(event.target.value); setFormError('') }} placeholder={copy.namePlaceholder} /></label>
-          <label>{copy.email}<input type="email" autoComplete="email" dir="ltr" required value={inviteEmail} onChange={event => { setInviteEmail(event.target.value); setFormError('') }} placeholder={copy.emailPlaceholder} /></label>
-          {service && <><label>{words.username}<input required value={inviteUsername} onChange={event => setInviteUsername(event.target.value)} /></label><label>{words.phone}<input type="tel" dir="ltr" required value={invitePhone} onChange={event => setInvitePhone(event.target.value)} /></label></>}
-          <label>{copy.role}<select value={inviteRole} onChange={event => setInviteRole(event.target.value)}>
+          <label>{copy.role}<select autoFocus value={inviteRole} onChange={event => { setInviteRole(event.target.value); setFormError('') }}>
             {roleValues.map(value => <option key={value} value={value}>{copy.roles[value]}</option>)}
           </select></label>
+          <label>{copy.email}<input type="email" autoComplete="email" dir="ltr" required maxLength={120} value={inviteEmail} onChange={event => { setInviteEmail(event.target.value); setFormError('') }} placeholder={copy.emailPlaceholder} /></label>
         </> : <>
           <div className="admin-users-edit-identity"><span className="admin-users-avatar" aria-hidden="true">{local(dialogState?.user.name).split(/\s+/).map(part => part[0]).slice(0, 2).join('')}</span>
             <div><strong>{local(dialogState?.user.name)}</strong><span dir="ltr">{dialogState?.user.email}</span></div></div>

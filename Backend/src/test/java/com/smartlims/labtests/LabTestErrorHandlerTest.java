@@ -42,7 +42,7 @@ class LabTestErrorHandlerTest {
 
     @Test
     void unsupportedMethodsAndMediaTypesKeepTheirHttpStatuses() throws Exception {
-        mvc.perform(delete("/api/lab-tests/test")).andExpect(status().isMethodNotAllowed());
+        mvc.perform(delete("/api/lab-tests")).andExpect(status().isMethodNotAllowed());
         mvc.perform(post("/api/lab-tests").contentType(MediaType.TEXT_PLAIN).content("{}"))
                 .andExpect(status().isUnsupportedMediaType());
     }

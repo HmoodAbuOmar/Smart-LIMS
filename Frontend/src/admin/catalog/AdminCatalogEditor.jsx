@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { catalogName, validateParameter, validateRange, validateTest } from './adminCatalogModel.js'
 
-export default function AdminCatalogEditor({ kind, record, test, parameter, data, service, copy, language, onToggleLanguage, onSaved, onClose, inline = false, onDirtyChange, onBusyChange, onActiveChange, registerForm }) {
+export default function AdminCatalogEditor({ kind, record, test, parameter, data, service, copy, language, onToggleLanguage, onSaved, onDeleted, onClose, inline = false, onDirtyChange, onBusyChange, onActiveChange, registerForm }) {
   const modal = kind !== 'test' && !inline
   const root = useRef(null), busy = useRef(false), mounted = useRef(false)
-  const [saving, setSaving] = useState(false), [failed, setFailed] = useState(false), [errors, setErrors] = useState({}), [confirm, setConfirm] = useState(false), [translationAttention, setTranslationAttention] = useState(false)
+  const [saving, setSaving] = useState(false), [failed, setFailed] = useState(false), [errors, setErrors] = useState({}), [confirm, setConfirm] = useState(false), [translationAttention, setTranslationAttention] = useState(false), [deleteState, setDeleteState] = useState('idle')
   const [values, setValues] = useState(() => {
     if (kind === 'test') return record ? { ...record, sampleType: record.sampleType || ({ Blood: 'BLOOD', 'دم': 'BLOOD' }[record.sampleTypeEn || record.sampleTypeAr] ?? record.sampleTypeEn ?? record.sampleTypeAr ?? ''), price: (record.priceCents / 100).toFixed(2) } : { code: '', nameEn: '', nameAr: '', descriptionEn: '', descriptionAr: '', price: '', sampleType: '', preparationEn: '', preparationAr: '', active: true }
     if (kind === 'parameter') return record ? { ...record } : { code: '', nameEn: '', nameAr: '', valueType: 'NUMERIC', unit: '', methodEn: '', methodAr: '', displayOrder: 0, required: false, active: true }
@@ -33,7 +33,7 @@ export default function AdminCatalogEditor({ kind, record, test, parameter, data
     return () => { mounted.current = false; if (modal) { element.close(); document.body.style.overflow = previousOverflow; if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }) } onDirtyChange?.(false); onBusyChange?.(false) }
   }, [modal, onDirtyChange, onBusyChange])
   function close() { if (!busy.current) onClose() }
-  function update(field, value) { setValues(current => ({ ...current, [field]: value, ...(service.live && /(?:En|Ar)$/.test(field) ? { [field.slice(0, -2) + (field.endsWith('En') ? 'Ar' : 'En')]: value } : {}) })); setErrors(current => ({ ...current, [field]: undefined, _form: undefined })); setFailed(false); setConfirm(false) }
+  function update(field, value) { setValues(current => ({ ...current, [field]: value, ...(service.live && /(?:En|Ar)$/.test(field) ? { [field.slice(0, -2) + (field.endsWith('En') ? 'Ar' : 'En')]: value } : {}) })); setErrors(current => ({ ...current, [field]: undefined, _form: undefined })); setFailed(false); setConfirm(false); setDeleteState('idle') }
   async function submit(event, confirmed = false) {
     event.preventDefault()
     if (busy.current) return
@@ -47,11 +47,22 @@ export default function AdminCatalogEditor({ kind, record, test, parameter, data
       return
     }
     if (kind === 'test' && record?.active && !values.active && !confirmed) { setConfirm(true); return }
+    setDeleteState('idle')
     busy.current = true; setSaving(true); setFailed(false)
     try {
       const saved = kind === 'test' ? await service.saveTest(values, record?.id) : kind === 'parameter' ? await service.saveParameter(values, test.id, record?.id) : kind === 'range' ? await service.saveRange(values, parameter.id, test.id) : kind === 'close' ? await service.closeRange(record.id, values.validTo) : await service.setTestActive(record.id, false)
       if (mounted.current) onSaved(saved)
     } catch (error) { if (mounted.current) { if (error.code === 'VALIDATION') setErrors(error.fields); else setFailed(true) } }
+    finally { busy.current = false; if (mounted.current) setSaving(false) }
+  }
+  async function remove() {
+    if (busy.current || !record) return
+    if (deleteState !== 'confirm') { setDeleteState('confirm'); return }
+    busy.current = true; setSaving(true); setFailed(false)
+    try {
+      await service.deleteTest(record.id)
+      if (mounted.current) onDeleted(record.id)
+    } catch (error) { if (mounted.current) setDeleteState(error.code === 'LAB_TEST_IN_USE' ? 'inUse' : 'error') }
     finally { busy.current = false; if (mounted.current) setSaving(false) }
   }
   function field(name, label) {
@@ -85,14 +96,17 @@ export default function AdminCatalogEditor({ kind, record, test, parameter, data
     {['code', 'nameAr', 'nameEn', 'valueType', 'unit', 'methodAr', 'methodEn', 'displayOrder', 'required', 'active'].map(field)}
   </> : kind === 'close' ? <><p className="ac-form-note">{copy.intervalsHint}</p>{field('validTo')}</> : <div className="ac-form-note"><strong>{catalogName(record, language)}</strong><p>{copy.deactivateHint}</p></div>
   const form = <>
-    {kind !== 'test' && <div className="ac-editor-heading"><h3 id="catalog-editor-title">{title}</h3><div>{onToggleLanguage && <button type="button" className="ac-language" onClick={onToggleLanguage} lang={language === 'ar' ? 'en' : 'ar'}>{copy.switchLanguage}</button>}{modal && <button type="button" className="ac-icon" disabled={saving} aria-label={copy.close} onClick={close}><X size={19} aria-hidden="true" /></button>}</div></div>}
+    {kind !== 'test' && <div className="ac-editor-heading"><h3 id="catalog-editor-title">{title}</h3>{modal && <button type="button" className="ac-icon" disabled={saving} aria-label={copy.close} onClick={close}><X size={19} aria-hidden="true" /></button>}</div>}
     <form className={`ac-form ac-form-${kind}`} onSubmit={submit} noValidate aria-label={title} aria-busy={saving}>
       {content}
       {kind === 'test' && translationAttention && <p className="ac-form-note" role="status">{copy.translationAttention}</p>}
       {errors._form && <p className="ac-error ac-wide" role="alert">{copy.errors[errors._form]}</p>}
       {failed && <p className="ac-error ac-wide" role="alert">{copy.saveError}</p>}
       {confirm && <div className="ac-form-note" role="alert"><strong>{catalogName(record, language)}</strong><p>{copy.deactivateHint}</p><button type="button" className="ac-primary" disabled={saving} onClick={event => submit(event, true)}>{copy.confirmDeactivate}</button></div>}
-      <div className="ac-form-actions"><button type="button" disabled={saving} onClick={close}>{kind === 'range' ? copy.reset : copy.cancel}</button><button type="submit" className="ac-primary" disabled={saving}>{saving ? copy.saving : kind === 'deactivate' ? copy.confirmDeactivate : kind === 'range' ? copy.addRange : kind === 'test' ? copy.saveChanges : copy.save}</button></div>
+      {deleteState === 'confirm' && <p className="ac-form-note" role="status">{copy.deleteHint}</p>}
+      {deleteState === 'inUse' && <p className="ac-error ac-wide" role="alert">{copy.deleteInUse}</p>}
+      {deleteState === 'error' && <p className="ac-error ac-wide" role="alert">{copy.deleteError}</p>}
+      <div className="ac-form-actions">{kind === 'test' && <button type="button" className="ac-danger" disabled={saving || !record} title={record ? undefined : copy.deleteNeedsSave} onClick={remove}>{saving && deleteState === 'confirm' ? copy.deleting : deleteState === 'confirm' ? copy.confirmDeleteTest : copy.deleteTest}</button>}<button type="button" disabled={saving} onClick={close}>{kind === 'range' ? copy.reset : copy.cancel}</button><button type="submit" className="ac-primary" disabled={saving}>{saving ? copy.saving : kind === 'deactivate' ? copy.confirmDeactivate : kind === 'range' ? copy.addRange : kind === 'test' ? copy.saveChanges : copy.save}</button></div>
     </form>
   </>
   if (!modal) return <section ref={root} className={`ac-inline-editor ac-inline-${kind}`} aria-label={title}>{form}</section>

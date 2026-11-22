@@ -1,11 +1,13 @@
 package com.smartlims.orders.controller;
 
+import com.smartlims.orders.dto.AdminOrderPage;
 import com.smartlims.orders.dto.CreateSelfOrderRequest;
 import com.smartlims.orders.dto.CreateStaffOrderRequest;
 import com.smartlims.orders.dto.OrderDetailResponse;
 import com.smartlims.orders.dto.OrderPageResponse;
 import com.smartlims.orders.dto.OrderQueryRequest;
 import com.smartlims.orders.dto.CancelOrderRequest;
+import com.smartlims.orders.service.AdminOrderReadService;
 import com.smartlims.orders.service.OrderReadService;
 import com.smartlims.orders.service.OrderCancellationService;
 import com.smartlims.orders.service.OrderCreationResult;
@@ -24,11 +26,28 @@ public class OrderController {
     private final OrderService orders;
     private final OrderReadService reads;
     private final OrderCancellationService cancellations;
+    private final AdminOrderReadService adminReads;
 
-    public OrderController(OrderService orders, OrderReadService reads, OrderCancellationService cancellations) {
+    public OrderController(OrderService orders, OrderReadService reads, OrderCancellationService cancellations,
+                           AdminOrderReadService adminReads) {
         this.orders = orders;
         this.reads = reads;
         this.cancellations = cancellations;
+        this.adminReads = adminReads;
+    }
+
+    @GetMapping
+    public ResponseEntity<AdminOrderPage> listAdmin(
+            @RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(adminReads.list(actor,
+                com.smartlims.laboratory.dto.LaboratoryQuery.of(query, "fromDate", "toDate", "status", "search", "sort")));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderDetailResponse> getAdmin(@PathVariable String id,
+            @RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        query.keySet().forEach(key -> { throw com.smartlims.laboratory.exception.LaboratoryException.invalid(key); });
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(adminReads.get(actor, id));
     }
 
     @PostMapping(path = "/{id}/cancel", consumes = MediaType.APPLICATION_JSON_VALUE)

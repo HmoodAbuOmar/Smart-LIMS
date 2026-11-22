@@ -8,6 +8,8 @@
 .admin-catalog button:hover:not(:disabled), .admin-catalog-dialog button:hover:not(:disabled) { background: #eaf5f1; }
 .admin-catalog button:disabled, .admin-catalog-dialog button:disabled { cursor: not-allowed; opacity: .55; }
 .admin-catalog .ac-primary, .admin-catalog-dialog .ac-primary { background: #146b63; border-color: #146b63; color: #fff; }
+.admin-catalog .ac-danger, .admin-catalog-dialog .ac-danger { margin-inline-end: auto; border-color: #e4b7b1; background: #fff; color: #9c4036; }
+.admin-catalog .ac-danger:hover:not(:disabled), .admin-catalog-dialog .ac-danger:hover:not(:disabled) { background: #fdf4f2; border-color: #d7a099; }
 .admin-catalog .ac-primary:hover:not(:disabled), .admin-catalog-dialog .ac-primary:hover:not(:disabled) { background: #10574f; border-color: #10574f; }
 .admin-catalog :is(button,input,select,textarea):focus-visible, .admin-catalog-dialog :is(button,input,select,textarea):focus-visible { outline: 2px solid #258571; outline-offset: 3px; }
 .ac-heading { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }

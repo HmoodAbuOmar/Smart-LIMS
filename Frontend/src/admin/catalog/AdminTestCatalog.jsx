@@ -80,7 +80,7 @@ export default function AdminTestCatalog({ language, activePage, onNavigate, onT
     }, () => { if (!controller.signal.aborted) setRangeLoad({ id: parameterKey, attempt, error: true }) })
     return () => controller.abort()
   }, [service, testId, parameterKey, section, attempt])
-  useEffect(() => { if (notice !== 'saved') return undefined; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer) }, [notice])
+  useEffect(() => { if (notice !== 'saved' && notice !== 'deleted') return undefined; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer) }, [notice])
   function reset() { setDirty(false); setRevision(value => value + 1) }
   function selectTest(id) { request(() => { reset(); setCreating(false); setTestId(id); setParameterId(''); setMobileEditor(true) }) }
   function newTest() { request(() => { reset(); setCreating(true); setParameterId(''); setMobileEditor(true); onNavigate('tests') }) }
@@ -92,6 +92,14 @@ export default function AdminTestCatalog({ language, activePage, onNavigate, onT
     if (kind === 'parameter') setParameterId(record.id)
     if (service.live && collection === 'tests') setAttempt(value => value + 1)
     reset(); setDialog(null); setNotice('saved')
+  }
+  function removed(id) {
+    setData(current => {
+      const parameterIds = new Set(current.parameters.filter(item => item.testId === id).map(item => item.id))
+      return { ...current, tests: current.tests.filter(item => item.id !== id), parameters: current.parameters.filter(item => item.testId !== id), ranges: current.ranges.filter(item => !parameterIds.has(item.parameterId)) }
+    })
+    setTestId(''); setCreating(false); setParameterId(''); reset(); setNotice('deleted')
+    if (service.live) setAttempt(value => value + 1)
   }
   async function toggle(record, kind) {
     if (lock.current) return
@@ -121,7 +129,7 @@ export default function AdminTestCatalog({ language, activePage, onNavigate, onT
   const addParameter = <button type="button" className="ac-primary" onClick={() => setDialog({ kind: 'parameter' })}><Plus size={15} aria-hidden="true" />{copy.addParameter}</button>
   return <section className="admin-catalog" aria-label={copy.title}>
     <div className="ac-heading"><span className="ac-heading-icon" aria-hidden="true"><FlaskConical size={23} /></span><div><h2>{copy.title}</h2><p>{copy.description}</p></div><button type="button" className="ac-primary" disabled={loadState !== 'ready' || formBusy || actionBusy} onClick={newTest}><Plus size={16} aria-hidden="true" />{copy.newTest}</button></div>
-    {notice && <p className={notice === 'saved' ? 'ac-notice' : 'ac-error'} role="status">{copy[notice]}</p>}
+    {notice && <p className={notice === 'saveError' ? 'ac-error' : 'ac-notice'} role="status">{copy[notice]}</p>}
     {listError && loadState === 'ready' && <p className="ac-error" role="status">{copy.loadError} <button type="button" onClick={() => setAttempt(value => value + 1)}>{copy.retry}</button></p>}
     {loadState === 'loading' ? empty(copy.loading) : loadState === 'error' ? empty(copy.loadError, <button type="button" onClick={() => { setLoadState('loading'); setAttempt(value => value + 1) }}>{copy.retry}</button>) : <div className="ac-workspace" data-editor-open={mobileEditor}>
       <aside className="ac-list-pane ac-card" aria-label={copy.tests}>
@@ -137,7 +145,7 @@ export default function AdminTestCatalog({ language, activePage, onNavigate, onT
           <header className="ac-test-header"><div className="ac-test-identity"><bdi>{test?.code || copy.newTest}</bdi>{test && <><span aria-hidden="true">—</span><h3>{local(test)}</h3></>}</div><div className="ac-active-toggle"><button type="button" role="switch" aria-checked={section === 'tests' && !service.live ? draftActive : test?.active || false} aria-labelledby="catalog-active-label" disabled={formBusy || actionBusy || (service.live && !test)} onClick={() => { if (section === 'tests' && !service.live) testApi.current?.setActive(!draftActive); else request(() => toggle(test, 'test')) }}><span aria-hidden="true" /></button><span id="catalog-active-label">{copy.active}</span></div></header>
           <div className="ac-tabs" role="tablist" aria-label={copy.title}>{[['tests', 'details'], ['parameters', 'parameters'], ['referenceRanges', 'referenceRanges']].map(([id, key]) => <button type="button" role="tab" id={`catalog-tab-${id}`} aria-selected={section === id} tabIndex={section === id ? 0 : -1} aria-controls="catalog-panel" disabled={id !== 'tests' && !test} title={id !== 'tests' && !test ? copy.dependentHint : undefined} key={id} onClick={() => navigate(id)} onKeyDown={tabKeyDown}>{copy[key]}</button>)}</div>
           <div id="catalog-panel" className="ac-panel" role="tabpanel" aria-labelledby={`catalog-tab-${section}`}>
-            {pendingDetails ? empty(detailError ? copy.loadError : copy.loading, detailError ? <button type="button" onClick={() => setAttempt(value => value + 1)}>{copy.retry}</button> : null) : section === 'tests' ? <><AdminCatalogEditor key={`test-${test?.id || 'new'}-${revision}`} kind="test" record={test} {...editorProps} registerForm={registerForm} onActiveChange={setDraftActive} onDirtyChange={setDirty} onBusyChange={setFormBusy} onSaved={record => saved(record, 'test')} onClose={() => request(() => { reset(); if (creating) setCreating(false) })} />{creating && <p className="ac-muted">{copy.dependentHint}</p>}</> : section === 'parameters' ? <>
+            {pendingDetails ? empty(detailError ? copy.loadError : copy.loading, detailError ? <button type="button" onClick={() => setAttempt(value => value + 1)}>{copy.retry}</button> : null) : section === 'tests' ? <><AdminCatalogEditor key={`test-${test?.id || 'new'}-${revision}`} kind="test" record={test} {...editorProps} registerForm={registerForm} onActiveChange={setDraftActive} onDirtyChange={setDirty} onBusyChange={setFormBusy} onSaved={record => saved(record, 'test')} onDeleted={removed} onClose={() => request(() => { reset(); if (creating) setCreating(false) })} />{creating && <p className="ac-muted">{copy.dependentHint}</p>}</> : section === 'parameters' ? <>
               <div className="ac-section-heading"><div><h3>{copy.parameters}</h3><p className="ac-muted">{local(test)}</p></div>{addParameter}</div>
               {!parameters.length ? empty(copy.noParameters, addParameter) : <AdminCatalogParametersTable parameters={parameters} language={language} copy={copy} busy={actionBusy} onEdit={item => setDialog({ kind: 'parameter', record: item })} onToggle={item => toggle(item, 'parameter')} onRanges={item => { setParameterId(item.id); navigate('referenceRanges') }} />}            </> : <>
               <section className="ac-ranges-tab" aria-label={copy.referenceRanges}>
