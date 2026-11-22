@@ -80,12 +80,10 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests/{testId}/parameters/{parameterId}/reference-ranges").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/lab-tests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/lab-tests/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/lab-tests/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/status").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/lab-tests/{id}/details").hasRole("ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/appointment-types").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
-                        .requestMatchers(HttpMethod.POST, "/api/appointment-types").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/appointment-types/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/appointment-slots/schedule").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/appointment-slots").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/appointment-slots").hasAnyRole("ADMIN", "RECEPTIONIST")

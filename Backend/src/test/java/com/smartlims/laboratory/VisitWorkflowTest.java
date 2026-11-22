@@ -62,7 +62,7 @@ class VisitWorkflowTest extends LaboratoryTestSupport {
         arrive(o, a.id());
         error(mvc.perform(bearer(post("/api/appointments/" + a.id() + "/cancel"), Role.PATIENT).contentType("application/json").content("{}")), 409, "APPOINTMENT_NOT_CHANGEABLE", null);
         var otherOrder = create(other, first);
-        var body = new com.smartlims.appointments.dto.AppointmentRequests.Book(otherOrder.id().toString(), a.typeId().toString(), a.slotId().toString());
+        var body = new com.smartlims.appointments.dto.AppointmentRequests.Book(otherOrder.id().toString(), a.slotId().toString());
         assertEquals("APPOINTMENT_SLOT_UNAVAILABLE", assertThrows(com.smartlims.appointments.exception.AppointmentException.class, () -> bookingService.book(actor(Role.ADMIN), body, List.of(UUID.randomUUID().toString()))).getCode());
     }
 

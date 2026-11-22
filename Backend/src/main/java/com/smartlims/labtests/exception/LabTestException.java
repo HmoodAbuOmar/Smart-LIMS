@@ -24,6 +24,11 @@ public class LabTestException extends RuntimeException {
         return new LabTestException(HttpStatus.NOT_FOUND, "LAB_TEST_NOT_FOUND", "Laboratory test not found.", null);
     }
 
+    public static LabTestException inUse() {
+        return new LabTestException(HttpStatus.CONFLICT, "LAB_TEST_IN_USE",
+                "This laboratory test is referenced by retained records. Deactivate it instead.", null);
+    }
+
     public static LabTestException duplicate() {
         return new LabTestException(HttpStatus.CONFLICT, "LAB_TEST_CODE_IN_USE", "A laboratory test with this code already exists.", "code");
     }

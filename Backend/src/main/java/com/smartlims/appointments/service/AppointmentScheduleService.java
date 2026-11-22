@@ -12,7 +12,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
-import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,44 +25,14 @@ import org.springframework.validation.annotation.Validated;
 public class AppointmentScheduleService {
     private final AuditPublisher audit;
     private final AppointmentAccess access;
-    private final AppointmentTypeRepository types;
     private final AppointmentSlotRepository slots;
     private final AppointmentRepository appointments;
 
-    public AppointmentScheduleService(AppointmentAccess access, AppointmentTypeRepository types, AppointmentSlotRepository slots, AppointmentRepository appointments, AuditPublisher audit) {
+    public AppointmentScheduleService(AppointmentAccess access, AppointmentSlotRepository slots, AppointmentRepository appointments, AuditPublisher audit) {
         this.audit = audit;
         this.access = access;
-        this.types = types;
         this.slots = slots;
         this.appointments = appointments;
-    }
-
-    @Transactional
-    public AppointmentResponses.Type saveType(Authentication actor, String id, @NotNull @Valid AppointmentRequests.Type body) {
-        var account = access.current(actor, Role.ADMIN);
-        UUID key = id == null ? null : AppointmentQuery.uuid(id, "id");
-        slots.lockSchedule();
-        if (types.existsByCodeAndIdNot(body.code(), key == null ? new UUID(0, 0) : key))
-            throw AppointmentException.conflict("APPOINTMENT_SCHEDULE_CONFLICT");
-        var type = key == null ? new AppointmentType(body.code(), body.name(), body.active()) : types.findById(key).orElseThrow(() -> AppointmentException.missing("APPOINTMENT_TYPE"));
-        boolean changed = key == null || !java.util.Objects.equals(type.getCode(), body.code())
-                || !java.util.Objects.equals(type.getName(), body.name()) || type.isActive() != body.active();
-        type.setCode(body.code());
-        type.setName(body.name());
-        type.setActive(body.active());
-        var saved = types.saveAndFlush(type);
-        if (changed) audit.record(account, key == null ? TYPE_CREATE : TYPE_UPDATE, saved.getId());
-        return AppointmentMapping.type(saved);
-    }
-
-    @Transactional(readOnly = true)
-    public AppointmentResponses.Page<AppointmentResponses.Type> types(Authentication actor, AppointmentQuery query) {
-        var account = access.current(actor, Role.PATIENT, Role.ADMIN, Role.RECEPTIONIST);
-        boolean all = query.bool("includeInactive");
-        if (all && account.getRole() == Role.PATIENT)
-            throw AppointmentException.forbidden();
-        Specification<AppointmentType> filter = (root, q, cb) -> all ? cb.conjunction() : cb.isTrue(root.get("active"));
-        return AppointmentMapping.page(AppointmentPages.find(types, filter, query, Sort.by("code", "id")), AppointmentMapping::type);
     }
 
     @Transactional

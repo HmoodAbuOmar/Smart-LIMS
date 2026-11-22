@@ -22,7 +22,6 @@ class AppointmentConcurrencyTest extends AppointmentTestSupport {
 
     @Test
     void concurrentDifferentOrdersForSamePatientCannotDoubleBookEvenWithSpareCapacity() throws Exception {
-        var t = type();
         var target = slot(0, 5);
         var firstOrder = create(own, first);
         var secondOrder = create(own, first);
@@ -31,7 +30,7 @@ class AppointmentConcurrencyTest extends AppointmentTestSupport {
             Callable<String> x = () -> {
                 gate.await();
                 try {
-                    book(firstOrder, t, target);
+                    book(firstOrder, target);
                     return "BOOKED";
                 } catch (AppointmentException e) {
                     return e.getCode();
@@ -40,7 +39,7 @@ class AppointmentConcurrencyTest extends AppointmentTestSupport {
             Callable<String> y = () -> {
                 gate.await();
                 try {
-                    book(secondOrder, t, target);
+                    book(secondOrder, target);
                     return "BOOKED";
                 } catch (AppointmentException e) {
                     return e.getCode();
@@ -58,10 +57,9 @@ class AppointmentConcurrencyTest extends AppointmentTestSupport {
 
     @Test
     void bookingAndReschedulingCompeteForSameLastPlaceWithoutLosingOldBooking() throws Exception {
-        var t = type();
         var old = slot(0, 1);
         var target = slot(1, 1);
-        var existing = book(create(own, first), t, old);
+        var existing = book(create(own, first), old);
         var order = create(other, first);
         try (var pool = Executors.newFixedThreadPool(2)) {
             var gate = new CountDownLatch(1);
@@ -77,7 +75,7 @@ class AppointmentConcurrencyTest extends AppointmentTestSupport {
             Callable<String> y = () -> {
                 gate.await();
                 try {
-                    book(order, t, target);
+                    book(order, target);
                     return "SUCCESS";
                 } catch (AppointmentException e) {
                     return e.getCode();
@@ -96,7 +94,7 @@ class AppointmentConcurrencyTest extends AppointmentTestSupport {
 
     @Test
     void cookieAppointmentWritesRequireMatchingCsrfAndBearerTransportRemainsExempt() throws Exception {
-        var a = book(create(own, first), type(), slot(0, 1));
+        var a = book(create(own, first), slot(0, 1));
         String path = "/api/appointments/" + a.id() + "/cancel";
         error(mvc.perform(post(path).cookie(new Cookie("access_token", tokens.get(Role.PATIENT))).contentType("application/json").content("{}")), 403, "FORBIDDEN", null);
         Cookie csrf = mvc.perform(get("/api/auth/csrf-token")).andReturn().getResponse().getCookie("XSRF-TOKEN");

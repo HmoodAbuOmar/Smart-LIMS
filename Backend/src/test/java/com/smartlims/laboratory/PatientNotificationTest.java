@@ -260,7 +260,7 @@ class PatientNotificationTest extends MedicalHistoryTestSupport {
         var order = create(own, first);
         var a = appointment(order, 1, 3);
         var originalKey = jdbc.queryForObject("SELECT idempotency_key FROM appointments WHERE id=?", UUID.class, a.id());
-        bookingService.book(actor(Role.ADMIN), new AppointmentRequests.Book(order.id().toString(), a.typeId().toString(), a.slotId().toString()), List.of(originalKey.toString()));
+        bookingService.book(actor(Role.ADMIN), new AppointmentRequests.Book(order.id().toString(), a.slotId().toString()), List.of(originalKey.toString()));
         assertEquals(1, events("APPOINTMENT_CONFIRMED"));
         var start = a.startsAt().plusSeconds(3600);
         var target = schedule.createSlot(actor(Role.RECEPTIONIST), new AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(1800).toString(), 3, true));
@@ -426,10 +426,9 @@ class PatientNotificationTest extends MedicalHistoryTestSupport {
     @Test
     void bookingRollbackLeavesNoEventAndRetryAfterRollbackCreatesOne() {
         var order = create(own, first);
-        var type = schedule.saveType(actor(Role.ADMIN), null, new AppointmentRequests.Type("SYN_ROLLBACK", "Synthetic booking", true));
         var start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusSeconds(86400);
         var slot = schedule.createSlot(actor(Role.RECEPTIONIST), new AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(1800).toString(), 2, true));
-        var request = new AppointmentRequests.Book(order.id().toString(), type.id().toString(), slot.id().toString());
+        var request = new AppointmentRequests.Book(order.id().toString(), slot.id().toString());
         var key = keys();
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             bookingService.book(actor(Role.PATIENT), request, key);

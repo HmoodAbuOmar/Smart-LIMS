@@ -405,4 +405,27 @@ class MigrationLineageTest {
         execute(url, "UPDATE patient_notifications SET read_at=created_at");
         assertEquals(List.of("1"), rows(url, "SELECT count(*) FROM patient_notifications WHERE read_at=created_at"));
     }
+    @Test
+    void appointmentTypeRemovalPreservesEveryOtherValueAndAppliedHistory() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "28").migrate();
+        execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
+        var before = data(url);
+        assertFalse(before.remove("appointment_types").isEmpty());
+        String bookings = "SELECT (to_jsonb(a)-'type_id'-'type_name_snapshot')::text FROM appointments a ORDER BY id";
+        before.put("appointments", rows(url, bookings));
+        var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "29");
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        var after = data(url);
+        after.put("appointments", rows(url, bookings));
+        assertEquals(before, after, "Bookings, slots, statuses, revisions, moves, visits and results retained");
+        assertEquals(List.of("0"), rows(url, "SELECT count(*) FROM information_schema.columns WHERE table_name='appointments' AND column_name IN ('type_id','type_name_snapshot')"));
+        assertEquals(List.of("0"), rows(url, "SELECT count(*) FROM information_schema.tables WHERE table_name='appointment_types'"));
+        assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=28 ORDER BY installed_rank"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+        assertProtections(url);
+    }
+
 }

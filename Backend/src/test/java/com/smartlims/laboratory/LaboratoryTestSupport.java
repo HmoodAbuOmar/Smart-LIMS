@@ -97,10 +97,9 @@ abstract class LaboratoryTestSupport extends IsolatedPostgresTest {
     }
 
     com.smartlims.appointments.dto.AppointmentResponses.Detail appointment(OrderDetailResponse order, int index, int capacity) {
-        var type = schedule.saveType(actor(Role.ADMIN), null, new com.smartlims.appointments.dto.AppointmentRequests.Type("SYN_" + UUID.randomUUID().toString().substring(0, 8), "Synthetic visit", true));
         var start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusSeconds(86400 + index * 3600L);
         var slot = schedule.createSlot(actor(Role.RECEPTIONIST), new com.smartlims.appointments.dto.AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(1800).toString(), capacity, true));
-        return bookingService.book(actor(Role.ADMIN), new com.smartlims.appointments.dto.AppointmentRequests.Book(order.id().toString(), type.id().toString(), slot.id().toString()), List.of(UUID.randomUUID().toString())).appointment();
+        return bookingService.book(actor(Role.ADMIN), new com.smartlims.appointments.dto.AppointmentRequests.Book(order.id().toString(), slot.id().toString()), List.of(UUID.randomUUID().toString())).appointment();
     }
 
     final UUID reviewerId = UUID.fromString("00000000-0000-0000-0000-000000000101");
@@ -142,7 +141,7 @@ abstract class LaboratoryTestSupport extends IsolatedPostgresTest {
 
     @BeforeEach
     void workflowFixtures() {
-        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             var account = account(role.name().toLowerCase(Locale.ROOT), role);
             actors.put(role, account);

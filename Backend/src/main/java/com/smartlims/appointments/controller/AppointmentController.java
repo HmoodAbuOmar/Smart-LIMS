@@ -59,6 +59,6 @@ public class AppointmentController {
 
     @GetMapping("/api/appointment-slots")
     public ResponseEntity<?> slots(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(bookings.slots(actor, AppointmentQuery.of(query, "orderId", "typeId", "from", "to")));
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(bookings.slots(actor, AppointmentQuery.of(query, "orderId", "from", "to")));
     }
 }
