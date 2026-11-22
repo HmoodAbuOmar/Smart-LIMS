@@ -3,18 +3,16 @@ package com.smartlims.auth.dto;
 import com.smartlims.auth.entity.AccountStatus;
 import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.service.AuthRequestException;
-
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.springframework.http.HttpStatus;
 
 public record UserQueryRequest(String search, Role role, AccountStatus status, Instant createdFrom,
-                               Instant createdTo, int page, int size, String sort) {
+                                Instant createdTo, int page, int size, String sort) {
     private static final Set<String> FIELDS = Set.of("search", "role", "status", "createdFrom", "createdTo", "page", "size", "sort");
 
     public UserQueryRequest {
@@ -47,27 +45,19 @@ public record UserQueryRequest(String search, Role role, AccountStatus status, I
         try {
             if (!value.matches("[0-9]+")) throw invalid(field);
             return Integer.parseInt(value);
-        } catch (NumberFormatException error) {
-            throw invalid(field);
-        }
+        } catch (NumberFormatException error) { throw invalid(field); }
     }
 
     private static <E extends Enum<E>> E enumeration(Map<String, List<String>> values, String key, Class<E> type) {
         if (!values.containsKey(key)) return null;
-        try {
-            return Enum.valueOf(type, single(values, key, ""));
-        } catch (IllegalArgumentException error) {
-            throw invalid(key);
-        }
+        try { return Enum.valueOf(type, single(values, key, "")); }
+        catch (IllegalArgumentException error) { throw invalid(key); }
     }
 
     private static Instant timestamp(Map<String, List<String>> values, String key) {
         if (!values.containsKey(key)) return null;
-        try {
-            return OffsetDateTime.parse(single(values, key, "")).toInstant();
-        } catch (DateTimeParseException error) {
-            throw invalid(key);
-        }
+        try { return OffsetDateTime.parse(single(values, key, "")).toInstant(); }
+        catch (DateTimeParseException error) { throw invalid(key); }
     }
 
     public static AuthRequestException invalid(String field) {

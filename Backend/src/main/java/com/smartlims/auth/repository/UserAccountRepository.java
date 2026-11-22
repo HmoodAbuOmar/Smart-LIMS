@@ -24,6 +24,9 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     boolean existsByRole(com.smartlims.auth.entity.Role role);
 
+    @Query(value = "select exists(select 1 from patients where user_id = :id)", nativeQuery = true)
+    boolean hasLinkedPatient(@Param("id") UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserAccount u where u.id = :id")
     Optional<UserAccount> findWithLockById(@Param("id") UUID id);

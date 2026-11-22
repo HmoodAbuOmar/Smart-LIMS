@@ -23,6 +23,14 @@ public final class PatientSpecifications {
         };
     }
 
+    public static Specification<Patient> linkStatus(String status) {
+        return (root, query, builder) -> switch (status) {
+            case "LINKED" -> builder.isNotNull(root.get("user"));
+            case "UNLINKED" -> builder.isNull(root.get("user"));
+            default -> builder.conjunction();
+        };
+    }
+
     private static String escape(String value) {
         return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }

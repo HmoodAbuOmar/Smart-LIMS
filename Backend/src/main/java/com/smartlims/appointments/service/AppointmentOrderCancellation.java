@@ -1,5 +1,8 @@
 package com.smartlims.appointments.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.appointments.entity.AppointmentStatus;
 import com.smartlims.appointments.repository.*;
 import com.smartlims.orders.entity.*;
@@ -8,12 +11,14 @@ import org.springframework.transaction.annotation.*;
 
 @Service
 public class AppointmentOrderCancellation {
+    private final AuditPublisher audit;
     private final AppointmentRepository appointments;
     private final AppointmentSlotRepository slots;
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public AppointmentOrderCancellation(AppointmentRepository appointments, AppointmentSlotRepository slots,
-                                        com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                        com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit) {
+        this.audit = audit;
         this.appointments = appointments;
         this.slots = slots;
         this.notifications = notifications;
@@ -33,6 +38,7 @@ public class AppointmentOrderCancellation {
             // Required order consistency cascade is independent of direct-action cutoff.
             appointment.cancel(order.getCancelledBy(), order.getCancelledAt(), order.getCancellationReason());
             notifications.appointment(appointment, false);
+            audit.record(order.getCancelledBy(), APPOINTMENT_CANCEL, appointment.getId());
         });
         appointments.flush();
     }

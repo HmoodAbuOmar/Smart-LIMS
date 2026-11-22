@@ -1,30 +1,22 @@
 package com.smartlims.auth.repository;
 
-import com.smartlims.auth.dto.UserListRow;
 import com.smartlims.auth.dto.UserPageResponse;
 import com.smartlims.auth.dto.UserQueryRequest;
+import com.smartlims.auth.dto.UserListRow;
 import com.smartlims.auth.entity.AccountOrigin;
 import com.smartlims.auth.entity.UserAccount;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-
-import java.time.Instant;
+import jakarta.persistence.criteria.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class UserAccountQueries {
     private final EntityManager entityManager;
 
-    public UserAccountQueries(EntityManager entityManager) {
-        this.entityManager = entityManager;
-    }
+    public UserAccountQueries(EntityManager entityManager) { this.entityManager = entityManager; }
 
     public UserPageResponse page(UserQueryRequest request) {
         var builder = entityManager.getCriteriaBuilder();
@@ -32,7 +24,7 @@ public class UserAccountQueries {
         var countRoot = countQuery.from(UserAccount.class);
         countQuery.select(builder.count(countRoot)).where(filters(request, countRoot, builder));
         long total = entityManager.createQuery(countQuery).getSingleResult();
-        int pages = total == 0 ? 0 : (int) Math.min(Integer.MAX_VALUE, (total + request.size() - 1) / request.size());
+        int pages = (int) Math.min(Integer.MAX_VALUE, (total + request.size() - 1) / request.size());
         long offset = (long) request.page() * request.size();
         List<UserListRow> content = List.of();
         if (offset < total && offset <= Integer.MAX_VALUE) {
@@ -42,7 +34,6 @@ public class UserAccountQueries {
             Expression<?> key = switch (field) {
                 case "fullName" -> builder.lower(root.get("fullName"));
                 case "status" -> status(root, builder);
-                case "lastLoginAt" -> builder.nullLiteral(Instant.class);
                 default -> root.get(field);
             };
             var nullsLast = builder.<Integer>selectCase().when(builder.isNull(key), 1).otherwise(0);
@@ -52,7 +43,7 @@ public class UserAccountQueries {
                     .getResultList().stream().map(UserListRow::from).toList();
         }
         return new UserPageResponse(content, request.page(), request.size(), total, pages,
-                request.page() == 0, pages == 0 || (long) request.page() + 1 >= pages);
+                request.page() == 0, (long) request.page() + 1 >= pages);
     }
 
     private Predicate[] filters(UserQueryRequest request, Root<UserAccount> root, CriteriaBuilder builder) {

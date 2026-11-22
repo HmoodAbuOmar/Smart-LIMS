@@ -68,7 +68,7 @@ class PatientSelfProfileTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items,test_orders,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             var account = UserAccount.invite("Independent Account Name", role.name().toLowerCase(Locale.ROOT) + "@example.invalid", null, "000099", role);
             account.acceptInvitation("test-only-unused-hash", Instant.now());
@@ -156,7 +156,10 @@ class PatientSelfProfileTest extends IsolatedPostgresTest {
                 .andExpect(jsonPath("$.address").value(org.hamcrest.Matchers.nullValue())).andExpect(jsonPath("$.completionPercentage").value(100));
         assertEquals(accountBefore, jdbc.queryForMap("SELECT * FROM users WHERE id=?", accounts.get(Role.PATIENT).getId()));
         assertEquals(immutableBefore, jdbc.queryForMap("SELECT id,user_id,patient_number,created_by,created_at FROM patients WHERE id=?", own.id()));
-        assertEquals(foreign, service.get(actor(Role.ADMIN), foreign.id().toString()));
+        assertEquals(new StaffPatientResponse(foreign.id(), foreign.patientNumber(),
+                foreign.fullName(), foreign.dateOfBirth(), foreign.gender(), foreign.phoneNumber(), foreign.address(),
+                foreign.createdAt(), foreign.updatedAt(), PatientLinkStatus.UNLINKED),
+                service.get(actor(Role.ADMIN), foreign.id().toString()));
         assertEquals("Updated Patient", service.getMe(actor(Role.PATIENT)).fullName());
         verifyNoInteractions(email);
     }

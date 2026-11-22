@@ -43,6 +43,7 @@ class PatientRequestTest {
         assertEquals(0, defaults.page());
         assertEquals(20, defaults.size());
         assertEquals("createdAt,desc", defaults.sort());
+        assertEquals("ALL", defaults.linkStatus());
         PatientQueryRequest bounds = PatientQueryRequest.fromQueryParameters(Map.of(
                 "search", List.of("  " + "x".repeat(120) + "  "),
                 "page", List.of("2147483647"), "size", List.of("100"), "sort", List.of("fullName,asc")));
@@ -57,7 +58,7 @@ class PatientRequestTest {
 
     @Test
     void queryConstructionRejectsInvalidValuesAndRepeatedKnownParameters() {
-        for (String field : List.of("search", "page", "size", "sort")) {
+        for (String field : List.of("search", "page", "size", "sort", "linkStatus")) {
             PatientValidationException error = assertThrows(PatientValidationException.class,
                     () -> PatientQueryRequest.fromQueryParameters(Map.of(field, List.of("0", "0"))));
             assertEquals(field, error.getField());
@@ -74,5 +75,25 @@ class PatientRequestTest {
         // Preserve first-error ordering when several query parameters are invalid.
         assertEquals("page", assertThrows(PatientValidationException.class,
                 () -> PatientQueryRequest.fromQueryParameters(Map.of("page", List.of("-1"), "size", List.of("0")))).getField());
+        assertEquals("sort", assertThrows(PatientValidationException.class,
+                () -> PatientQueryRequest.fromQueryParameters(Map.of("sort", List.of("invalid"),
+                        "linkStatus", List.of("ALL", "ALL")))).getField());
+    }
+
+    @Test
+    void linkStatusRequiresOneExactSupportedValue() {
+        for (String value : List.of("ALL", "LINKED", "UNLINKED")) {
+            assertEquals(value, PatientQueryRequest.fromQueryParameters(Map.of("linkStatus", List.of(value))).linkStatus());
+            assertEquals(value, new PatientQueryRequest("", 0, 20, null, value).linkStatus());
+        }
+        assertEquals("ALL", new PatientQueryRequest("", 0, 20, null).linkStatus());
+        for (String value : List.of("", "linked", "all", "UNlinked", " LINKED", "LINKED ", "UNKNOWN")) {
+            assertEquals("linkStatus", assertThrows(PatientValidationException.class,
+                    () -> new PatientQueryRequest("", 0, 20, null, value)).getField());
+        }
+        for (List<String> values : List.of(List.of("ALL", "ALL"), List.of("LINKED", "UNLINKED"))) {
+            assertEquals("linkStatus", assertThrows(PatientValidationException.class,
+                    () -> PatientQueryRequest.fromQueryParameters(Map.of("linkStatus", values))).getField());
+        }
     }
 }

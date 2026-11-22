@@ -1,7 +1,15 @@
 # Results API Contract — Stage 4
 
+CAT-RANGE-01 (2026-11-09) adds ADMIN-only configured numeric reference range
+create/list in [LAB_TESTS_API.md](LAB_TESTS_API.md#configured-reference-ranges--cat-range-01-2026-11-09).
+This is catalog configuration only. No automatic age/sex/date matching, fallback,
+reference population or flags are introduced. Manual result referenceText/
+referenceMin/referenceMax/flag entry remains unchanged; new drafts, existing
+drafts, corrections and immutable published snapshots do not follow configured
+ranges. Configuration does not change publication authority or emit notifications.
+
 Migration-version references in historical sections describe the original V1-V9
-implementation. The current application migration set is canonical V1-V25 from
+implementation. The current application migration source is canonical V1-V27 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
 fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
 

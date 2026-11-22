@@ -1,5 +1,41 @@
 # Smart-LIMS Database Design
 
+## Unused catalog deletion (2026-11-22)
+
+No schema change. DELETE takes lab_tests FOR UPDATE, checks order_items and result_values through test_parameters, removes reference_ranges then unused test_parameters, category assignments and parent atomically. Retained FKs remain NO ACTION; FK violations roll back cleanup and map to LAB_TEST_IN_USE. Existing snapshot FOR SHARE locks serialize concurrent order creation; parameter/range writes lock the same parent. Audit DELETE participates in the transaction and has no target FK.
+
+## Appointment type removal (2026-11-22)
+
+V29 removes appointments.type_id foreign key and column, type_name_snapshot, then appointment_types. All appointments are lab visits. Booking IDs, slots, status, versions, retry keys, move history and visit references are retained. Existing order/coordination/appointment/slot locks and capacity constraints continue to apply. V1-V28 remain immutable.
+
+
+ADM-DASH-01 (2026-11-10): no schema/migration change. The Admin dashboard is a
+repeatable-read aggregate over retained profiles, orders/items, current-slot
+appointments, result versions/current publication markers and rejected specimens.
+Reuse existing operational report status/attendance/rejection grouping for all-time
+cards. Daily order counts and test distribution use the same 7/14-day parent
+created_at cohort at Asia/Jerusalem midnights; zero-fill calendar days in the
+read model. Distribution counts item rows grouped by test ID and retained
+code/name snapshots, never current catalog or quantities/result versions.
+Draft review counts do not assert completeness. Retained rejected samples include
+replaced originals; no follow-up closure field/rule exists. Explicit order flags
+and payments have no data source and remain unsupported/null. No clinical or
+order lifecycle semantics change. New Admin detail reuses existing mapper/snapshots.
+See [dashboard contract](ADMIN_ACTIVITY_API.md#admin-dashboard---adm-dash-01-2026-11-10).
+
+ADM-AUD-02 (2026-11-10): V28 implements the audit_logs concept in section 4.18
+with a narrower safe contract, superseding that section's proposed columns and
+planned status for this slice. Columns: UUID id, actor_id/name snapshot, action,
+entity_type/entity_id, occurred_at/recorded_at, fixed summary. Actor and entity
+IDs are logical historical references with no new deletion-blocking FK. No JSON
+payload, request body, tokens, contact/clinical data or historical backfill.
+Indexes support chronology, actor/action and entity lookups; UPDATE/DELETE trigger
+enforces append-only history. A MANDATORY synchronous publisher writes on the
+source transaction; failures roll back audit and business state together.
+Existing clinical laboratory_events remains immutable and unchanged; the Admin
+read model unions both safe projections before filtering/counting/paging. See
+[coverage and no-op rules](ADMIN_ACTIVITY_API.md#transactional-admin-audit-extension--adm-aud-02-2026-11-10).
+
 ## Patient notifications design (NOTIF-38, 2026-10-31)
 
 Additive V25 creates patient_notifications only; V1-V24 are immutable. Rows have
@@ -237,13 +273,13 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 15 | `result_specimens` | Implemented V9 | Retained exact specimens per result version. |
 | 16 | `result_values` | Implemented V9 | Values and historical manual-reference/definition snapshots. |
 | 17 | `patient_notifications` | V25; NOTIF-38 | Patient-profile in-app workflow events and read state; external delivery deferred. |
-| 18 | `audit_logs` | Planned; T-AUD-02/03 | Append-only records of important business actions. |
+| 18 | `audit_logs` | V28; ADM-AUD-02 | Append-only safe Admin/staff command metadata; combined with existing laboratory events for Admin reads. |
 | 19 | `symptom_assessments` | Deferred AI; T-AI-01 | Patient symptom-analysis sessions for the later test-suggestion feature. |
 | 20 | `suggested_tests` | Deferred AI; T-AI-01 | Laboratory tests suggested by a symptom assessment. |
 | 21 | `patient_link_tokens` | Implemented V5 | Short-lived, single-use capabilities for verified patient account/profile linking. |
 | 22 | `lab_test_categories` | Implemented V6; Stage 1 Task 2 | Zero-to-many fixed category assignments per test; composite key prevents duplicate membership. Task 3 implements assignment/response arrays; Task 4 implements membership filtering and patient list availability. |
 
-Additional implemented tables: appointment_types, appointment_reschedules (V8),
+Additional implemented tables: appointment_reschedules (V8),
 visits, visit_items and laboratory_events (V9). The latter is workflow history,
 not the wider proposed audit_logs subsystem.
 
@@ -252,6 +288,18 @@ not the wider proposed audit_logs subsystem.
 ### 4.1. `users`
 
 System accounts and authentication state. Preserve the existing implementation.
+
+Users Management extension (2026-11-06): V26 adds nullable `last_login_at`
+TIMESTAMPTZ with no default/backfill. Shared successful login writes it; ordinary
+requests and failed logins do not. Status is derived from existing enabled,
+origin, invitation_accepted_at and email_verified_at; no lifecycle reconstruction
+or authentication/last-admin rule change. [USERS_API.md](USERS_API.md) defines
+the read projection, query boundaries and actions. Page count/content share a
+read-only REPEATABLE_READ transaction. Bulk writes share administrator advisory
+coordination, lock selected account rows in UUID order and validate all targets
+before changes. Patient-role changes hold the same account lock used by linking.
+Physical deletion flushes in-transaction and translates FK violations to 409
+USER_HAS_RETAINED_REFERENCES; clinical/audit FKs and retained rows are unchanged.
 
 Implementation status: implemented in V1/V2; preserve the actual migrations and current account behavior. T-AUTH-01 records bounded verification, not deployment readiness.
 
@@ -268,6 +316,7 @@ Implementation status: implemented in V1/V2; preserve the actual migrations and 
 | `enabled` | `BOOLEAN` | No | DEFAULT FALSE | Account enabled state |
 | `email_verified_at` | `TIMESTAMPTZ` | Yes | - | Email verification time |
 | `invitation_accepted_at` | `TIMESTAMPTZ` | Yes | - | Invitation acceptance time |
+| `last_login_at` | `TIMESTAMPTZ` | Yes | V26; no default/backfill | Most recent successful authentication recorded after this change |
 | `failed_login_attempts` | `INTEGER` | No | DEFAULT 0 | Failed login count |
 | `locked_until` | `TIMESTAMPTZ` | Yes | - | Temporary lock expiry |
 | `reset_code_hash` | `VARCHAR(255)` | Yes | - | Password-reset code hash |
@@ -403,7 +452,7 @@ Implementation status: implemented in main's unchanged V4__lab_tests.sql. The cu
 
 **Rules and relationships**
 
-- Implemented: code is trimmed/uppercased and constrained to the LAB_TESTS_API format; currency is ILS. ADMIN writes; staff lists include either state, while PATIENT lists are active-only and reject active=false with 403. Task 5 enforces PATIENT active-only detail access: inactive and missing records return the same 404; staff retain inactive details. PUT preserves availability; PATCH changes it. No delete endpoint exists.
+- Implemented: code is trimmed/uppercased and constrained to the LAB_TESTS_API format; currency is ILS. ADMIN writes; staff lists include either state, while PATIENT lists are active-only and reject active=false with 403. Task 5 enforces PATIENT active-only detail access: inactive and missing records return the same 404; staff retain inactive details. PUT preserves availability; PATCH changes it. ADMIN DELETE removes only unused definitions and their catalog configuration; retained references return 409 LAB_TEST_IN_USE.
 - Stage 4 parameters reuse this catalog identity. One ordered item may contain many parameters; no clinical definitions or minimum panel size are inferred.
 - price must be >= 0. Use NUMERIC(12,2) and Java BigDecimal for money. Initial currency is ILS. [S2]
 - sample_type is the default sample description; multiple required specimen types are handled by laboratory workflow in the initial scope.
@@ -425,7 +474,7 @@ The relationship is zero-to-many categories per test and zero-to-many tests per 
 | `category` | `VARCHAR(30)` | No | Composite PK; fixed-vocabulary CHECK; no default | One stable category identifier |
 
 - `PRIMARY KEY (lab_test_id, category)` prevents duplicate assignment of the same category to the same test, including concurrent inserts. Do not add uniqueness on either column alone: a test may have multiple categories and the same category may be assigned to multiple tests. No surrogate UUID or assignment timestamp is needed.
-- `FOREIGN KEY (lab_test_id) REFERENCES lab_tests(id)` with NO ACTION prevents orphan assignments and follows retained catalog identity conventions. Catalog deletion remains unsupported; deactivation preserves assignments. Removing an assignment through ADMIN PUT deletes only the corresponding collection row, never its test.
+- `FOREIGN KEY (lab_test_id) REFERENCES lab_tests(id)` with NO ACTION prevents orphan assignments and follows retained catalog identity conventions. Unused catalog deletion removes assignments atomically with the test; deactivation of referenced tests preserves assignments. Removing an assignment through ADMIN PUT deletes only the corresponding collection row, never its test.
 - The CHECK is `category IN ('BLOOD_TESTS', 'VITAMINS_MINERALS', 'THYROID', 'LIVER', 'KIDNEY', 'LIPIDS', 'DIABETES')`. Together with NOT NULL and the composite key, this bounds each test to zero through seven valid unique assignments. "All", blank, null, and arbitrary/differently cased identifiers cannot be stored. Use string-enum values, never enum ordinals; labels and display order remain contract/client mappings. A category can have no tests without requiring a placeholder row.
 - Retain existing lab_tests indexes. The composite PK covers per-test category loading and its FK. Add B-tree `lab_test_categories(category, lab_test_id)` for category membership queries. Task 4 uses a correlated EXISTS membership predicate against the mapped collection and combines availability/literal search before totals, sorting and pagination over tests. The outer query has no assignment join, so filtering cannot duplicate content or inflate counts; each matching test returns its full category set in contract order.
 - V6 creates only the empty assignment table and reverse index, without data inference, legacy backfill, or changes to lab_tests rows. V1-V5 remain unchanged. UUIDs, names, descriptions, prices, currency, sample types, preparation instructions, availability, and timestamps are preserved. No fabricated "uncategorized" row/value or automatic deactivation.
@@ -473,7 +522,7 @@ target is not implemented or authorized by this stage.
 
 Approved numeric or textual reference ranges by parameter, age, sex, and validity period.
 
-Implementation status: planned, absent from V1-V5. This is proposed design; resolve the linked requirements/decisions and API contract in IMPLEMENTATION_PLAN before implementation.
+Implementation status: V28, ADM-AUD-02. The earlier proposed JSON/correlation/system-actor fields are not part of this safe command-metadata slice. Existing laboratory_events is retained separately.
 
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
@@ -560,7 +609,7 @@ Stage 2 Task 6 reviewed design, implemented in V7 by Task 7 with the OrderItem m
 ### 4.9. `appointment_slots`
 
 Stage 3 approved design (2026-10-29), superseding the former proposal. V8 adds
-explicit slots, appointment_types, appointment_coordination, appointments and
+explicit slots, appointment_coordination, appointments and
 appointment_reschedules. V1–V7 are preserved. Detailed rules/DTOs:
 [APPOINTMENTS_API.md](APPOINTMENTS_API.md). Implemented and verified in Stage 3;
 final full-suite evidence is in TESTING.md. Development/production application is
@@ -581,12 +630,10 @@ not established by isolated migration tests.
 - Positive capacity and end > start; EXCLUDE USING gist on tstzrange(start,end,'[)')
   prohibits overlap for all slots, including inactive. No PostgreSQL extension needed.
 - Explicit future publication by ADMIN/RECEPTIONIST; no generated hours. Times immutable
-  through API. Capacity shared across types; CONFIRMED rows alone consume capacity.
+  through API. Capacity shared across all bookings; CONFIRMED and CHECKED_IN rows consume capacity.
 - Asia/Jerusalem for display; TIMESTAMPTZ instants for storage/comparison. Start/end
   input requires explicit offset; API retains microsecond precision.
-- appointment_types: UUID PK, unique code VARCHAR(30), name VARCHAR(150), active boolean,
-  created_at/updated_at; checks mirror normalized code/name. ADMIN create/replace only.
-  No deletion/seeds. Existing appointment type_name_snapshot remains unchanged.
+- V29 removes appointment_types and the appointment type fields; all visits use the same booking workflow.
 - appointment_coordination has one checked id=1 row. Every appointment/schedule write
   obtains its SELECT FOR UPDATE lock. This intentionally serializes writes for one
   laboratory, protecting cross-order patient overlap and global creator/key uniqueness.
@@ -594,8 +641,8 @@ not established by isolated migration tests.
 
 Lock order: appointment mutations first discover the immutable order ID without a
 write lock, lock that order row, then coordination, then re-read/lock appointment,
-then old/new slots in lexical UUID order. Booking: order→coordination→type→slot.
-Schedule management: coordination→type/slot only. Linked order cancellation already
+then old/new slots in lexical UUID order. Booking: order -> coordination -> slot.
+Schedule management: coordination -> slot only. Linked order cancellation already
 holds order, then coordination→appointment→slot. Never acquire order while holding
 coordination. Count capacity/patient conflicts and write under those same locks;
 flush before returning. Rollback preserves old allocation. Capacity is derived from
@@ -614,8 +661,6 @@ capacity. CANCELLED/COMPLETED/NO_SHOW retain history without consuming capacity.
 | `id` | `UUID` | No | PK | Record identifier |
 | `order_id` | `UUID` | No | FK test_orders.id; partial UNIQUE for CONFIRMED/CHECKED_IN | Parent laboratory order |
 | `slot_id` | `UUID` | No | FK appointment_slots.id | Selected booking period |
-| `type_id` | `UUID` | No | FK appointment_types.id | Retained appointment type |
-| `type_name_snapshot` | `VARCHAR(150)` | No | Trimmed nonblank | Original display name |
 | `status` | `VARCHAR(20)` | No | DEFAULT CONFIRMED; five-state CHECK | Business workflow state |
 | `version` | `BIGINT` | No | DEFAULT 0; >=0 | Optimistic revision |
 | `created_by` | `UUID` | No | FK users.id | Authenticated creator |
@@ -781,21 +826,21 @@ Implementation status: planned, absent from V1-V5. This is proposed design; reso
 | Column | PostgreSQL type | Nullable | Key / default | Meaning |
 |---|---|---|---|---|
 | `id` | `UUID` | No | PK | Record identifier |
-| `user_id` | `UUID` | Yes | FK users.id | Linked account or event actor/recipient |
-| `action` | `VARCHAR(60)` | No | - | Audit event code |
+| `actor_id` | `UUID` | No | Logical retained identity | Authenticated staff actor |
+| `actor_name_snapshot` | `VARCHAR(120)` | No | Nonblank | Retained staff display name |
+| `action` | `VARCHAR(40)` | No | Closed publisher operation vocabulary | Audit action code |
 | `entity_type` | `VARCHAR(50)` | No | - | Affected entity type |
-| `entity_id` | `UUID` | Yes | - | Affected entity identifier |
-| `request_id` | `VARCHAR(100)` | Yes | - | Request correlation identifier |
-| `details` | `JSONB` | No | DEFAULT {} | Minimal structured event details |
-| `created_at` | `TIMESTAMPTZ` | No | DEFAULT CURRENT_TIMESTAMP | Creation time |
+| `entity_id` | `UUID` | No | Logical retained identity | Affected entity identifier |
+| `occurred_at` | `TIMESTAMPTZ` | No | Source command server instant | Effective timestamp |
+| `recorded_at` | `TIMESTAMPTZ` | No | Source command server instant | Audit chronology timestamp |
+| `summary` | `VARCHAR(250)` | No | Fixed operation summary | No user-supplied payload or clinical/contact data |
 
 **Rules and relationships**
 
-- user_id is nullable for system actions. entity_type and entity_id identify a business record logically; entity_id is not a foreign key to every table.
-- details defaults to an empty JSON object. Record profile creation/linking, orders, payments, sample events, validation, publication, corrections, and rescheduling.
-- Use append-only access; revoke ordinary UPDATE and DELETE rights on this table from the application database role.
-- Never record passwords, JWTs, email tokens, database connection secrets, or unnecessary health data. [S6]
-- Index (entity_type, entity_id, created_at), (user_id, created_at), and (action, created_at).
+- Actor and entity references survive permitted deletion without changing existing account/clinical deletion guards. No fabricated system actor or historical backfill.
+- A MANDATORY synchronous publisher accepts only actor, closed operation enum and entity UUID. No passwords, proof, contact/clinical values or arbitrary details. Existing laboratory history is projected safely, not duplicated.
+- An append-only database trigger rejects UPDATE/DELETE; no HTTP mutation route. Audit failures abort the business transaction, and business rollback removes the audit insert.
+- Chronological, actor, action and entity indexes include recorded_at DESC,id DESC. Combined read filtering/counting/pagination is documented in ADMIN_ACTIVITY_API.md. Payments remain outside this audit slice.
 
 ### 4.19. `symptom_assessments`
 
@@ -1012,7 +1057,7 @@ The laboratory must provide the approved catalog, reference values, sample/conta
 
 The [dashboard contract](DASHBOARD_API.md) adds no schema or migration. One
 read-only REPEATABLE_READ transaction resolves the eligible linked PATIENT and
-reuses order aggregates, actual order-to-visit links, appointment slots/types,
+reuses order aggregates, actual order-to-visit links, appointment slots,
 current PUBLISHED results and active catalog DTOs. Database pages/counts select
 all owned orders, future CONFIRMED appointments and current publications before
 fixed preview limits; no joins multiply counts. All cutoff comparisons use the
@@ -1026,3 +1071,47 @@ original chartValue/comparator semantics. Existing trend grouping loads the owne
 numeric history before limiting; large-history performance remains unbenchmarked.
 Existing FK/current-result indexes are reused. No writers, locks, lifecycle
 changes, popularity tracking or notifications storage are introduced.
+
+## Configured reference range slice (CAT-RANGE-01, 2026-11-09)
+
+Additive V27__reference_ranges.sql creates exactly one table, reference_ranges,
+with UUID identity, retained parameter_id FK to test_parameters, exact
+MALE/FEMALE/ANY applicability, nullable integer min_age_days/max_age_days,
+NUMERIC(38,12) lower_limit/upper_limit, nullable DATE valid_from/valid_to and
+UTC created_at. Checks enforce nonnegative ages, nonempty bounded half-open
+age/date intervals, supported applicability, finite numeric limits, at least
+one numeric limit and lower <= upper. Index (parameter_id,applicability) supports
+overlap lookup and (parameter_id,created_at,id) supports stable paging. No seeds,
+extension requirement, result FK, snapshot backfill or change to V1–V26.
+
+Both nested IDs and NUMERIC type are verified in the service. Creates take the
+existing LabTestRepository.findForUpdate parent lock BEFORE parameter lookup,
+overlap query and insert; explicit READ_COMMITTED isolation ensures a waiting
+create's overlap query sees its predecessor's committed insert. All configuration
+writers use this path, including when there are no existing ranges. Parameter
+updates use the same parent lock and reject NUMERIC→TEXT while ranges exist.
+No order lock is acquired, preserving existing order→catalog lock ordering.
+Overlap is an intersection in both half-open age and date dimensions, scoped
+to parameter and exact applicability, including expired configurations.
+The scalar checks/FK are database constraints; overlap/type checks are service
+invariants coordinated by the shared row lock (direct SQL bypass is not an API).
+No database extension or speculative patient matching rule is introduced.
+
+API/date classification: [LAB_TESTS_API.md](LAB_TESTS_API.md#configured-reference-ranges--cat-range-01-2026-11-09).
+Only storage/create/list are enabled; older “automatic reference_ranges deferred”
+statements continue to apply to matching/flags/population. Existing manual
+result_values references and immutable published snapshots remain authoritative.
+CAT-ADMIN-02 verification (2026-11-09) exercised V27 on the guarded disposable
+regression database plus fresh/upgrade compatibility databases: full Maven 531
+tests, no failures/errors/skips, and live Postman overlap/concurrency/configuration
+checks passed. Existing V1–V27 migration files are unchanged from entry HEAD.
+No development/production migration or deployment readiness claim is made.
+# Admin activity reads (2026-11-10)
+
+ADM-ACT-01 adds no schema changes. Admin lists/reports read canonical V1–V27:
+test_orders/order_items immutable test names/prices; laboratory_events safe
+projection; appointments/current slots; visit_items; current published results;
+samples.rejected_at. Each multi-query response uses a read-only repeatable-read
+transaction so content/counts/totals/options share one snapshot. See
+[metric/source/coverage rules](ADMIN_ACTIVITY_API.md). This earlier slice preceded
+V28 audit_logs; payments remain unimplemented and financial unsupported/null differs from zero.

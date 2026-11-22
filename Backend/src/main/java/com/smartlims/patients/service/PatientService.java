@@ -1,5 +1,8 @@
 package com.smartlims.patients.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
@@ -30,6 +33,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +44,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class PatientService {
     private static final ZoneId LAB_ZONE = ZoneId.of("Asia/Jerusalem");
+    private final AuditPublisher audit;
     private final PatientRepository patients;
     private final UserAccountRepository users;
     private final PatientMapper mapper;
@@ -47,7 +52,8 @@ public class PatientService {
     private final VerificationTokens tokenValues;
 
     public PatientService(PatientRepository patients, UserAccountRepository users, PatientMapper mapper,
-                          PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues) {
+                          PatientLinkTokenRepository linkTokens, VerificationTokens tokenValues, AuditPublisher audit) {
+        this.audit = audit;
         this.patients = patients;
         this.users = users;
         this.mapper = mapper;
@@ -109,6 +115,7 @@ public class PatientService {
         String rawToken = tokenValues.create();
         PatientLinkToken token = linkTokens.saveAndFlush(new PatientLinkToken(
                 tokenValues.hash(rawToken), patient, issuer, now.plusSeconds(600)));
+        audit.record(issuer, PATIENT_LINK_ISSUE, patient.getId());
         return new PatientLinkTokenResponse(rawToken, token.getExpiresAt());
     }
 
@@ -149,20 +156,23 @@ public class PatientService {
 
     @Transactional
     public PatientResponse create(Authentication actor, @Valid CreatePatientRequest request) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST");
+        UserAccount account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
         validateBirthDate(request.dateOfBirth());
         String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
-        Patient patient = new Patient(number, users.getReferenceById(actorId(actor)), request.fullName(),
+        Patient patient = new Patient(number, account, request.fullName(),
                 request.dateOfBirth(), request.gender(), request.phoneNumber(), request.address());
-        return mapper.toResponse(patients.saveAndFlush(patient));
+        var saved = patients.saveAndFlush(patient);
+        audit.record(account, PATIENT_CREATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
     public PatientPageResponse list(Authentication actor, @Valid PatientQueryRequest query) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
+        currentAccount(actor, false, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
         String[] sort = query.sort().split(",");
         Sort ordering = Sort.by(Sort.Direction.fromString(sort[1]), sort[0]).and(Sort.by("id"));
-        Specification<Patient> filter = PatientSpecifications.search(query.search());
+        Specification<Patient> filter = PatientSpecifications.search(query.search())
+                .and(PatientSpecifications.linkStatus(query.linkStatus()));
         PageRequest pageable = PageRequest.of(query.page(), query.size(), ordering);
         // JPA uses an integer offset; very distant empty pages can be answered from the count.
         if (pageable.getOffset() > Integer.MAX_VALUE) {
@@ -175,21 +185,26 @@ public class PatientService {
     }
 
     @Transactional(readOnly = true)
-    public PatientResponse get(Authentication actor, String id) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+    public PatientReadResponse get(Authentication actor, String id) {
+        UserAccount account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         UUID patientId = profileId(id);
-        Patient patient = hasRole(actor, "PATIENT")
-                ? patients.findByIdAndUser_Id(patientId, actorId(actor)).orElseThrow(PatientNotFoundException::new)
+        Patient patient = account.getRole() == Role.PATIENT
+                ? patients.findByIdAndUser_Id(patientId, account.getId()).orElseThrow(PatientNotFoundException::new)
                 : patients.findById(patientId).orElseThrow(PatientNotFoundException::new);
-        return mapper.toResponse(patient);
+        return account.getRole() == Role.PATIENT ? mapper.toResponse(patient) : mapper.toStaffResponse(patient);
     }
 
     @Transactional
     public PatientResponse update(Authentication actor, String id, @Valid UpdatePatientRequest request) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST");
+        var account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
         UUID patientId = profileId(id);
         validateBirthDate(request.dateOfBirth());
         Patient patient = patients.findWithLockById(patientId).orElseThrow(PatientNotFoundException::new);
+        boolean changed = !java.util.Objects.equals(patient.getFullName(), request.fullName())
+                || !java.util.Objects.equals(patient.getDateOfBirth(), request.dateOfBirth())
+                || patient.getGender() != request.gender()
+                || !java.util.Objects.equals(patient.getPhoneNumber(), request.phoneNumber())
+                || !java.util.Objects.equals(patient.getAddress(), request.address());
         patient.setFullName(request.fullName());
         patient.setDateOfBirth(request.dateOfBirth());
         patient.setGender(request.gender());
@@ -197,6 +212,7 @@ public class PatientService {
         patient.setAddress(request.address());
         patient.setUpdatedAt(Instant.now());
         patients.flush();
+        if (changed) audit.record(account, PATIENT_UPDATE, patient.getId());
         return mapper.toResponse(patient);
     }
 
@@ -221,7 +237,7 @@ public class PatientService {
     }
 
     private void requireRole(Authentication actor, String... roles) {
-        if (actor == null || !actor.isAuthenticated()) {
+        if (actor == null || !actor.isAuthenticated() || actor instanceof AnonymousAuthenticationToken) {
             throw new PatientAuthenticationException();
         }
         for (String role : roles)
@@ -231,6 +247,10 @@ public class PatientService {
     }
 
     private UUID actorId(Authentication actor) {
-        return UUID.fromString(actor.getName());
+        try {
+            return UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw new PatientAuthenticationException();
+        }
     }
 }

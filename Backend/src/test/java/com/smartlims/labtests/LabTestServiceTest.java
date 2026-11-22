@@ -1,6 +1,8 @@
 package com.smartlims.labtests;
 
 import com.smartlims.labtests.dto.*;
+import com.smartlims.auth.entity.*;
+import com.smartlims.auth.repository.UserAccountRepository;
 import com.smartlims.labtests.entity.LabTest;
 import com.smartlims.labtests.exception.LabTestException;
 import com.smartlims.labtests.mapper.LabTestMapper;
@@ -13,7 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import jakarta.persistence.EntityManager;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,12 +30,19 @@ import static org.mockito.Mockito.*;
 
 class LabTestServiceTest {
     private final LabTestRepository repository = mock(LabTestRepository.class);
-    private final EntityManager entities = mock(EntityManager.class);
-    private final LabTestService service = new LabTestService(repository, new LabTestMapper(), entities);
+    private final UserAccountRepository users = mock(UserAccountRepository.class);
+    private final LabTestService service = new LabTestService(repository, new LabTestMapper(), users,
+            mock(com.smartlims.laboratory.service.AuditPublisher.class));
     private final LabTestRequest request = new LabTestRequest("cbc", "CBC", null, BigDecimal.TEN, null, "Blood", null, List.of());
 
     private Authentication actor(String role) {
-        return new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null,
+        UUID id = UUID.randomUUID();
+        if (!role.equals("UNSUPPORTED")) {
+            UserAccount account = UserAccount.invite("Synthetic Account", "test@example.invalid", "test", "000001", Role.valueOf(role));
+            account.acceptInvitation("unused-test-hash", java.time.Instant.now());
+            when(users.findById(id)).thenReturn(Optional.of(account));
+        }
+        return new UsernamePasswordAuthenticationToken(id.toString(), null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + role)));
     }
 
@@ -138,7 +146,8 @@ class LabTestServiceTest {
         test.setActive(false);
         when(repository.findById(id)).thenReturn(Optional.of(test));
         LabTestMapper protectedMapper = mock(LabTestMapper.class);
-        var protectedService = new LabTestService(repository, protectedMapper, entities);
+        var protectedService = new LabTestService(repository, protectedMapper, users,
+                mock(com.smartlims.laboratory.service.AuditPublisher.class));
         var hidden = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), id.toString()));
         var missing = assertThrows(LabTestException.class, () -> protectedService.get(actor("PATIENT"), UUID.randomUUID().toString()));
         assertEquals(HttpStatus.NOT_FOUND, hidden.getStatus());

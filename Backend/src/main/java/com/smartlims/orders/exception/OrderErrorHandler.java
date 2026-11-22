@@ -19,6 +19,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(basePackageClasses = OrderController.class)
 public class OrderErrorHandler {
+    @ExceptionHandler(com.smartlims.laboratory.exception.LaboratoryException.class)
+    ResponseEntity<ApiError> adminQuery(com.smartlims.laboratory.exception.LaboratoryException e, HttpServletResponse response) {
+        return respond(e.getStatus(), e.getCode(), e.getMessage(),
+                e.getField() == null ? Map.of() : Map.of(e.getField(), e.getMessage()), response);
+    }
     @ExceptionHandler(OrderException.class)
     ResponseEntity<ApiError> request(OrderException error, HttpServletResponse response) {
         return respond(error.getStatus(), error.getCode(), error.getMessage(),

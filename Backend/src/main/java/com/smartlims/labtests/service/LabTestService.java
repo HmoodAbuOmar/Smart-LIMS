@@ -1,5 +1,12 @@
 package com.smartlims.labtests.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
+import com.smartlims.auth.entity.Role;
+import com.smartlims.auth.entity.UserAccount;
+import com.smartlims.auth.repository.UserAccountRepository;
+import com.smartlims.auth.security.LoginEligibility;
 import com.smartlims.labtests.dto.*;
 import com.smartlims.labtests.entity.LabTest;
 import com.smartlims.labtests.entity.LabTestCategory;
@@ -7,12 +14,12 @@ import com.smartlims.labtests.exception.LabTestException;
 import com.smartlims.labtests.mapper.LabTestMapper;
 import com.smartlims.labtests.repository.LabTestRepository;
 import com.smartlims.labtests.specification.LabTestSpecifications;
-import jakarta.persistence.EntityManager;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,6 +27,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,32 +36,36 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class LabTestService {
+    private final AuditPublisher audit;
     private final LabTestRepository tests;
     private final LabTestMapper mapper;
-    private final EntityManager entities;
+    private final UserAccountRepository users;
 
-    public LabTestService(LabTestRepository tests, LabTestMapper mapper, EntityManager entities) {
+    public LabTestService(LabTestRepository tests, LabTestMapper mapper, UserAccountRepository users, AuditPublisher audit) {
+        this.audit = audit;
         this.tests = tests;
         this.mapper = mapper;
-        this.entities = entities;
+        this.users = users;
     }
 
     @Transactional
     public LabTestResponse create(Authentication actor, @NotNull @Valid LabTestRequest request) {
-        requireRole(actor, "ADMIN");
+        var account = currentAccount(actor, "ADMIN");
         if (tests.existsByCode(request.code()))
             throw LabTestException.duplicate();
         LabTest test = new LabTest(request.code(), request.name(), request.description(),
                 request.price().setScale(2, RoundingMode.UNNECESSARY), request.sampleType(), request.preparationInstructions());
         request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
-        return mapper.toResponse(save(test));
+        var saved = save(test);
+        audit.record(account, CATALOG_CREATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
     public LabTestPageResponse list(Authentication actor, @NotNull LabTestQueryRequest query) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+        UserAccount account = currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         Boolean active = query.active();
-        if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT"))) {
+        if (account.getRole() == Role.PATIENT) {
             if (Boolean.FALSE.equals(active))
                 throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
             active = true;
@@ -72,77 +84,92 @@ public class LabTestService {
     }
 
     @Transactional(readOnly = true)
+    public List<String> sampleTypes(Authentication actor) {
+        currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN");
+        return tests.findSampleTypes();
+    }
+
+    @Transactional(readOnly = true)
     public LabTestResponse get(Authentication actor, String id) {
-        requireRole(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
+        UserAccount account = currentAccount(actor, "ADMIN", "RECEPTIONIST", "LAB_TECHNICIAN", "PATIENT");
         LabTest test = tests.findById(identifier(id)).orElseThrow(LabTestException::missing);
-        if (!test.isActive() && actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT")))
+        if (!test.isActive() && account.getRole() == Role.PATIENT)
             throw LabTestException.missing();
         return mapper.toResponse(test);
     }
 
     @Transactional
     public LabTestResponse update(Authentication actor, String id, @NotNull @Valid LabTestRequest request) {
-        requireRole(actor, "ADMIN");
+        return updateFields(actor, id, request, true);
+    }
+
+    @Transactional
+    public LabTestResponse updateDetails(Authentication actor, String id, @NotNull @Valid LabTestDetailsRequest request) {
+        return updateFields(actor, id, request.asCatalogRequest(), false);
+    }
+
+    private LabTestResponse updateFields(Authentication actor, String id, LabTestRequest request, boolean replaceCategories) {
+        var account = currentAccount(actor, "ADMIN");
         UUID testId = identifier(id);
         LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
         if (tests.existsByCodeAndIdNot(request.code(), testId))
             throw LabTestException.duplicate();
+        boolean changed = !java.util.Objects.equals(test.getCode(), request.code())
+                || !java.util.Objects.equals(test.getName(), request.name())
+                || !java.util.Objects.equals(test.getDescription(), request.description())
+                || test.getPrice().compareTo(request.price()) != 0
+                || !java.util.Objects.equals(test.getSampleType(), request.sampleType())
+                || !java.util.Objects.equals(test.getPreparationInstructions(), request.preparationInstructions())
+                || replaceCategories && !test.getCategories().equals(request.categories().stream()
+                .map(LabTestCategory::valueOf).collect(java.util.stream.Collectors.toSet()));
         test.setCode(request.code());
         test.setName(request.name());
         test.setDescription(request.description());
         test.setPrice(request.price().setScale(2, RoundingMode.UNNECESSARY));
         test.setSampleType(request.sampleType());
         test.setPreparationInstructions(request.preparationInstructions());
-        test.getCategories().clear();
-        request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
+        if (replaceCategories) {
+            test.getCategories().clear();
+            request.categories().stream().map(LabTestCategory::valueOf).forEach(test.getCategories()::add);
+        }
         test.setUpdatedAt(Instant.now());
-        return mapper.toResponse(save(test));
+        var saved = save(test);
+        if (changed) audit.record(account, CATALOG_UPDATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional
     public LabTestResponse changeStatus(Authentication actor, String id, @NotNull @Valid LabTestStatusRequest request) {
-        requireRole(actor, "ADMIN");
+        var account = currentAccount(actor, "ADMIN");
         LabTest test = tests.findForUpdate(identifier(id)).orElseThrow(LabTestException::missing);
+        boolean changed = test.isActive() != request.active();
         test.setActive(request.active());
         test.setUpdatedAt(Instant.now());
-        return mapper.toResponse(save(test));
+        var saved = save(test);
+        if (changed) audit.record(account, request.active() ? CATALOG_ACTIVATE : CATALOG_DEACTIVATE, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional
     public void delete(Authentication actor, String id) {
-        requireRole(actor, "ADMIN");
-        UUID testId = identifier(id);
-        LabTest test = tests.findForUpdate(testId).orElseThrow(LabTestException::missing);
-        if (count("select count(item) from OrderItem item where item.labTest.id = :id", testId) > 0
-                || count("select count(value) from ResultValue value where value.parameter.labTest.id = :id", testId) > 0)
+        var account = currentAccount(actor, "ADMIN");
+        var key = identifier(id);
+        var test = tests.findForUpdate(key).orElseThrow(LabTestException::missing);
+        if (tests.hasRetainedUse(key))
             throw LabTestException.inUse();
-        entities.createQuery("delete from ReferenceRange range where range.parameter.labTest.id = :id")
-                .setParameter("id", testId).executeUpdate();
-        entities.createQuery("delete from TestParameter parameter where parameter.labTest.id = :id")
-                .setParameter("id", testId).executeUpdate();
-        test.getCategories().clear();
-        tests.delete(test);
         try {
-            tests.flush();
+            tests.deleteCatalogRanges(key);
+            tests.deleteCatalogParameters(key);
+            tests.delete(test); // JPA removes this test's category assignments.
+            tests.flush(); // Surface authoritative FK protection before leaving the transaction.
         } catch (DataIntegrityViolationException error) {
-            if (foreignKey(error))
-                throw LabTestException.inUse();
+            for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+                if (cause instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState()))
+                    throw LabTestException.inUse();
+            }
             throw error;
         }
-    }
-
-    private long count(String query, UUID id) {
-        return entities.createQuery(query, Long.class).setParameter("id", id).getSingleResult();
-    }
-
-    private boolean foreignKey(DataIntegrityViolationException error) {
-        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-            if (cause instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState()))
-                return true;
-            if (cause instanceof ConstraintViolationException constraint && "23503".equals(constraint.getSQLState()))
-                return true;
-        }
-        return false;
+        audit.record(account, CATALOG_DELETE, key);
     }
 
     private LabTest save(LabTest test) {
@@ -170,12 +197,25 @@ public class LabTestService {
         }
     }
 
-    private void requireRole(Authentication actor, String... roles) {
-        if (actor == null || !actor.isAuthenticated())
+    private UserAccount currentAccount(Authentication actor, String... roles) {
+        if (actor == null || !actor.isAuthenticated() || actor instanceof AnonymousAuthenticationToken)
+            throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
+        if (Arrays.stream(roles).noneMatch(role -> actor.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_" + role))))
+            throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
+        UUID id;
+        try {
+            id = UUID.fromString(actor.getName());
+        } catch (IllegalArgumentException | NullPointerException error) {
+            throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
+        }
+        UserAccount account = users.findById(id).orElseThrow(() ->
+                new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null));
+        if (!LoginEligibility.eligible(account))
             throw new LabTestException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required.", null);
         for (String role : roles) {
-            if (actor.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role)))
-                return;
+            if (account.getRole() == Role.valueOf(role))
+                return account;
         }
         throw new LabTestException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied.", null);
     }

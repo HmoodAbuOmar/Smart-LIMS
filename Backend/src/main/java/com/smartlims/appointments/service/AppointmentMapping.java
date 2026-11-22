@@ -15,10 +15,6 @@ public final class AppointmentMapping {
     private AppointmentMapping() {
     }
 
-    public static AppointmentResponses.Type type(AppointmentType t) {
-        return new AppointmentResponses.Type(t.getId(), t.getCode(), t.getName(), t.isActive());
-    }
-
     public static AppointmentResponses.Slot slot(AppointmentSlot s, long occupied) {
         return new AppointmentResponses.Slot(s.getId(), s.getStartsAt(), s.getEndsAt(), s.getCapacity(), s.getCapacity() - occupied, s.isActive(), LAB_ZONE.getId());
     }
@@ -30,7 +26,7 @@ public final class AppointmentMapping {
         boolean cancel = reason == null, move = cancel && a.getOrder().getStatus() == OrderStatus.PENDING;
         if (cancel && !move)
             reason = "ORDER_NOT_PENDING";
-        return new AppointmentResponses.Detail(a.getId(), a.getOrder().getId(), slot.getId(), a.getType().getId(), a.getTypeNameSnapshot(), slot.getStartsAt(), slot.getEndsAt(), LAB_ZONE.getId(), local.toLocalDate(), local.toLocalTime(), local.getOffset().toString(), a.getStatus(), a.getVersion(), move, cancel, reason, a.getCreatedAt(), a.getUpdatedAt(), a.getCancelledAt(), a.getCancellationReason());
+        return new AppointmentResponses.Detail(a.getId(), a.getOrder().getId(), slot.getId(), slot.getStartsAt(), slot.getEndsAt(), LAB_ZONE.getId(), local.toLocalDate(), local.toLocalTime(), local.getOffset().toString(), a.getStatus(), a.getVersion(), move, cancel, reason, a.getCreatedAt(), a.getUpdatedAt(), a.getCancelledAt(), a.getCancellationReason());
     }
 
     public static <T, R> AppointmentResponses.Page<R> page(Page<T> page, Function<T, R> mapping) {

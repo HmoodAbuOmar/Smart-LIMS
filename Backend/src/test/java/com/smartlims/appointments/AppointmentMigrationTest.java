@@ -44,11 +44,11 @@ class AppointmentMigrationTest {
     @Test
     void freshMigrationAndConstraintsWithoutSeeds() throws Exception {
         var f = migrations(null);
-        assertEquals(25, f.migrate().migrationsExecuted);
+        assertEquals(29, f.migrate().migrationsExecuted);
         f.validate();
         assertEquals(0, f.migrate().migrationsExecuted);
         try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement()) {
-            for (String table : List.of("appointment_types", "appointment_slots", "appointments", "appointment_reschedules"))
+            for (String table : List.of("appointment_slots", "appointments", "appointment_reschedules"))
                 try (var r = s.executeQuery("SELECT count(*) FROM " + table)) {
                     assertTrue(r.next());
                     assertEquals(0, r.getInt(1));
@@ -73,7 +73,7 @@ class AppointmentMigrationTest {
             }
         }
         var f = migrations(null);
-        assertEquals(13, f.migrate().migrationsExecuted);
+        assertEquals(17, f.migrate().migrationsExecuted);
         f.validate();
         try (var c = DriverManager.getConnection(url, "postgres", ""); var s = c.createStatement()) {
             List<String> after = new ArrayList<>();

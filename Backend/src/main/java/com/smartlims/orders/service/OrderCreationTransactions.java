@@ -1,5 +1,8 @@
 package com.smartlims.orders.service;
 
+import com.smartlims.laboratory.service.AuditPublisher;
+import static com.smartlims.laboratory.dto.AuditOperation.*;
+
 import com.smartlims.auth.entity.Role;
 import com.smartlims.auth.entity.UserAccount;
 import com.smartlims.auth.repository.UserAccountRepository;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrderCreationTransactions {
+    private final AuditPublisher audit;
     private final UserAccountRepository users;
     private final PatientRepository patients;
     private final LabTestRepository tests;
@@ -35,7 +39,8 @@ public class OrderCreationTransactions {
 
     public OrderCreationTransactions(UserAccountRepository users, PatientRepository patients,
                                      LabTestRepository tests, TestOrderRepository orders, OrderMapper mapper, EntityManager entities,
-                                     com.smartlims.notifications.service.NotificationPublisher notifications) {
+                                     com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit) {
+        this.audit = audit;
         this.users = users;
         this.patients = patients;
         this.tests = tests;
@@ -63,6 +68,7 @@ public class OrderCreationTransactions {
         // Return database timestamp precision on both the initial response and subsequent replays.
         entities.refresh(order);
         notifications.order(order);
+        audit.record(context.actor(), ORDER_CREATE, order.getId());
         return new OrderCreationResult(mapper.toDetail(order), true);
     }
 

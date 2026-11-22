@@ -86,7 +86,7 @@ public class LoginService {
         if (!LoginEligibility.eligible(user))
             return new LoginResult(null, new AuthRequestException(
                     HttpStatus.BAD_REQUEST, "EMAIL_NOT_CONFIRMED", "Please confirm your email.", null));
-        user.successfulLogin();
+        user.successfulLogin(now);
         return new LoginResult(user, null);
     }
 

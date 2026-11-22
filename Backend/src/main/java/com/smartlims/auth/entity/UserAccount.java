@@ -61,6 +61,9 @@ public class UserAccount {
     @Column(name = "invitation_accepted_at")
     private Instant invitationAcceptedAt;
 
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
     @Column(name = "failed_login_attempts", nullable = false)
     private int failedLoginAttempts;
 
@@ -146,9 +149,10 @@ public class UserAccount {
         }
     }
 
-    public void successfulLogin() {
+    public void successfulLogin(Instant now) {
         failedLoginAttempts = 0;
         lockedUntil = null;
+        lastLoginAt = now;
     }
 
     public void setResetCode(String hash, Instant expiresAt) {

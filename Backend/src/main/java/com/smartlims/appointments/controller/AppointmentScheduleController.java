@@ -17,21 +17,6 @@ public class AppointmentScheduleController {
         this.schedule = schedule;
     }
 
-    @GetMapping("/api/appointment-types")
-    public ResponseEntity<?> types(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
-        return response(schedule.types(actor, AppointmentQuery.of(query, "includeInactive")), 200);
-    }
-
-    @PostMapping(path = "/api/appointment-types", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> createType(@Valid @RequestBody AppointmentRequests.Type body, JwtAuthenticationToken actor) {
-        return response(schedule.saveType(actor, null, body), 201);
-    }
-
-    @PutMapping(path = "/api/appointment-types/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> updateType(@PathVariable String id, @Valid @RequestBody AppointmentRequests.Type body, JwtAuthenticationToken actor) {
-        return response(schedule.saveType(actor, id, body), 200);
-    }
-
     @PostMapping(path = "/api/appointment-slots", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> createSlot(@Valid @RequestBody AppointmentRequests.SlotCreate body, JwtAuthenticationToken actor) {
         return response(schedule.createSlot(actor, body), 201);
@@ -44,7 +29,7 @@ public class AppointmentScheduleController {
 
     @GetMapping("/api/appointment-slots/schedule")
     public ResponseEntity<?> slots(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
-        return response(schedule.schedule(actor, AppointmentQuery.of(query, "from", "to")), 200);
+        return response(schedule.schedule(actor, AppointmentQuery.of(query, "from", "to", "active")), 200);
     }
 
     private ResponseEntity<?> response(Object body, int status) {

@@ -301,6 +301,80 @@ class MigrationLineageTest {
     }
 
     @Test
+    void referenceRangesUpgradeAddsOneEmptyTableAndRetainsAllDataIncludingPublishedSnapshots() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "26").migrate();
+        execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
+        var before = data(url);
+        var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "27");
+        assertEquals(1, current.info().pending().length);
+        assertEquals("V27__reference_ranges.sql", current.info().pending()[0].getScript());
+        String sql = resource("/db/migration/V27__reference_ranges.sql");
+        assertEquals(1, Pattern.compile("(?im)^CREATE TABLE\\s+").matcher(sql).results().count());
+        assertFalse(Pattern.compile("(?im)^INSERT\\s").matcher(sql).find());
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        var after = data(url);
+        assertEquals(List.of(), after.remove("reference_ranges"));
+        assertEquals(before, after);
+        assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=26 ORDER BY installed_rank"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+    }
+
+    @Test
+    void adminAuditUpgradeAddsOneEmptyAppendOnlyTableWithoutChangingRetainedHistory() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "27").migrate();
+        execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
+        var before = data(url);
+        var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        String sql = resource("/db/migration/V28__admin_audit_logs.sql");
+        assertEquals(1, Pattern.compile("(?im)^CREATE TABLE\\s+").matcher(sql).results().count());
+        assertFalse(Pattern.compile("(?im)^INSERT\\s").matcher(sql).find());
+        var current = migration(url, SPLIT, "28");
+        assertEquals(1, current.info().pending().length);
+        assertEquals("V28__admin_audit_logs.sql", current.info().pending()[0].getScript());
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        var after = data(url);
+        assertEquals(List.of(), after.remove("audit_logs"));
+        assertEquals(before, after);
+        assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=27 ORDER BY installed_rank"));
+        execute(url, "INSERT INTO audit_logs(id,actor_id,actor_name_snapshot,action,entity_type,entity_id,occurred_at,recorded_at,summary) VALUES (gen_random_uuid(),gen_random_uuid(),'Synthetic staff','CREATE','booking slot',gen_random_uuid(),now(),now(),'Created a booking slot.')");
+        try (var c = DriverManager.getConnection(url, "postgres", ""); var statement = c.createStatement()) {
+            for (String mutation : List.of("UPDATE audit_logs SET summary='Changed'", "DELETE FROM audit_logs")) {
+                var failure = assertThrows(SQLException.class, () -> statement.executeUpdate(mutation));
+                assertEquals("23514", failure.getSQLState());
+            }
+        }
+        assertEquals(List.of("1"), rows(url, "SELECT count(*) FROM audit_logs"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+    }
+
+    @Test
+    void lastLoginUpgradePreservesExistingAccountsAndHistoryWithoutFabricatedLogins() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "25").migrate();
+        execute(url, "INSERT INTO users(id,full_name,email,role,origin) VALUES "
+                + "('00000000-0000-0000-0000-000000000001','Synthetic retained account','retained@example.invalid','PATIENT','PUBLIC_REGISTRATION')");
+        var before = rows(url, "SELECT row_to_json(u)::jsonb::text FROM users u ORDER BY id");
+        var history = rows(url, "SELECT row_to_json(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "26");
+        assertEquals(1, current.info().pending().length);
+        assertEquals("V26__user_last_login.sql", current.info().pending()[0].getScript());
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        assertEquals(List.of("1"), rows(url, "SELECT count(*) FROM users WHERE last_login_at IS NULL"));
+        // Remove only the new nullable field before comparing every retained account value.
+        assertEquals(before, rows(url, "SELECT (row_to_json(u)::jsonb - 'last_login_at')::text FROM users u ORDER BY id"));
+        assertEquals(history, rows(url, "SELECT row_to_json(h)::text FROM flyway_schema_history h WHERE version::integer <= 25 ORDER BY installed_rank"));
+        assertEquals(List.of("timestamp with time zone|YES|none"), rows(url,
+                "SELECT data_type || '|' || is_nullable || '|' || coalesce(column_default,'none') FROM information_schema.columns WHERE table_name='users' AND column_name='last_login_at'"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+    }
+
+    @Test
     void notificationUpgradePreservesAllV24DataDdlSequencesAndHistoryWithoutBackfill() throws Exception {
         String url = database();
         migration(url, SPLIT, "24").migrate();
@@ -331,4 +405,27 @@ class MigrationLineageTest {
         execute(url, "UPDATE patient_notifications SET read_at=created_at");
         assertEquals(List.of("1"), rows(url, "SELECT count(*) FROM patient_notifications WHERE read_at=created_at"));
     }
+    @Test
+    void appointmentTypeRemovalPreservesEveryOtherValueAndAppliedHistory() throws Exception {
+        String url = database();
+        migration(url, SPLIT, "28").migrate();
+        execute(url, resource("/db/fixtures/migration-lineage-synthetic.sql"));
+        var before = data(url);
+        assertFalse(before.remove("appointment_types").isEmpty());
+        String bookings = "SELECT (to_jsonb(a)-'type_id'-'type_name_snapshot')::text FROM appointments a ORDER BY id";
+        before.put("appointments", rows(url, bookings));
+        var history = rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
+        var current = migration(url, SPLIT, "29");
+        assertEquals(1, current.migrate().migrationsExecuted);
+        current.validate();
+        var after = data(url);
+        after.put("appointments", rows(url, bookings));
+        assertEquals(before, after, "Bookings, slots, statuses, revisions, moves, visits and results retained");
+        assertEquals(List.of("0"), rows(url, "SELECT count(*) FROM information_schema.columns WHERE table_name='appointments' AND column_name IN ('type_id','type_name_snapshot')"));
+        assertEquals(List.of("0"), rows(url, "SELECT count(*) FROM information_schema.tables WHERE table_name='appointment_types'"));
+        assertEquals(history, rows(url, "SELECT to_jsonb(h)::text FROM flyway_schema_history h WHERE version::integer<=28 ORDER BY installed_rank"));
+        assertEquals(0, current.migrate().migrationsExecuted);
+        assertProtections(url);
+    }
+
 }
