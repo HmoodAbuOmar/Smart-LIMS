@@ -138,7 +138,6 @@ class PatientDashboardTest extends MedicalHistoryTestSupport {
         var result = read();
         assertEquals(2, result.upcomingAppointmentCount());
         assertEquals(earliest.id(), result.nextAppointment().id());
-        assertEquals(earliest.typeName(), result.nextAppointment().typeName());
         assertEquals(earliest.startsAt().atZone(ZoneId.of("Asia/Jerusalem")).getOffset().toString(), result.nextAppointment().utcOffset());
         assertTrue(result.nextAppointment().startsAt().isAfter(result.asOf()));
         mvc.perform(bearer(get("/api/appointments/me").param("tab", "UPCOMING"), Role.PATIENT)).andExpect(jsonPath("$.totalElements").value(2));
@@ -243,15 +242,13 @@ class PatientDashboardTest extends MedicalHistoryTestSupport {
         String orderId = json.readTree(created.getContentAsByteArray()).get("id").asString();
         mvc.perform(bearer(post("/api/orders/me"), Role.PATIENT).contentType("application/json")
                 .header("Idempotency-Key", key).content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(orderId));
-        var type = schedule.saveType(actor(Role.ADMIN), null, new com.smartlims.appointments.dto.AppointmentRequests.Type("SYN_DASH", "Synthetic dashboard visit", true));
         var start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusSeconds(86400);
         var slot = schedule.createSlot(actor(Role.RECEPTIONIST), new com.smartlims.appointments.dto.AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(1800).toString(), 2, true));
-        mvc.perform(bearer(get("/api/appointment-types"), Role.PATIENT)).andExpect(jsonPath("$.content[0].id").value(type.id().toString()));
-        mvc.perform(bearer(get("/api/appointment-slots").param("orderId", orderId).param("typeId", type.id().toString())
+        mvc.perform(bearer(get("/api/appointment-slots").param("orderId", orderId)
                         .param("from", start.minusSeconds(1).toString()).param("to", start.plusSeconds(3600).toString()), Role.PATIENT))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].id").value(slot.id().toString()));
         String bookingKey = UUID.randomUUID().toString();
-        String booking = json.writeValueAsString(Map.of("orderId", orderId, "typeId", type.id(), "slotId", slot.id()));
+        String booking = json.writeValueAsString(Map.of("orderId", orderId, "slotId", slot.id()));
         mvc.perform(bearer(post("/api/appointments"), Role.PATIENT).contentType("application/json")
                 .header("Idempotency-Key", bookingKey).content(booking)).andExpect(status().isCreated());
         mvc.perform(bearer(post("/api/appointments"), Role.PATIENT).contentType("application/json")

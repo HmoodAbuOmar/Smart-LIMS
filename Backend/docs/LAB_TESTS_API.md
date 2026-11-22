@@ -1,5 +1,16 @@
 # Lab Tests API
 
+## Delete unused lab test (CAT-DELETE-01, 2026-11-22)
+
+`DELETE /api/lab-tests/{id}` is ADMIN-only, including a current stored role/eligibility recheck. It has no body or extra query parameters. A canonical UUID is required; malformed IDs return 400 VALIDATION_ERROR. An authenticated non-admin returns 403 FORBIDDEN before target lookup; missing IDs return 404 LAB_TEST_NOT_FOUND. Existing browser/CSRF rules apply: a bare unauthenticated write without CSRF returns 403; invalid bearer authentication returns 401.
+
+An unused active or inactive definition returns **204 No Content** with no-store. The same transaction removes that test's category assignments, configured reference ranges and unused parameters, then the test, and records the fixed catalog DELETE audit event. It never removes category enum values or other tests' definitions. Repeat deletion returns 404.
+
+Any retained order item (including pending, cancelled or completed orders), result value using a parameter, or other retained FK reference returns **409 LAB_TEST_IN_USE**: "This laboratory test is referenced by retained records. Deactivate it instead." No partial cleanup or audit write survives a failed deletion. Existing PATCH /{id}/status remains available to deactivate referenced tests.
+
+Deletion holds the existing catalog write lock. Order creation takes its conflicting snapshot read lock; parameter/range writes take the same parent write lock. The winner commits before the waiter rechecks existence/use. PostgreSQL foreign keys remain authoritative for other/concurrent retained references; FK failures are translated to the same conflict and roll back the entire transaction. No clinical history is cascaded or rewritten.
+
+
 ## Admin three-tab completion (CAT-ADMIN-02, 2026-11-09)
 
 Reviewed Test-Catlog.jpeg, Test_Catlog2.jpeg and Test_Catlog3.jpeg against the
@@ -170,7 +181,7 @@ test including inactive; name<=150 nonblank, unit<=40, method<=100, strict strin
 integers/booleans, no unknown fields. Used definitions cannot have clinical fields
 rewritten: retain/deactivate and create a new stable code instead; active may change.
 Snapshot rows in already-created drafts/publications never follow catalog changes.
-No deletion/seeding or automatic clinical ranges. Current category vocabulary/
+No independent parameter/range deletion, seeding or automatic clinical ranges. Parent-test deletion is limited to wholly unused catalog configuration. Current category vocabulary/
 assignment behavior and original order snapshots remain unchanged. Standard errors:
 404 LAB_TEST_NOT_FOUND/PARAMETER_NOT_FOUND; 409 PARAMETER_CHANGED,
 PARAMETER_IN_USE, PARAMETER_CODE_CONFLICT; strict invalid fields→400.
@@ -221,7 +232,7 @@ slice by RESULTS_API.md; automatic reference_ranges remains deferred.
 
 Stage 1 catalog implementation (2026-10-28): POST/PUT accept category arrays persisted through the Task 2 `LabTest.categories` mapping and V6 table. PUT replaces the complete set; PATCH status preserves assignments. Every test response includes the full array in contract order, or `[]`. V1-V6 are unchanged. Task 4 adds singular category membership filtering and patient active-only list visibility. Task 5 enforces patient active-only details, returning the same 404 as a missing test for inactive records while retaining staff access. Storage, assignment, list, and final detail/regression verification are recorded separately in [TESTING.md](TESTING.md).
 
-All endpoints require an eligible authenticated account using the existing bearer token or access cookie. Cookie writes also require the existing CSRF token. ADMIN, RECEPTIONIST, and LAB_TECHNICIAN may list either availability state. PATIENT lists return active tests only; a well-formed `active=false` is forbidden. Staff may read active or inactive details. PATIENT may read active details only; inactive details return the same 404 as a missing test. Only ADMIN can write. No delete endpoint exists: deactivate records to retain their identity for historical references.
+All endpoints require an eligible authenticated account using the existing bearer token or access cookie. Cookie writes also require the existing CSRF token. ADMIN, RECEPTIONIST, and LAB_TECHNICIAN may list either availability state. PATIENT lists return active tests only; a well-formed `active=false` is forbidden. Staff may read active or inactive details. PATIENT may read active details only; inactive details return the same 404 as a missing test. Only ADMIN can write. ADMIN may delete an unused test through DELETE /api/lab-tests/{id}; referenced tests return 409 LAB_TEST_IN_USE and may still be deactivated.
 
 | Method | Path | Purpose | Success |
 |---|---|---|---|
@@ -297,7 +308,7 @@ Errors follow the existing `{code,message,fieldErrors,requestId}` format, with `
 | 415 | Framework response or INVALID_REQUEST | Unsupported Content-Type on POST, PUT, or PATCH after authentication and CSRF checks |
 | 500 | INTERNAL_SERVER_ERROR | Unexpected failure |
 
-405 and 415 can be resolved before a controller is selected, so their framework response body is not guaranteed to use the catalog error envelope. Existing security takes precedence: for example, authenticated DELETE is denied with 403, since no delete endpoint is authorized.
+405 and 415 can be resolved before a controller is selected, so their framework response body is not guaranteed to use the catalog error envelope. Existing security takes precedence: for example, an authenticated non-admin DELETE is denied with 403; ADMIN DELETE follows the unused/retained-use rules above.
 
 ## Stage 1 Task 1: patient catalog target contract
 

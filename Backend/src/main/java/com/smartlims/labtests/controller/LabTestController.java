@@ -39,6 +39,12 @@ public class LabTestController {
         return tests.get(actor, id);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id, JwtAuthenticationToken actor) {
+        tests.delete(actor, id);
+        return ResponseEntity.noContent().header("Cache-Control", "no-store").build();
+    }
+
     @GetMapping("/sample-types")
     public ResponseEntity<List<String>> sampleTypes(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
         if (!query.isEmpty())

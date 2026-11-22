@@ -49,17 +49,13 @@ abstract class AppointmentTestSupport extends IsolatedPostgresTest {
     com.smartlims.appointments.service.AppointmentBookingService bookings;
     final Instant future = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusSeconds(86400);
 
-    com.smartlims.appointments.dto.AppointmentResponses.Type type() {
-        return schedule.saveType(actor(Role.ADMIN), null, new com.smartlims.appointments.dto.AppointmentRequests.Type("SYN_" + UUID.randomUUID().toString().substring(0, 8), "Synthetic appointment", true));
-    }
-
     com.smartlims.appointments.dto.AppointmentResponses.Slot slot(int index, int capacity) {
         var start = future.plusSeconds(index * 3600L);
         return schedule.createSlot(actor(Role.RECEPTIONIST), new com.smartlims.appointments.dto.AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(1800).toString(), capacity, true));
     }
 
-    com.smartlims.appointments.dto.AppointmentResponses.Detail book(OrderDetailResponse order, com.smartlims.appointments.dto.AppointmentResponses.Type type, com.smartlims.appointments.dto.AppointmentResponses.Slot slot) {
-        return bookings.book(actor(Role.ADMIN), new com.smartlims.appointments.dto.AppointmentRequests.Book(order.id().toString(), type.id().toString(), slot.id().toString()), List.of(UUID.randomUUID().toString())).appointment();
+    com.smartlims.appointments.dto.AppointmentResponses.Detail book(OrderDetailResponse order, com.smartlims.appointments.dto.AppointmentResponses.Slot slot) {
+        return bookings.book(actor(Role.ADMIN), new com.smartlims.appointments.dto.AppointmentRequests.Book(order.id().toString(), slot.id().toString()), List.of(UUID.randomUUID().toString())).appointment();
     }
 
     @Autowired
@@ -96,7 +92,7 @@ abstract class AppointmentTestSupport extends IsolatedPostgresTest {
 
     @BeforeEach
     void workflowFixtures() {
-        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             var account = account(role.name().toLowerCase(Locale.ROOT), role);
             actors.put(role, account);

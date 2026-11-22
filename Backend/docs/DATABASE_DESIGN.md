@@ -1,5 +1,14 @@
 # Smart-LIMS Database Design
 
+## Unused catalog deletion (2026-11-22)
+
+No schema change. DELETE takes lab_tests FOR UPDATE, checks order_items and result_values through test_parameters, removes reference_ranges then unused test_parameters, category assignments and parent atomically. Retained FKs remain NO ACTION; FK violations roll back cleanup and map to LAB_TEST_IN_USE. Existing snapshot FOR SHARE locks serialize concurrent order creation; parameter/range writes lock the same parent. Audit DELETE participates in the transaction and has no target FK.
+
+## Appointment type removal (2026-11-22)
+
+V29 removes appointments.type_id foreign key and column, type_name_snapshot, then appointment_types. All appointments are lab visits. Booking IDs, slots, status, versions, retry keys, move history and visit references are retained. Existing order/coordination/appointment/slot locks and capacity constraints continue to apply. V1-V28 remain immutable.
+
+
 ADM-DASH-01 (2026-11-10): no schema/migration change. The Admin dashboard is a
 repeatable-read aggregate over retained profiles, orders/items, current-slot
 appointments, result versions/current publication markers and rejected specimens.
@@ -270,7 +279,7 @@ Historical isolated-test evidence is separate: [TESTING.md](TESTING.md) records 
 | 21 | `patient_link_tokens` | Implemented V5 | Short-lived, single-use capabilities for verified patient account/profile linking. |
 | 22 | `lab_test_categories` | Implemented V6; Stage 1 Task 2 | Zero-to-many fixed category assignments per test; composite key prevents duplicate membership. Task 3 implements assignment/response arrays; Task 4 implements membership filtering and patient list availability. |
 
-Additional implemented tables: appointment_types, appointment_reschedules (V8),
+Additional implemented tables: appointment_reschedules (V8),
 visits, visit_items and laboratory_events (V9). The latter is workflow history,
 not the wider proposed audit_logs subsystem.
 
@@ -443,7 +452,7 @@ Implementation status: implemented in main's unchanged V4__lab_tests.sql. The cu
 
 **Rules and relationships**
 
-- Implemented: code is trimmed/uppercased and constrained to the LAB_TESTS_API format; currency is ILS. ADMIN writes; staff lists include either state, while PATIENT lists are active-only and reject active=false with 403. Task 5 enforces PATIENT active-only detail access: inactive and missing records return the same 404; staff retain inactive details. PUT preserves availability; PATCH changes it. No delete endpoint exists.
+- Implemented: code is trimmed/uppercased and constrained to the LAB_TESTS_API format; currency is ILS. ADMIN writes; staff lists include either state, while PATIENT lists are active-only and reject active=false with 403. Task 5 enforces PATIENT active-only detail access: inactive and missing records return the same 404; staff retain inactive details. PUT preserves availability; PATCH changes it. ADMIN DELETE removes only unused definitions and their catalog configuration; retained references return 409 LAB_TEST_IN_USE.
 - Stage 4 parameters reuse this catalog identity. One ordered item may contain many parameters; no clinical definitions or minimum panel size are inferred.
 - price must be >= 0. Use NUMERIC(12,2) and Java BigDecimal for money. Initial currency is ILS. [S2]
 - sample_type is the default sample description; multiple required specimen types are handled by laboratory workflow in the initial scope.
@@ -465,7 +474,7 @@ The relationship is zero-to-many categories per test and zero-to-many tests per 
 | `category` | `VARCHAR(30)` | No | Composite PK; fixed-vocabulary CHECK; no default | One stable category identifier |
 
 - `PRIMARY KEY (lab_test_id, category)` prevents duplicate assignment of the same category to the same test, including concurrent inserts. Do not add uniqueness on either column alone: a test may have multiple categories and the same category may be assigned to multiple tests. No surrogate UUID or assignment timestamp is needed.
-- `FOREIGN KEY (lab_test_id) REFERENCES lab_tests(id)` with NO ACTION prevents orphan assignments and follows retained catalog identity conventions. Catalog deletion remains unsupported; deactivation preserves assignments. Removing an assignment through ADMIN PUT deletes only the corresponding collection row, never its test.
+- `FOREIGN KEY (lab_test_id) REFERENCES lab_tests(id)` with NO ACTION prevents orphan assignments and follows retained catalog identity conventions. Unused catalog deletion removes assignments atomically with the test; deactivation of referenced tests preserves assignments. Removing an assignment through ADMIN PUT deletes only the corresponding collection row, never its test.
 - The CHECK is `category IN ('BLOOD_TESTS', 'VITAMINS_MINERALS', 'THYROID', 'LIVER', 'KIDNEY', 'LIPIDS', 'DIABETES')`. Together with NOT NULL and the composite key, this bounds each test to zero through seven valid unique assignments. "All", blank, null, and arbitrary/differently cased identifiers cannot be stored. Use string-enum values, never enum ordinals; labels and display order remain contract/client mappings. A category can have no tests without requiring a placeholder row.
 - Retain existing lab_tests indexes. The composite PK covers per-test category loading and its FK. Add B-tree `lab_test_categories(category, lab_test_id)` for category membership queries. Task 4 uses a correlated EXISTS membership predicate against the mapped collection and combines availability/literal search before totals, sorting and pagination over tests. The outer query has no assignment join, so filtering cannot duplicate content or inflate counts; each matching test returns its full category set in contract order.
 - V6 creates only the empty assignment table and reverse index, without data inference, legacy backfill, or changes to lab_tests rows. V1-V5 remain unchanged. UUIDs, names, descriptions, prices, currency, sample types, preparation instructions, availability, and timestamps are preserved. No fabricated "uncategorized" row/value or automatic deactivation.
@@ -600,7 +609,7 @@ Stage 2 Task 6 reviewed design, implemented in V7 by Task 7 with the OrderItem m
 ### 4.9. `appointment_slots`
 
 Stage 3 approved design (2026-10-29), superseding the former proposal. V8 adds
-explicit slots, appointment_types, appointment_coordination, appointments and
+explicit slots, appointment_coordination, appointments and
 appointment_reschedules. V1–V7 are preserved. Detailed rules/DTOs:
 [APPOINTMENTS_API.md](APPOINTMENTS_API.md). Implemented and verified in Stage 3;
 final full-suite evidence is in TESTING.md. Development/production application is
@@ -621,12 +630,10 @@ not established by isolated migration tests.
 - Positive capacity and end > start; EXCLUDE USING gist on tstzrange(start,end,'[)')
   prohibits overlap for all slots, including inactive. No PostgreSQL extension needed.
 - Explicit future publication by ADMIN/RECEPTIONIST; no generated hours. Times immutable
-  through API. Capacity shared across types; CONFIRMED rows alone consume capacity.
+  through API. Capacity shared across all bookings; CONFIRMED and CHECKED_IN rows consume capacity.
 - Asia/Jerusalem for display; TIMESTAMPTZ instants for storage/comparison. Start/end
   input requires explicit offset; API retains microsecond precision.
-- appointment_types: UUID PK, unique code VARCHAR(30), name VARCHAR(150), active boolean,
-  created_at/updated_at; checks mirror normalized code/name. ADMIN create/replace only.
-  No deletion/seeds. Existing appointment type_name_snapshot remains unchanged.
+- V29 removes appointment_types and the appointment type fields; all visits use the same booking workflow.
 - appointment_coordination has one checked id=1 row. Every appointment/schedule write
   obtains its SELECT FOR UPDATE lock. This intentionally serializes writes for one
   laboratory, protecting cross-order patient overlap and global creator/key uniqueness.
@@ -634,8 +641,8 @@ not established by isolated migration tests.
 
 Lock order: appointment mutations first discover the immutable order ID without a
 write lock, lock that order row, then coordination, then re-read/lock appointment,
-then old/new slots in lexical UUID order. Booking: order→coordination→type→slot.
-Schedule management: coordination→type/slot only. Linked order cancellation already
+then old/new slots in lexical UUID order. Booking: order -> coordination -> slot.
+Schedule management: coordination -> slot only. Linked order cancellation already
 holds order, then coordination→appointment→slot. Never acquire order while holding
 coordination. Count capacity/patient conflicts and write under those same locks;
 flush before returning. Rollback preserves old allocation. Capacity is derived from
@@ -654,8 +661,6 @@ capacity. CANCELLED/COMPLETED/NO_SHOW retain history without consuming capacity.
 | `id` | `UUID` | No | PK | Record identifier |
 | `order_id` | `UUID` | No | FK test_orders.id; partial UNIQUE for CONFIRMED/CHECKED_IN | Parent laboratory order |
 | `slot_id` | `UUID` | No | FK appointment_slots.id | Selected booking period |
-| `type_id` | `UUID` | No | FK appointment_types.id | Retained appointment type |
-| `type_name_snapshot` | `VARCHAR(150)` | No | Trimmed nonblank | Original display name |
 | `status` | `VARCHAR(20)` | No | DEFAULT CONFIRMED; five-state CHECK | Business workflow state |
 | `version` | `BIGINT` | No | DEFAULT 0; >=0 | Optimistic revision |
 | `created_by` | `UUID` | No | FK users.id | Authenticated creator |
@@ -1052,7 +1057,7 @@ The laboratory must provide the approved catalog, reference values, sample/conta
 
 The [dashboard contract](DASHBOARD_API.md) adds no schema or migration. One
 read-only REPEATABLE_READ transaction resolves the eligible linked PATIENT and
-reuses order aggregates, actual order-to-visit links, appointment slots/types,
+reuses order aggregates, actual order-to-visit links, appointment slots,
 current PUBLISHED results and active catalog DTOs. Database pages/counts select
 all owned orders, future CONFIRMED appointments and current publications before
 fixed preview limits; no joins multiply counts. All cutoff comparisons use the

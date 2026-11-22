@@ -59,7 +59,7 @@ class PersistedServiceAuthorizationTest extends IsolatedPostgresTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,appointment_types,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         var administrator = account("administrator", Role.ADMIN);
         var admin = actor(administrator.getId().toString(), "ADMIN");
         caller = account("caller", Role.ADMIN);
@@ -123,7 +123,8 @@ class PersistedServiceAuthorizationTest extends IsolatedPostgresTest {
                 () -> catalog.create(actor, testRequest),
                 () -> catalog.update(actor, activeTest.toString(), testRequest),
                 () -> catalog.updateDetails(actor, activeTest.toString(), new LabTestDetailsRequest(testRequest.code(), testRequest.name(), testRequest.description(), testRequest.price(), testRequest.currency(), testRequest.sampleType(), testRequest.preparationInstructions())),
-                () -> catalog.changeStatus(actor, activeTest.toString(), new LabTestStatusRequest(false)));
+                () -> catalog.changeStatus(actor, activeTest.toString(), new LabTestStatusRequest(false)),
+                () -> catalog.delete(actor, activeTest.toString()));
         for (Runnable operation : catalogOperations) {
             var denied = assertThrows(LabTestException.class, operation::run);
             assertEquals(401, denied.getStatus().value());
@@ -152,7 +153,8 @@ class PersistedServiceAuthorizationTest extends IsolatedPostgresTest {
                 () -> catalog.create(forged, testRequest),
                 () -> catalog.update(forged, activeTest.toString(), testRequest),
                 () -> catalog.updateDetails(forged, activeTest.toString(), new LabTestDetailsRequest(testRequest.code(), testRequest.name(), testRequest.description(), testRequest.price(), testRequest.currency(), testRequest.sampleType(), testRequest.preparationInstructions())),
-                () -> catalog.changeStatus(forged, activeTest.toString(), new LabTestStatusRequest(false)))) {
+                () -> catalog.changeStatus(forged, activeTest.toString(), new LabTestStatusRequest(false)),
+                () -> catalog.delete(forged, activeTest.toString()))) {
             assertEquals("FORBIDDEN", assertThrows(LabTestException.class, operation::run).getCode());
             assertEquals(before, snapshot());
         }

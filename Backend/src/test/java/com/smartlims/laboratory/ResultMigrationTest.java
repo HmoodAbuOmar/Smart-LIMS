@@ -74,7 +74,7 @@ class ResultMigrationTest {
             before.put(table, rows("SELECT (to_jsonb(t) - 'last_login_at')::text FROM " + table + " t ORDER BY 1"));
         var appointment = rows("SELECT to_jsonb(a)::text FROM appointments a");
         var history = rows("SELECT to_jsonb(h)::text FROM flyway_schema_history h ORDER BY installed_rank");
-        var f = migration(null);
+        var f = migration("28");
         assertEquals(8, f.migrate().migrationsExecuted);
         f.validate();
         for (var entry : before.entrySet())

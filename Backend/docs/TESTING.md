@@ -1,5 +1,217 @@
 # Database-backed test setup
 
+## Appointment types removal / unused catalog deletion / Postman (2026-11-22)
+
+Entry: backend-hmood, clean tracked tree. Owner explicitly requested frontend changes,
+separate-database migration/tests, Admin-only deletion, direct existing Postman edits,
+and live saved-request verification. No commit/push, dependency upgrade, development
+migration or development database access. The owner's three local lab tests were
+never targets. Local planning and existing Postman mirror/runner directories stay excluded.
+
+Task 1: additive V29 explicitly drops the appointment type FK, type_id and
+ type_name_snapshot before dropping appointment_types. V1-V28 content matches HEAD.
+No retained booking/slot/status/version/retry/move/visit values are rewritten. Type
+entity/repository/DTO/management API/security routes removed. Availability uses
+orderId/from/to/page/size; booking uses orderId/slotId; move retains slotId/expectedVersion.
+Patient live/development booking, receipt/list, receptionist adapters/fixtures and
+current API/data/permission/dashboard contracts updated. Ownership, PENDING order,
+coordination/slot locks, capacity, patient conflict and original retry intent remain.
+
+Task 2: DELETE /api/lab-tests/{id}, ADMIN route and stored eligibility recheck;
+204 empty/no-store for unused active/inactive definitions with transactional cleanup
+of assignments/ranges/parameters and safe audit DELETE. 409 LAB_TEST_IN_USE for
+retained order/result/other FK references; 404 LAB_TEST_NOT_FOUND, authenticated
+non-admin 403. Deactivate retained. Existing parent write/snapshot locks serialize
+use/deletion; authoritative FK conflicts roll back cleanup. Tests cover both race
+outcomes, draft/published snapshots, cancelled/completed/pending references, forced
+FK and audit failures, role forgery and ineligible accounts.
+
+Independent PostgreSQL verification: saved PG16 recovery-20261031 cluster was stopped.
+Inspected postgresql.conf/HBA, pg_ctl status and listener, then started only that
+cluster. Live SQL current_database=smartlims_auth_regression, 127.0.0.1:55432,
+cluster_name=smartlims-disposable-regression-20261031; data_directory matches saved
+SMARTLIMS_TEST_POSTGRES_DATA; fsync/full_page_writes on; server PID/listener 29028
+match postmaster.pid/process -D. CHECKPOINT succeeded. Maven/Surefire local mapping
+and isolation guard unchanged. Compatibility/harness cases own only new guarded
+smartlims_migration_<32 hex> databases on that instance. Synthetic data/fake email.
+
+Commands (Backend, import saved non-secret SMARTLIMS_TEST_* user values):
+
+```powershell
+.\mvnw.cmd '-Dtest=Appointment*Test,MigrationLineageTest,AdminAuditWorkflowTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=LabTestDeletionTest,LabTestManagementTest,LabTestServiceTest,OrderCreationTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=LabTestDeletionTest,PersistedServiceAuthorizationTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+.\mvnw.cmd '-Dtest=BookingCatalogPostmanVerification,LabTestErrorHandlerTest,PatientManagementTest' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd '-Dtest=BookingCatalogPostmanVerification' test '-Dspring.test.mockmvc.print=NONE'
+.\mvnw.cmd test
+```
+
+Focused appointment/migration/audit: 60/60, zero failures/errors/skips, 02:26,
+19:19:05 +02:00. Initial compile caught stale removed DTO consumers, corrected.
+First deletion compile found a nonexistent fixture account setter; corrected to
+setEnabled. First compiled deletion/catalog/orders run: 60 tests, 1 failure/2 errors
+in new deletion tests (bare anonymous write is existing CSRF 403; cancelled fixture
+was then changed to COMPLETED without clearing cancellation fields; synthetic order
+number violated its CHECK). Other 52 cases passed. Corrected delete+persisted-auth
+rerun: 24/24, 00:50.787, 19:25:23, zero failures/errors/skips. Assertions/production
+security/schema constraints were preserved; corrected synthetic fixture setup.
+
+Initial full direct wrapper run: 572 tests, 2 failures, 0 errors/skips, 09:58,
+19:36:02. Both stale contract assertions: standalone handler DELETE expected 405
+(now supported 204 with mocked service), and PatientManagementTest expected only
+V1-V28. Handler now tests genuinely unsupported PATCH on the same route; migration
+manifest includes V29. Corrected handler+patient suites: 44/44 pass in later opt-in
+invocation; first opt-in harness fails before HTTP because insecure cookies are
+forbidden outside local profile. Standalone verification now uses secure cookies
+and explicit bearer requests without weakening the guard; profile/datasource/JWT
+are explicit and local sensitive application configuration is not loaded.
+
+Corrected BookingCatalogPostmanVerification: 1/1 passes, zero failures/errors/skips,
+00:53.374, 19:40:37. Creates a new test DB at V28, loads retained synthetic published
+history and a CONFIRMED booking, boots an explicit loopback app that migrates V29,
+compares every retained booking/slot value and prior Flyway checksum, and executes
+exact cloud read-back saved requests. Existing booking view/alternatives/move/view/
+cancel/view all 200; original move row retained. New booking availability 200,
+creation 201, replay 200, view/alternatives/move/cancel/view 200. Catalog create 201,
+non-admin delete 403, referenced delete 409 LAB_TEST_IN_USE, missing delete 404
+LAB_TEST_NOT_FOUND, disposable delete 204 empty/no-store. SQL confirms disposable
+definition gone, referenced test/two published results retained, fake email unused.
+App closes and only its owned migration DB is dropped.
+
+Postman directly saved in existing Smart-LIMS API collection
+50742279-2e703687-f70e-46b1-bcf5-55db0d345512. Deleted Appointment Types folder/three
+obsolete requests. Updated existing List Bookable Appointment Slots, Book Appointment,
+List Appointment Alternatives, Reschedule Appointment, and audit coverage description.
+Added under Test Catalog / Tests: Create Disposable Lab Test, Delete Lab Test,
+Delete Lab Test - Referenced (409), Delete Lab Test - Missing (404),
+Delete Lab Test - Non-Admin (403). Manual delete UID:
+50742279-4346c27d-80c0-4e25-8692-84db13848806. URL
+{{baseUrl}}/api/lab-tests/{{deletableLabTestId}}, bearer {{adminToken}}.
+Create Disposable captures deletableLabTestId without replacing testId.
+Existing Smart-LIMS Local environment c977915f-e635-4fa6-9707-411c3bfe1f12:
+removed typeId; added blank deletableLabTestId/referencedLabTestId/missingLabTestId.
+Read-back confirms all other requests/auth/scripts and environment values unchanged;
+collection variables preserved. 103 initial requests -> 105 final. No type input/URL
+remains. Runtime tokens/baseUrl/fixture IDs are memory-only overrides, not cloud writes.
+
+Connected MCP surface supports direct request edits but exposes no runCollection.
+Exact saved collection/environment read-back refreshed their existing ignored mirrors;
+Newman runs selected requests against the loopback test app. Temporary runner was
+restored offline from npm cache, with no project manifest/dependency changes.
+19 live HTTP calls / 19 saved assertions plus explicit status-count expectations,
+0 failures, exit 0, 17:40:29.360Z-17:40:33.256Z (actual summary timestamps retained).
+No hosted execution or Postman Desktop Send is claimed.
+
+Frontend commands (Frontend): npm run build; npm run lint; npm run test:booking;
+npm run test:portal; npm run test:patient-facing; node scripts/check-integration-regressions.mjs;
+node src/receptionist/appointments/check-appointments-model.mjs;
+node src/receptionist/appointments/check-appointments-browser.mjs.
+Build/lint/patient model/copy/API checks pass. First browser runs completed booking
+scenarios, then failed the old blanket no-API expectation on production GET /api/auth/me.
+Updated the affected check to require exactly that production auth probe and keep
+all development/business API requests forbidden. Corrected browser pass covers
+booking/capacity race/move/cancel/cascade, EN/AR desktop/mobile, keyboard/dialogs,
+and production denial. Screenshots in temporary smart-lims-appointments-HZ8FOY.
+
+Final complete direct `.\mvnw.cmd test` rerun: **572 tests / 62 suites,
+0 failures/errors/skips, exit 0, BUILD SUCCESS, 08:23, 19:49:03 +02:00**.
+Independent parsing of exactly the fresh XML suites named by that invocation agrees
+572/0/0/0 (opt-in verification reports are excluded). No later production/test code
+changes. `.\mvnw.cmd '-DskipTests' package`: BUILD SUCCESS, exit 0, 00:12.389,
+19:50:31 +02:00; completed tests were not rerun. Final executable JAR contains V29,
+excludes removed type classes/repository and excludes historical/test-only fixtures.
+
+Post-run live SQL identity still matches the guarded disposable cluster; no other
+client backends and no remaining smartlims_migration_* databases. CHECKPOINT passes.
+Restored only this initially stopped cluster to stopped; pg_ctl confirms no server
+running and no listener remains on 55432. Final git diff --check passes. Branch is
+backend-hmood. No commit/push or application/development datasource/config changes.
+All three requested tasks DONE. Development deployment/migration was not performed;
+restart/rebuild the owner's local backend before manually using the new endpoint.
+
+Changed-file manifest (repository-relative; deletion of AppointmentType files included):
+
+- `Backend/docs/TESTING.md`
+
+- `Backend/docs/APPOINTMENTS_API.md`
+- `Backend/docs/DASHBOARD_API.md`
+- `Backend/docs/DATABASE_DESIGN.md`
+- `Backend/docs/ENDPOINT_PERMISSIONS.md`
+- `Backend/docs/LAB_TESTS_API.md`
+- `Backend/src/main/java/com/smartlims/appointments/controller/AppointmentController.java`
+- `Backend/src/main/java/com/smartlims/appointments/controller/AppointmentScheduleController.java`
+- `Backend/src/main/java/com/smartlims/appointments/dto/AppointmentRequests.java`
+- `Backend/src/main/java/com/smartlims/appointments/dto/AppointmentResponses.java`
+- `Backend/src/main/java/com/smartlims/appointments/entity/Appointment.java`
+- `Backend/src/main/java/com/smartlims/appointments/entity/AppointmentType.java`
+- `Backend/src/main/java/com/smartlims/appointments/repository/AppointmentTypeRepository.java`
+- `Backend/src/main/java/com/smartlims/appointments/service/AppointmentBookingService.java`
+- `Backend/src/main/java/com/smartlims/appointments/service/AppointmentMapping.java`
+- `Backend/src/main/java/com/smartlims/appointments/service/AppointmentScheduleService.java`
+- `Backend/src/main/java/com/smartlims/auth/security/SecurityConfiguration.java`
+- `Backend/src/main/java/com/smartlims/laboratory/dto/AuditOperation.java`
+- `Backend/src/main/java/com/smartlims/labtests/controller/LabTestController.java`
+- `Backend/src/main/java/com/smartlims/labtests/exception/LabTestException.java`
+- `Backend/src/main/java/com/smartlims/labtests/repository/LabTestRepository.java`
+- `Backend/src/main/java/com/smartlims/labtests/service/LabTestService.java`
+- `Backend/src/main/resources/db/migration/V29__remove_appointment_types.sql`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentBookingTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentCancellationTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentConcurrencyTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentMigrationTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentReadTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentRescheduleTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentScheduleTest.java`
+- `Backend/src/test/java/com/smartlims/appointments/AppointmentTestSupport.java`
+- `Backend/src/test/java/com/smartlims/appointments/BookingCatalogPostmanVerification.java`
+- `Backend/src/test/java/com/smartlims/auth/AuthenticationRegressionTest.java`
+- `Backend/src/test/java/com/smartlims/auth/PersistedServiceAuthorizationTest.java`
+- `Backend/src/test/java/com/smartlims/auth/RegistrationTest.java`
+- `Backend/src/test/java/com/smartlims/auth/UserActionsTest.java`
+- `Backend/src/test/java/com/smartlims/auth/UserListingTest.java`
+- `Backend/src/test/java/com/smartlims/laboratory/AdminAuditWorkflowTest.java`
+- `Backend/src/test/java/com/smartlims/laboratory/LabTestDeletionTest.java`
+- `Backend/src/test/java/com/smartlims/laboratory/LaboratoryTestSupport.java`
+- `Backend/src/test/java/com/smartlims/laboratory/PatientDashboardTest.java`
+- `Backend/src/test/java/com/smartlims/laboratory/PatientNotificationTest.java`
+- `Backend/src/test/java/com/smartlims/laboratory/ResultMigrationTest.java`
+- `Backend/src/test/java/com/smartlims/laboratory/VisitWorkflowTest.java`
+- `Backend/src/test/java/com/smartlims/labtests/LabTestCategoryMigrationTest.java`
+- `Backend/src/test/java/com/smartlims/labtests/LabTestErrorHandlerTest.java`
+- `Backend/src/test/java/com/smartlims/labtests/LabTestManagementTest.java`
+- `Backend/src/test/java/com/smartlims/migrations/MigrationLineageTest.java`
+- `Backend/src/test/java/com/smartlims/orders/OrderCreationTest.java`
+- `Backend/src/test/java/com/smartlims/orders/OrderMigrationTest.java`
+- `Backend/src/test/java/com/smartlims/orders/OrderWorkflowTestSupport.java`
+- `Backend/src/test/java/com/smartlims/patients/AdminPeoplePostmanVerification.java`
+- `Backend/src/test/java/com/smartlims/patients/PatientManagementTest.java`
+- `Backend/src/test/java/com/smartlims/patients/PatientMigrationCompatibilityTest.java`
+- `Backend/src/test/java/com/smartlims/patients/PatientProfileLinkingTest.java`
+- `Backend/src/test/java/com/smartlims/patients/PatientSelfProfileTest.java`
+- `Frontend/scripts/check-booking-model.mjs`
+- `Frontend/scripts/check-integration-regressions.mjs`
+- `Frontend/src/dev/portalSampleData.js`
+- `Frontend/src/dev/portalWorkspace.js`
+- `Frontend/src/portal/booking/AppointmentReschedule.jsx`
+- `Frontend/src/portal/booking/BookingCheckout.jsx`
+- `Frontend/src/portal/booking/BookingReceipt.jsx`
+- `Frontend/src/portal/booking/MyAppointments.jsx`
+- `Frontend/src/portal/booking/PatientAppointmentForm.jsx`
+- `Frontend/src/portal/booking/bookingModel.js`
+- `Frontend/src/portal/portalCopy.js`
+- `Frontend/src/receptionist/appointments/AppointmentEditor.jsx`
+- `Frontend/src/receptionist/appointments/README.md`
+- `Frontend/src/receptionist/appointments/appointmentsDevelopmentStore.js`
+- `Frontend/src/receptionist/appointments/appointmentsService.js`
+- `Frontend/src/receptionist/appointments/check-appointments-browser.mjs`
+- `Frontend/src/receptionist/appointments/check-appointments-model.mjs`
+- `Frontend/src/services/portalApi.js`
+
+Local-only support: IMPLEMENTATION_PLAN.md; existing ignored postman mirrors;
+postman/run-booking-delete.cjs; sanitized logs/booking-delete-run-summary.json.
+
+
 ## Admin Dashboard - ADM-DASH-01 (2026-11-10)
 
 Entry backend-hmood, clean tree. Read AGENTS.md, Dashboard.jpeg/Dashboard2.jpeg,

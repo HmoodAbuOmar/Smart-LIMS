@@ -45,7 +45,7 @@ class AdminAuditWorkflowTest extends LaboratoryTestSupport {
     }
 
     @Test
-    void catalogParametersRangesTypesAndSlotsRecordSafeMetadataOnlyForRealChanges() {
+    void catalogParametersRangesAndSlotsRecordSafeMetadataOnlyForRealChanges() {
         var admin = actor(Role.ADMIN);
         var test = catalog.create(admin, definition("AUDIT_CFG", "SENSITIVE_AUDIT_PAYLOAD"));
         var body = new LabTestDetailsRequest(test.code(), test.name(), test.description(), test.price(), "ILS", test.sampleType(), test.preparationInstructions());
@@ -63,15 +63,12 @@ class AdminAuditWorkflowTest extends LaboratoryTestSupport {
         parameterService.save(admin, test.id().toString(), parameter.id().toString(),
                 new TestParameterRequest("AUD", "Changed", "NUMERIC", null, null, 1, false, false, changed.version()));
         ranges.create(admin, test.id().toString(), parameter.id().toString(), new ReferenceRangeRequest("ANY", null, null, BigDecimal.ZERO, BigDecimal.TEN, null, null));
-        var type = schedule.saveType(admin, null, new AppointmentRequests.Type("AUD", "SENSITIVE_AUDIT_PAYLOAD", true));
-        schedule.saveType(admin, type.id().toString(), new AppointmentRequests.Type("AUD", "SENSITIVE_AUDIT_PAYLOAD", true));
-        schedule.saveType(admin, type.id().toString(), new AppointmentRequests.Type("AUD", "Changed", false));
         var start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusSeconds(86400);
         var slot = schedule.createSlot(actor(Role.RECEPTIONIST), new AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(600).toString(), 2, true));
         schedule.updateSlot(admin, slot.id().toString(), new AppointmentRequests.SlotUpdate(3, true));
         schedule.updateSlot(admin, slot.id().toString(), new AppointmentRequests.SlotUpdate(3, false));
         schedule.updateSlot(admin, slot.id().toString(), new AppointmentRequests.SlotUpdate(3, false));
-        assertEquals(13, count());
+        assertEquals(11, count());
         var page = activity.audit(admin, query("size", "100"));
         assertEquals(count(), page.totalElements());
         assertTrue(page.actions().containsAll(List.of("CREATE", "UPDATE", "ACTIVATE", "DEACTIVATE")));
@@ -117,21 +114,20 @@ class AdminAuditWorkflowTest extends LaboratoryTestSupport {
         var order = creation.create(admin, body, key).order();
         creation.create(admin, body, key);
         assertEquals(1, count());
-        var type = schedule.saveType(admin, null, new AppointmentRequests.Type("AUD", "Synthetic", true));
         var start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusSeconds(86400);
         var slot = schedule.createSlot(admin, new AppointmentRequests.SlotCreate(start.toString(), start.plusSeconds(600).toString(), 2, true));
         var next = schedule.createSlot(admin, new AppointmentRequests.SlotCreate(start.plusSeconds(3600).toString(), start.plusSeconds(4200).toString(), 2, true));
-        var booking = new AppointmentRequests.Book(order.id().toString(), type.id().toString(), slot.id().toString());
+        var booking = new AppointmentRequests.Book(order.id().toString(), slot.id().toString());
         var bookingKey = List.of(UUID.randomUUID().toString());
         var a = bookingService.book(admin, booking, bookingKey).appointment();
         bookingService.book(admin, booking, bookingKey);
         appointmentActions.move(admin, a.id().toString(), new AppointmentRequests.Move(a.slotId().toString(), a.version()));
         appointmentActions.move(admin, a.id().toString(), new AppointmentRequests.Move(next.id().toString(), a.version()));
         appointmentActions.move(admin, a.id().toString(), new AppointmentRequests.Move(next.id().toString(), a.version()));
-        assertEquals(6, count());
+        assertEquals(5, count());
         cancellations.cancel(admin, order.id().toString(), new CancelOrderRequest("SENSITIVE_AUDIT_PAYLOAD"));
         cancellations.cancel(admin, order.id().toString(), new CancelOrderRequest("SENSITIVE_AUDIT_PAYLOAD"));
-        assertEquals(8, count());
+        assertEquals(7, count());
         assertEquals(1, activity.audit(admin, query("action", "CANCEL", "search", a.id().toString())).totalElements());
         assertEquals(1, activity.audit(admin, query("action", "CANCEL", "search", order.id().toString())).totalElements());
         assertFalse(jdbc.queryForList("SELECT * FROM audit_logs").toString().contains("SENSITIVE_AUDIT_PAYLOAD"));

@@ -7,7 +7,7 @@ rolls back the workflow. See [NOTIFICATIONS_API.md](NOTIFICATIONS_API.md). Exist
 appointment API inputs, access, time/capacity rules and state transitions remain.
 
 Migration-version references in historical sections describe the original V1-V9
-implementation. The current application migration set is canonical V1-V25 from
+implementation. The current application migration set is canonical V1-V29 from
 `src/main/resources/db/migration`; the earlier V1-V9 SQL remains only in test
 fixtures for compatibility coverage. See [MIGRATION_LINEAGES.md](MIGRATION_LINEAGES.md).
 
@@ -34,13 +34,13 @@ Existing JWT, cookie/CSRF and error envelopes apply.
 ## 1. Approved rules and UI coverage
 
 The owner approved S3-APT-D01–D03 on 2026-10-29. The reviewed screenshot requires
-booking, Upcoming/Past, date/time/type/status and Reschedule/Cancel. Responses also
+booking, Upcoming/Past, date/time/status and Reschedule/Cancel. Responses also
 expose appointment ID. No sample types, hours, appointments or clinical rules seeded.
 
 - Timezone: **Asia/Jerusalem**, including DST. Store UTC instants. Input requires
   explicit RFC3339 offsets. Derive displayed date/time in the lab zone.
-- ADMIN manages types. ADMIN/RECEPTIONIST publish explicit non-overlapping slots;
-  capacity is shared across types. Half-open [start,end) intervals allow adjacency.
+- ADMIN/RECEPTIONIST publish explicit non-overlapping slots;
+  capacity is shared across all bookings. Half-open [start,end) intervals allow adjacency.
   Inactive slots also remain non-overlapping.
 - Booking requires an existing PENDING order. PATIENT must own its linked profile;
   ADMIN/RECEPTIONIST may book for any existing patient's PENDING order, including
@@ -53,7 +53,7 @@ expose appointment ID. No sample types, hours, appointments or clinical rules se
   transitions remain deferred. No arbitrary status endpoint or appointment deletion.
 - Patients act only on owned appointments; ADMIN/RECEPTIONIST may act for patients.
   Direct reschedule/cancel requires now < current start; no additional cutoff.
-  Reschedule preserves type and requires a still-PENDING order. Rebooking after
+  Reschedule requires a still-PENDING order. Rebooking after
   cancellation uses a new booking/key and retains the cancelled record.
 - Appointment cancellation leaves the order unchanged. Cancelling a PENDING order
   atomically cancels its CONFIRMED appointment and releases capacity **even after
@@ -70,13 +70,10 @@ accepted); reject unknown JSON/query fields and repeated query parameters.
 
 | Method/path | Roles | Behavior |
 |---|---|---|
-| GET /api/appointment-types | PATIENT, ADMIN, RECEPTIONIST | Active types; page/size; includeInactive=true staff-only. |
-| POST /api/appointment-types | ADMIN | Create type; 201. |
-| PUT /api/appointment-types/{id} | ADMIN | Replace code/name/active; 200. |
 | POST /api/appointment-slots | ADMIN, RECEPTIONIST | Publish slot; 201. |
 | PUT /api/appointment-slots/{id} | ADMIN, RECEPTIONIST | Replace capacity/active only; 200; immutable times. |
 | GET /api/appointment-slots/schedule | ADMIN, RECEPTIONIST | Published schedule, including full/past; from/to/page/size and optional active=true/false. Omitted active includes both open and closed slots. |
-| GET /api/appointment-slots | PATIENT, ADMIN, RECEPTIONIST | Bookable slots for required orderId/typeId/from/to; page/size. |
+| GET /api/appointment-slots | PATIENT, ADMIN, RECEPTIONIST | Bookable slots for required orderId/from/to; page/size. |
 | POST /api/appointments | PATIENT, ADMIN, RECEPTIONIST | Book; Idempotency-Key required; 201 new/200 replay. |
 | GET /api/appointments/me | PATIENT | tab=UPCOMING (default) or PAST; page/size. |
 | GET /api/appointments/me/{id} | PATIENT | Owned detail. |
@@ -91,10 +88,7 @@ patient list: 404 PATIENT_PROFILE_NOT_LINKED. Linked empty profile: empty 200 pa
 
 ## 3. Strict inputs and discovery
 
-Type create/replace: {"code":"SYNTHETIC_VISIT","name":"Synthetic visit","active":true}.
-code trimmed/uppercased, ASCII [A-Z0-9][A-Z0-9_-]{0,29}, unique; name trimmed,
-nonblank, <=150 characters; active required JSON boolean. Deactivation prevents new
-booking; existing appointments retain their type/name snapshot and can reschedule.
+All appointments are laboratory visits. No appointment type input or lookup is required.
 
 Slot create: {"startsAt":"2026-12-01T10:00:00+02:00","endsAt":"2026-12-01T10:30:00+02:00","capacity":2,"active":true}.
 Valid offset timestamps require seconds and 0–6 fractional digits; no local-only time.
@@ -102,15 +96,14 @@ End > start; new start strictly future. capacity positive JSON integer within in
 range; active required boolean. Update: {"capacity":3,"active":true}. Capacity cannot
 fall below CONFIRMED occupancy. No time edits/deletion. Inactivation retains bookings.
 
-Availability requires active type, accessible PENDING order with no active appointment,
-and from/to. Alternatives derive order/type/owner from eligible appointment and allow
-an inactive retained type. Only active future slots with capacity and no other active
+Availability requires an accessible PENDING order with no active appointment,
+and from/to. Alternatives derive order/owner from the eligible appointment. Only active future slots with capacity and no other active
 patient booking appear. This is advisory; writes recheck under locks.
 
 Slot queries require from/to offset timestamps, from < to, range <=31 days (technical
 bound, not a booking horizon). Select startsAt >= from and < to. page=0, size=20 defaults;
 digits only, page >=0 within int range, size 1–100. Sort slots by start asc/UUID asc,
-types by code asc/UUID asc, Upcoming by start asc/UUID asc, Past by start desc/UUID asc.
+Upcoming by start asc/UUID asc, Past by start desc/UUID asc.
 Unknown tab/boolean, empty/repeated/unknown params, malformed/overflow inputs: 400.
 No client patient/sort. Page fields: content,page,size,totalElements,totalPages,first,last.
 Large JPA offsets return empty accurate-count pages without integer overflow.
@@ -142,17 +135,17 @@ historical passing run is evidence for this change.
 POST /api/appointments:
 
 ```json
-{"orderId":"<order-uuid>","typeId":"<type-uuid>","slotId":"<slot-uuid>"}
+{"orderId":"<order-uuid>","slotId":"<slot-uuid>"}
 ```
 
 Exactly one canonical UUID Idempotency-Key required. Identity = (creator,key); intent
-= original order/type/slot. Same intent returns existing ID/current state even after
+= original order/slot. Same intent returns existing ID/current state even after
 move/cancel, without fresh availability checks, but rechecks current role/ownership.
 Different intent: 409 IDEMPOTENCY_KEY_REUSED. Failed writes do not consume keys. New
 keys intentionally book subject to all constraints. Patient Location on create/replay:
 /api/appointments/me/{id}; no fabricated staff read URI.
 
-Appointment fields: id,orderId,slotId,typeId,typeName (snapshot),startsAt,endsAt (UTC),
+Appointment fields: id,orderId,slotId,startsAt,endsAt (UTC),
 timezone="Asia/Jerusalem",appointmentDate (YYYY-MM-DD),appointmentTime (HH:mm:ss with
 fractions when present),utcOffset,status,version,canReschedule,canCancel,
 actionIneligibilityReason,createdAt,updatedAt,cancelledAt,cancellationReason.
@@ -160,14 +153,13 @@ No demographics, staff account data or internal retry intent. Ineligibility reas
 CANCELLED/STARTED, otherwise null; non-PENDING order gives ORDER_NOT_PENDING and disables
 reschedule only (direct cancel remains time/status-based). Writes recheck eligibility.
 Slot: id,startsAt,endsAt,capacity,remainingCapacity,active,timezone.
-Type: id,code,name,active. Remaining capacity counts all CONFIRMED types together.
+Remaining capacity counts all active appointments together.
 
 ## 5. Reschedule and cancel
 
 Reschedule: {"slotId":"<target-slot-uuid>","expectedVersion":0}; expectedVersion required
 nonnegative JSON integer within long range. Require CONFIRMED, now < old start, PENDING
-order and active/future target with capacity/no patient overlap. Preserve ID/order/type/
-snapshot/creation/retry intent. Retain old/new slot, actor/time and revision in
+order and active/future target with capacity/no patient overlap. Preserve ID/order/creation/retry intent. Retain old/new slot, actor/time and revision in
 appointment_reschedules. Release/reallocate atomically with stable slot locking.
 Failure retains old booking. Stale revision: 409 APPOINTMENT_CHANGED, refresh first.
 Immediate successful retry returns existing record when current revision=expected+1
@@ -192,13 +184,12 @@ Existing 401 UNAUTHORIZED/403 FORBIDDEN and cookie CSRF apply.
 | 400 | VALIDATION_ERROR | Invalid field/path/header/query. |
 | 400 | INVALID_JSON | Missing/malformed object, wrong types, unknown properties. |
 | 404 | PATIENT_PROFILE_NOT_LINKED / ORDER_NOT_FOUND / APPOINTMENT_NOT_FOUND | Identity/ownership privacy. |
-| 404 | APPOINTMENT_TYPE_NOT_FOUND / APPOINTMENT_SLOT_NOT_FOUND | Missing management target. |
-| 409 | APPOINTMENT_TYPE_UNAVAILABLE | Missing/inactive booking type. |
+| 404 | APPOINTMENT_SLOT_NOT_FOUND | Missing management target. |
 | 409 | ORDER_NOT_BOOKABLE | Non-PENDING order or active appointment exists. |
 | 409 | APPOINTMENT_SLOT_UNAVAILABLE | Missing/inactive/past/full target or patient overlap. |
 | 409 | APPOINTMENT_NOT_CHANGEABLE | Cancelled/started or reschedule order non-PENDING. |
 | 409 | APPOINTMENT_CHANGED | Stale reschedule revision. |
-| 409 | APPOINTMENT_SCHEDULE_CONFLICT | Slot overlap, duplicate type code or capacity below occupancy. |
+| 409 | APPOINTMENT_SCHEDULE_CONFLICT | Slot overlap or capacity below occupancy. |
 | 409 | IDEMPOTENCY_KEY_REUSED | Creator/key reused for different original intent. |
 
 No payment/sample/result/notification/general-audit work or visit transitions. Actual
@@ -214,15 +205,13 @@ header obtained from GET /api/auth/csrf-token. Never record raw tokens.
 
 | Step / actor | Exact request and expected result |
 |---|---|
-| Type / ADMIN | POST /api/appointment-types with `{"code":"SYNTHETIC_VISIT","name":"Synthetic visit","active":true}` → 201; save typeId. GET /api/appointment-types?includeInactive=true&page=0&size=20. PUT /api/appointment-types/{typeId} replaces the same full body (active=false removes from patient discovery). |
 | Slots / ADMIN or RECEPTIONIST | POST /api/appointment-slots with `{"startsAt":"2030-01-15T10:00:00+02:00","endsAt":"2030-01-15T10:30:00+02:00","capacity":2,"active":true}` → 201; save slotA. Repeat with start 10:30/end 11:00 for slotB. Times must still be future and not overlap existing slots; choose another date if necessary. |
 | Schedule / staff | GET /api/appointment-slots/schedule?from=2030-01-15T00:00:00Z&to=2030-01-16T00:00:00Z&page=0&size=20. PUT /api/appointment-slots/{slotA} with `{"capacity":3,"active":true}` → 200. |
 | Order / PATIENT | Use an existing owned PENDING order or POST /api/orders/me with `{"testIds":["<active-test-uuid>"]}` and a fresh UUID Idempotency-Key; save returned orderId. No appointment/payment created by order creation. |
-| Discovery / PATIENT | GET /api/appointment-types?page=0&size=20, then GET /api/appointment-slots?orderId={orderId}&typeId={typeId}&from=2030-01-15T00:00:00Z&to=2030-01-16T00:00:00Z&page=0&size=20. Encode + as %2B if using offsets in query parameters. |
-| Book / PATIENT or staff | POST /api/appointments with a fresh UUID Idempotency-Key and `{"orderId":"<orderId>","typeId":"<typeId>","slotId":"<slotA>"}` → 201 CONFIRMED, version=0, action flags true; save appointmentId. Same body/key → 200 same ID. Different slot/same key → 409 IDEMPOTENCY_KEY_REUSED. |
-| Lists/detail / PATIENT | GET /api/appointments/me?tab=UPCOMING&page=0&size=20; GET /api/appointments/me?tab=PAST&page=0&size=20; GET /api/appointments/me/{appointmentId}. Inspect ID/date/time/type/status/zone/offset/actions. Foreign patient detail →404. |
+| Book / PATIENT or staff | POST /api/appointments with a fresh UUID Idempotency-Key and `{"orderId":"<orderId>","slotId":"<slotA>"}` → 201 CONFIRMED, version=0, action flags true; save appointmentId. Same body/key → 200 same ID. Different slot/same key → 409 IDEMPOTENCY_KEY_REUSED. |
+| Lists/detail / PATIENT | GET /api/appointments/me?tab=UPCOMING&page=0&size=20; GET /api/appointments/me?tab=PAST&page=0&size=20; GET /api/appointments/me/{appointmentId}. Inspect ID/date/time/status/zone/offset/actions. Foreign patient detail →404. |
 | Alternatives / owner or staff | GET /api/appointments/{appointmentId}/alternatives?from=2030-01-15T00:00:00Z&to=2030-01-16T00:00:00Z&page=0&size=20. Current/full/inactive/conflicting slots excluded. |
-| Reschedule / owner or staff | POST /api/appointments/{appointmentId}/reschedule with `{"slotId":"<slotB>","expectedVersion":0}` →200, same ID/type, version=1. Exact immediate repeat →same version. Stale revision/different target →409. |
+| Reschedule / owner or staff | POST /api/appointments/{appointmentId}/reschedule with `{"slotId":"<slotB>","expectedVersion":0}` →200, same ID, version=1. Exact immediate repeat →same version. Stale revision/different target →409. |
 | Cancel / owner | POST /api/appointments/{appointmentId}/cancel with `{}` →200 CANCELLED, flags false; retained in PAST, order unchanged. Repeat preserves metadata. Staff require `{"reason":"Synthetic cancellation requested"}`. |
 | Rebook/cascade | Rebook the PENDING order with a fresh UUID key. POST /api/orders/{orderId}/cancel with `{}` as patient (staff require reason) →both order and active appointment CANCELLED atomically; older cancelled rows unchanged. |
 

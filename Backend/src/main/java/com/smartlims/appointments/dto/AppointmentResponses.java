@@ -9,14 +9,11 @@ public final class AppointmentResponses {
     private AppointmentResponses() {
     }
 
-    public record Type(UUID id, String code, String name, boolean active) {
-    }
-
     public record Slot(UUID id, Instant startsAt, Instant endsAt, int capacity, long remainingCapacity, boolean active,
                        String timezone) {
     }
 
-    public record Detail(UUID id, UUID orderId, UUID slotId, UUID typeId, String typeName,
+    public record Detail(UUID id, UUID orderId, UUID slotId,
                          Instant startsAt, Instant endsAt, String timezone, LocalDate appointmentDate,
                          LocalTime appointmentTime, String utcOffset,
                          AppointmentStatus status, long version, boolean canReschedule, boolean canCancel,

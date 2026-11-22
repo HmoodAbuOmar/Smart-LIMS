@@ -150,6 +150,28 @@ public class LabTestService {
         return mapper.toResponse(saved);
     }
 
+    @Transactional
+    public void delete(Authentication actor, String id) {
+        var account = currentAccount(actor, "ADMIN");
+        var key = identifier(id);
+        var test = tests.findForUpdate(key).orElseThrow(LabTestException::missing);
+        if (tests.hasRetainedUse(key))
+            throw LabTestException.inUse();
+        try {
+            tests.deleteCatalogRanges(key);
+            tests.deleteCatalogParameters(key);
+            tests.delete(test); // JPA removes this test's category assignments.
+            tests.flush(); // Surface authoritative FK protection before leaving the transaction.
+        } catch (DataIntegrityViolationException error) {
+            for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+                if (cause instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState()))
+                    throw LabTestException.inUse();
+            }
+            throw error;
+        }
+        audit.record(account, CATALOG_DELETE, key);
+    }
+
     private LabTest save(LabTest test) {
         try {
             return tests.saveAndFlush(test);

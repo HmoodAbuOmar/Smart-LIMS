@@ -2,6 +2,7 @@ package com.smartlims.laboratory.dto;
 
 /** Closed safe vocabulary. No user-supplied body, identity or clinical text is retained. */
 public enum AuditOperation {
+    CATALOG_DELETE("DELETE", "catalog definition", "Deleted an unused catalog definition and its catalog configuration."),
     CATALOG_CREATE("CREATE", "catalog definition", "Created a catalog definition. Historical order snapshots were retained."),
     CATALOG_UPDATE("UPDATE", "catalog definition", "Updated a catalog definition. Historical order snapshots were retained."),
     CATALOG_ACTIVATE("ACTIVATE", "catalog definition", "Activated a catalog definition."),
@@ -9,8 +10,6 @@ public enum AuditOperation {
     PARAMETER_CREATE("CREATE", "test parameter", "Created a test parameter definition."),
     PARAMETER_UPDATE("UPDATE", "test parameter", "Updated a test parameter definition. Retained result snapshots were unchanged."),
     RANGE_CREATE("CREATE", "reference range", "Created a configured reference range. Retained result snapshots were unchanged."),
-    TYPE_CREATE("CREATE", "appointment type", "Created an appointment type. No appointments were changed."),
-    TYPE_UPDATE("UPDATE", "appointment type", "Updated an appointment type. Existing appointment snapshots were retained."),
     SLOT_CREATE("CREATE", "booking slot", "Created a booking slot. No existing appointments were changed."),
     SLOT_UPDATE("UPDATE", "booking slot", "Updated booking slot capacity or activity. Existing bookings and times were retained."),
     USER_INVITE("INVITE", "user account", "Created an account invitation."),

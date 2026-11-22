@@ -26,11 +26,10 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
 
     @Test
     void patientCancelRetainsRecordOrderAndOriginalMetadataReleasesCapacityAndAllowsRebooking() throws Exception {
-        var t = type();
         var s = slot(0, 1);
         var o = create(own, first);
         var key = List.of(UUID.randomUUID().toString());
-        var request = new AppointmentRequests.Book(o.id().toString(), t.id().toString(), s.id().toString());
+        var request = new AppointmentRequests.Book(o.id().toString(), s.id().toString());
         var a = bookings.book(actor(Role.PATIENT), request, key).appointment();
         mvc.perform(bearer(post("/api/appointments/" + a.id() + "/cancel"), Role.PATIENT).contentType("application/json").content("{}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED")).andExpect(jsonPath("$.canCancel").value(false)).andExpect(jsonPath("$.canReschedule").value(false));
@@ -39,7 +38,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
         assertEquals(cancelled, actions.cancel(actor(Role.ADMIN), a.id().toString(), new AppointmentRequests.Cancel("Staff repeated synthetic request")));
         assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM test_orders WHERE id=?", String.class, o.id()));
         assertEquals(cancelled, bookings.book(actor(Role.PATIENT), request, key).appointment());
-        var replacement = book(o, t, s);
+        var replacement = book(o, s);
         assertNotEquals(a.id(), replacement.id());
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM appointments", Integer.class));
         mvc.perform(bearer(get("/api/appointments/me").param("tab", "PAST"), Role.PATIENT)).andExpect(jsonPath("$.totalElements").value(1));
@@ -47,7 +46,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
 
     @Test
     void staffReasonStrictJsonRolesAndOwnershipApplyEvenOnRepeats() throws Exception {
-        var a = book(create(own, first), type(), slot(0, 1));
+        var a = book(create(own, first), slot(0, 1));
         String path = "/api/appointments/" + a.id() + "/cancel";
         error(mvc.perform(bearer(post(path), Role.RECEPTIONIST).contentType("application/json").content("{}")), 400, "VALIDATION_ERROR", "reason");
         error(mvc.perform(bearer(post(path), Role.PATIENT).contentType("application/json").content("{\"reason\":123}")), 400, "INVALID_JSON", null);
@@ -62,7 +61,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
     @Test
     void startedDirectCancelRejectsButLinkedOrderCascadeCancelsAtomicallyWithCopiedMetadata() {
         var o = create(own, first);
-        var a = book(o, type(), slot(0, 1));
+        var a = book(o, slot(0, 1));
         jdbc.update("UPDATE appointment_slots SET starts_at=starts_at-interval '2 days',ends_at=ends_at-interval '2 days' WHERE id=?", a.slotId());
         assertEquals("APPOINTMENT_NOT_CHANGEABLE", assertThrows(AppointmentException.class, () -> actions.cancel(actor(Role.PATIENT), a.id().toString(), new AppointmentRequests.Cancel(null))).getCode());
         var cancelled = cancellations.cancel(actor(Role.PATIENT), o.id().toString(), new CancelOrderRequest("Synthetic order cancellation"));
@@ -77,11 +76,10 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
     @Test
     void orderCascadeLeavesPreviouslyCancelledHistoryUntouchedAndBookingReplayReturnsCurrentState() {
         var o = create(own, first);
-        var t = type();
         var s = slot(0, 1);
-        var old = book(o, t, s);
+        var old = book(o, s);
         var oldCancelled = actions.cancel(actor(Role.RECEPTIONIST), old.id().toString(), new AppointmentRequests.Cancel("Original synthetic"));
-        var request = new AppointmentRequests.Book(o.id().toString(), t.id().toString(), s.id().toString());
+        var request = new AppointmentRequests.Book(o.id().toString(), s.id().toString());
         var key = List.of(UUID.randomUUID().toString());
         var current = bookings.book(actor(Role.PATIENT), request, key).appointment();
         cancellations.cancel(actor(Role.ADMIN), o.id().toString(), new CancelOrderRequest("Order synthetic"));
@@ -95,7 +93,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
     @Test
     void orderAndAppointmentRollbackTogetherIncludingCapacity() {
         var o = create(own, first);
-        var a = book(o, type(), slot(0, 1));
+        var a = book(o, slot(0, 1));
         assertThrows(IllegalStateException.class, () -> new TransactionTemplate(transactionManager).execute(tx -> {
             cancellations.cancel(actor(Role.ADMIN), o.id().toString(), new CancelOrderRequest("Synthetic rollback"));
             throw new IllegalStateException("Synthetic rollback");
@@ -107,7 +105,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
 
     @Test
     void concurrentPatientStaffCancelReturnsIdenticalRetainedMetadata() throws Exception {
-        var a = book(create(own, first), type(), slot(0, 1));
+        var a = book(create(own, first), slot(0, 1));
         try (var pool = Executors.newFixedThreadPool(2)) {
             var gate = new CountDownLatch(1);
             var x = pool.submit(() -> {
@@ -127,7 +125,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
 
     @Test
     void rescheduleVersusCancelCannotLeaveCapacityAllocated() throws Exception {
-        var a = book(create(own, first), type(), slot(0, 1));
+        var a = book(create(own, first), slot(0, 1));
         var target = slot(1, 1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             var gate = new CountDownLatch(1);
@@ -154,14 +152,13 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
     @Test
     void bookingVersusOrderCancelNeverLeavesActiveAppointmentOnCancelledOrder() throws Exception {
         var o = create(own, first);
-        var t = type();
         var s = slot(0, 1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             var gate = new CountDownLatch(1);
             var x = pool.submit(() -> {
                 gate.await();
                 try {
-                    book(o, t, s);
+                    book(o, s);
                     return "BOOKED";
                 } catch (AppointmentException e) {
                     return e.getCode();
@@ -181,10 +178,9 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
     @Test
     void rescheduleVersusOrderCancelAndReleasedSlotReallocationAreSafe() throws Exception {
         var o = create(own, first);
-        var t = type();
         var old = slot(0, 1);
         var target = slot(1, 1);
-        var a = book(o, t, old);
+        var a = book(o, old);
         try (var pool = Executors.newFixedThreadPool(2)) {
             var gate = new CountDownLatch(1);
             var x = pool.submit(() -> {
@@ -205,7 +201,7 @@ class AppointmentCancellationTest extends AppointmentTestSupport {
             y.get(15, TimeUnit.SECONDS);
         }
         assertEquals("CANCELLED", jdbc.queryForObject("SELECT status FROM appointments WHERE id=?", String.class, a.id()));
-        assertNotNull(book(create(other, first), t, old));
-        assertNotNull(book(create(unlinked, first), t, target));
+        assertNotNull(book(create(other, first), old));
+        assertNotNull(book(create(unlinked, first), target));
     }
 }

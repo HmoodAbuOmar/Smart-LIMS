@@ -28,11 +28,6 @@ public class Appointment {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "original_slot_id", nullable = false, updatable = false)
     private AppointmentSlot originalSlot;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "type_id", nullable = false, updatable = false)
-    private AppointmentType type;
-    @Column(name = "type_name_snapshot", nullable = false, length = 150, updatable = false)
-    private String typeNameSnapshot;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AppointmentStatus status = AppointmentStatus.CONFIRMED;
@@ -73,12 +68,10 @@ public class Appointment {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Appointment(TestOrder order, AppointmentSlot slot, AppointmentType type, UserAccount actor, UUID key) {
+    public Appointment(TestOrder order, AppointmentSlot slot, UserAccount actor, UUID key) {
         this.order = order;
         this.slot = slot;
         this.originalSlot = slot;
-        this.type = type;
-        this.typeNameSnapshot = type.getName();
         this.createdBy = actor;
         this.idempotencyKey = key;
     }
