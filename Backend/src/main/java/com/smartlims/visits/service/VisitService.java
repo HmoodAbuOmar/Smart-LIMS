@@ -77,9 +77,14 @@ public class VisitService {
         var selected = LaboratoryInput.ids(body.orderItemIds(), "orderItemIds", 1, 100);
         var at = LaboratoryInput.time(body.arrivedAt(), "arrivedAt");
         var appointmentId = body.appointmentId() == null ? null : LaboratoryInput.uuid(body.appointmentId(), "appointmentId");
+        var version = body.expectedAppointmentVersion();
+        if (version != null && appointmentId == null)
+            throw LaboratoryException.invalid("expectedAppointmentVersion");
         if (at.isAfter(LaboratoryInput.now()))
             throw LaboratoryException.invalid("arrivedAt");
-        var hash = LaboratoryInput.hash(orderId, appointmentId, selected.stream().map(UUID::toString).sorted().toList(), at);
+        var sortedItems = selected.stream().map(UUID::toString).sorted().toList();
+        var hash = version == null ? LaboratoryInput.hash(orderId, appointmentId, sortedItems, at)
+                : LaboratoryInput.hash(orderId, appointmentId, sortedItems, at, version);
         locks.retry("visit", user.getId(), key);
         var order = orders.findForUpdate(orderId).orElseThrow(() -> LaboratoryException.missing("ORDER"));
         var prior = visits.findByCreatedBy_IdAndIdempotencyKey(user.getId(), key);
@@ -99,7 +104,12 @@ public class VisitService {
             appointment = appointments.findForUpdate(appointmentId).orElseThrow(() -> LaboratoryException.missing("APPOINTMENT"));
             if (!appointment.getOrder().getId().equals(orderId) || appointment.getStatus() != AppointmentStatus.CONFIRMED || visits.existsByAppointment_Id(appointmentId))
                 throw LaboratoryException.conflict("APPOINTMENT_STATE_CONFLICT");
+            if (version != null && appointment.getVersion() != version)
+                throw LaboratoryException.conflict("APPOINTMENT_CHANGED");
             slots.findForUpdate(appointment.getSlot().getId()).orElseThrow();
+            if (!AppointmentMapping.isScheduledDate(appointment, LaboratoryInput.now())
+                    || !AppointmentMapping.isScheduledDate(appointment, at))
+                throw LaboratoryException.conflict("APPOINTMENT_STATE_CONFLICT");
             appointment.checkIn(user, at);
             events.save(new LaboratoryEvent("appointment", appointmentId, "CHECK_IN", user, at, null));
             notifications.appointment(appointment, false);

@@ -93,7 +93,14 @@ abstract class LaboratoryTestSupport extends IsolatedPostgresTest {
     }
 
     com.smartlims.visits.dto.VisitResponse arrive(OrderDetailResponse order, UUID appointment) {
-        return visitService.arrive(actor(Role.RECEPTIONIST), new com.smartlims.visits.dto.VisitRequests.Arrival(order.id().toString(), appointment == null ? null : appointment.toString(), order.items().stream().map(i -> i.id().toString()).toList(), Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS).toString()), List.of(UUID.randomUUID().toString())).visit();
+        return visitService.arrive(actor(Role.RECEPTIONIST), new com.smartlims.visits.dto.VisitRequests.Arrival(order.id().toString(), appointment == null ? null : appointment.toString(), order.items().stream().map(i -> i.id().toString()).toList(), com.smartlims.laboratory.dto.LaboratoryInput.now().toString()), List.of(UUID.randomUUID().toString())).visit();
+    }
+
+    void moveAppointmentToToday(com.smartlims.appointments.dto.AppointmentResponses.Detail appointment) {
+        var zone = com.smartlims.appointments.service.AppointmentMapping.LAB_ZONE;
+        var start = LocalDate.now(zone).atStartOfDay(zone).toInstant();
+        jdbc.update("UPDATE appointment_slots SET starts_at=?,ends_at=? WHERE id=?",
+                java.sql.Timestamp.from(start), java.sql.Timestamp.from(start.plusSeconds(1800)), appointment.slotId());
     }
 
     com.smartlims.appointments.dto.AppointmentResponses.Detail appointment(OrderDetailResponse order, int index, int capacity) {

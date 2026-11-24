@@ -131,9 +131,10 @@ class PatientDashboardTest extends MedicalHistoryTestSupport {
         var cancelled = appointment(create(own, first), 1, 3);
         jdbc.update("UPDATE appointments SET status='CANCELLED',cancelled_at=created_at,cancelled_by=?,cancellation_reason='Synthetic' WHERE id=?", actors.get(Role.ADMIN).getId(), cancelled.id());
         var past = appointment(create(own, first), 3, 3);
-        jdbc.update("UPDATE appointment_slots SET starts_at=CURRENT_TIMESTAMP-interval '2 hours',ends_at=CURRENT_TIMESTAMP-interval '1 hour' WHERE id=?", past.slotId());
+        jdbc.update("UPDATE appointment_slots SET starts_at=starts_at-interval '2 days',ends_at=ends_at-interval '2 days' WHERE id=?", past.slotId());
         var checked = create(own, first);
         var checkAppointment = appointment(checked, 5, 3);
+        moveAppointmentToToday(checkAppointment);
         arrive(checked, checkAppointment.id());
         var result = read();
         assertEquals(2, result.upcomingAppointmentCount());

@@ -15,7 +15,11 @@ public final class VisitRequests {
             @JsonDeserialize(using = LaboratoryInput.Text.class) @NotNull @Pattern(regexp = LaboratoryInput.UUID_PATTERN) String orderId,
             @JsonDeserialize(using = LaboratoryInput.Text.class) @Pattern(regexp = LaboratoryInput.UUID_PATTERN) String appointmentId,
             @JsonDeserialize(using = LaboratoryInput.Ids.class) @NotNull @Size(min = 1, max = 100) List<String> orderItemIds,
-            @JsonDeserialize(using = LaboratoryInput.Text.class) @NotNull String arrivedAt) {
+            @JsonDeserialize(using = LaboratoryInput.Text.class) @NotNull String arrivedAt,
+            @JsonDeserialize(using = LaboratoryInput.LongValue.class) @PositiveOrZero Long expectedAppointmentVersion) {
+        public Arrival(String orderId, String appointmentId, List<String> orderItemIds, String arrivedAt) {
+            this(orderId, appointmentId, orderItemIds, arrivedAt, null);
+        }
     }
 
     public record Completion(

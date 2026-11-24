@@ -3,12 +3,21 @@ package com.smartlims.appointments.repository;
 import com.smartlims.appointments.entity.*;
 import jakarta.persistence.LockModeType;
 
+import java.time.Instant;
 import java.util.*;
 
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, UUID>, JpaSpecificationExecutor<Appointment> {
+    @Query("""
+            select a from Appointment a join fetch a.slot s
+            left join fetch a.order o left join fetch o.patient
+            where s.startsAt >= :from and s.startsAt < :to
+            order by s.startsAt, a.id
+            """)
+    List<Appointment> findScheduledDay(@Param("from") Instant from, @Param("to") Instant to);
+
     Optional<Appointment> findByCreatedBy_IdAndIdempotencyKey(UUID actor, UUID key);
 
     Optional<Appointment> findByIdAndOrder_Patient_User_Id(UUID id, UUID actor);

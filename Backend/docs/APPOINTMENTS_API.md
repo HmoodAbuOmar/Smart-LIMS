@@ -1,5 +1,49 @@
 # Appointments API
 
+## Receptionist Today
+
+`GET /api/appointments/today` accepts an optional `tab` of `arrivals`
+(default), `checkedIn`, or `notArrived`, and optional `date` in `YYYY-MM-DD`
+format. ADMIN and RECEPTIONIST can read it. The read uses `Cache-Control:
+no-store`. The date defaults to the current Asia/Jerusalem date. Scheduled slot
+starts are selected from that day's local midnight up to, but excluding, the
+next local midnight, including daylight-saving changes. Sort order is slot
+start, then appointment ID. Unknown or repeated parameters and invalid dates or
+tabs return `400 VALIDATION_ERROR`.
+
+The response contains `date`, `timezone`, `counts` and `content`. Counts
+cover the entire day regardless of tab. Arrivals includes every persisted
+status. Checked In includes only CHECKED_IN. Not Arrived includes only
+CONFIRMED, projected as BOOKED for this screen. Cancelled, completed and
+no-show rows appear only in Arrivals. Empty results return an empty array.
+Check-in leaves the appointment in Arrivals, moves it out of Not Arrived, and
+adds it to Checked In. Refresh reads the latest committed data.
+An elapsed slot remains in Not Arrived while its appointment is CONFIRMED.
+Recording a no-show removes it from Not Arrived while preserving its Arrivals
+row. Membership and check-in eligibility are separate. A confirmed appointment
+can appear in Not Arrived with check-in disabled if its order cannot be processed.
+
+Rows contain `id`, `startsAt`, `endsAt`, `appointmentDate`,
+`appointmentTime`, `patient` (ID, file number and full name), `orderId`,
+`orderNumber`, `orderItemIds`, `status`, `version`, `arrivedAt`,
+`checkInEligible` and `noShowSupported`. The stored check-in instant remains
+visible on completed rows. Every persisted appointment requires an existing
+order linked to a patient. PostgreSQL enforces both references. Defensive
+null handling in the response does not establish an orderless workflow.
+The orderless example in Screenshots 02 and 03 is excluded from acceptance
+criteria. Use an order-linked booking to demonstrate disabled check-in.
+
+Check-in reuses `POST /api/visits` with `Idempotency-Key`, the selected row's
+order ID, appointment ID, order item IDs, an arrival instant, and the row
+version as the optional `expectedAppointmentVersion`. A stale version on
+a confirmed appointment returns `409 APPOINTMENT_CHANGED`. An ineligible
+appointment returns `409 APPOINTMENT_STATE_CONFLICT` for a new request.
+Today and the Appointments List enable check-in only on the slot's scheduled
+date in `Asia/Jerusalem`. For a new scheduled check-in, both the server's current
+date and the supplied arrival instant must fall on that date. Walk-ins are
+unaffected. An identical replay with the same key returns the existing visit. Read Today
+again after the write to get the updated row and counts.
+
 NOTIF-38 (2026-10-31): actual booking, slot move, direct/cascaded cancellation,
 check-in, completion and no-show changes now persist patient in-app notifications
 in the source transaction. No-op/replay adds none; a notification write failure
@@ -30,6 +74,24 @@ verification/commit remain separate; no deployment or development migration clai
 Traceability: S3-APT-R01–R07, Tasks 12–18 in [the plan](../IMPLEMENTATION_PLAN.md).
 Storage/locking: [DATABASE_DESIGN.md](DATABASE_DESIGN.md#49-appointment_slots).
 Existing JWT, cookie/CSRF and error envelopes apply.
+
+## Receptionist Appointments List
+
+`GET /api/receptionist/appointments` requires the Receptionist role and returns `Cache-Control: no-store`.
+
+The same required order relationship applies to Screenshot 08. Each persisted
+appointment row links to its order. The orderless example is excluded from
+acceptance criteria.
+
+- `date` uses `YYYY-MM-DD` and defaults to today in `Asia/Jerusalem`. The query includes slots starting at local midnight and excludes the next local midnight.
+- `status` accepts `ALL` (default), `BOOKED` (also accepted as `CONFIRMED`), `CHECKED_IN`, `COMPLETED`, `CANCELLED`, and `NO_SHOW`, case-insensitively. Responses display `BOOKED` for confirmed appointments.
+- `search` matches a case-insensitive substring of the patient name, file number, or order number, up to 100 characters after trimming.
+- `sort` accepts `startsAt,asc` (default) and `startsAt,desc`. Appointments starting at the same time are ordered by ID.
+- `page` defaults to zero and `size` defaults to 20, with a maximum of 100. The response has `date`, `timezone`, `content`, `page`, `size`, `totalElements`, `totalPages`, `first`, and `last`. Totals reflect the combined filters.
+
+Rows provide the appointment and slot IDs, slot start and end, local appointment date and time, `booked`, `capacity`, patient ID/name/file number, order ID/number, status, version, arrival time, and action eligibility. Booked capacity counts confirmed and checked-in appointments across the entire slot, including rows outside the current filter or page. Check-in uses `POST /api/visits` with the row's appointment ID, order ID, order item IDs, version as `expectedAppointmentVersion`, arrival time, and an idempotency key. Follow order links through `GET /api/receptionist/orders/{id}`.
+
+The current page uses the development Today service and expects an array with localized patient names. Live integration needs to read the paged `content`, map `patient.fullName` for display, handle absent patient and order references, and use the returned eligibility fields. Refresh repeats the current GET. The create booking button opens Screenshot 09, which still needs live order and slot selection wired to the existing booking API. The booking contract uses order and slot IDs. The development editor still references appointment types.
 
 ## 1. Approved rules and UI coverage
 
