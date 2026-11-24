@@ -24,12 +24,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID>,
 
     Optional<Appointment> findByOrder_IdAndStatus(UUID order, AppointmentStatus status);
 
+    @EntityGraph(attributePaths = "slot")
+    List<Appointment> findByOrder_IdOrderByCreatedAtDescIdDesc(UUID order);
+
     boolean existsByOrder_IdAndStatus(UUID order, AppointmentStatus status);
 
     long countBySlot_IdAndStatus(UUID slot, AppointmentStatus status);
-
-    @Query("select count(a)>0 from Appointment a where a.order.id=:order and a.status in (com.smartlims.appointments.entity.AppointmentStatus.CONFIRMED,com.smartlims.appointments.entity.AppointmentStatus.CHECKED_IN)")
-    boolean existsActiveOrder(@Param("order") UUID order);
 
     @Query("select count(a) from Appointment a where a.slot.id=:slot and a.status in (com.smartlims.appointments.entity.AppointmentStatus.CONFIRMED,com.smartlims.appointments.entity.AppointmentStatus.CHECKED_IN)")
     long countActiveBySlot(@Param("slot") UUID slot);

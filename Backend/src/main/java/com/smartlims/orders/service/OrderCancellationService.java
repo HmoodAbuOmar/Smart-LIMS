@@ -11,6 +11,7 @@ import com.smartlims.orders.entity.OrderStatus;
 import com.smartlims.orders.exception.OrderException;
 import com.smartlims.orders.mapper.OrderMapper;
 import com.smartlims.orders.repository.TestOrderRepository;
+import com.smartlims.payments.PaymentReadRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -32,16 +33,19 @@ public class OrderCancellationService {
     private final OrderMapper mapper;
     private final EntityManager entities;
     private final AppointmentOrderCancellation appointments;
+    private final PaymentReadRepository payments;
     private final com.smartlims.notifications.service.NotificationPublisher notifications;
 
     public OrderCancellationService(OrderAccess access, TestOrderRepository orders, OrderMapper mapper, EntityManager entities, AppointmentOrderCancellation appointments,
-                                    com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit) {
+                                    com.smartlims.notifications.service.NotificationPublisher notifications, AuditPublisher audit,
+                                    PaymentReadRepository payments) {
         this.audit = audit;
         this.access = access;
         this.orders = orders;
         this.mapper = mapper;
         this.entities = entities;
         this.appointments = appointments;
+        this.payments = payments;
         this.notifications = notifications;
     }
 
@@ -62,6 +66,8 @@ public class OrderCancellationService {
             return mapper.toDetail(order);
         if (order.getStatus() != OrderStatus.PENDING)
             throw OrderException.notCancellable();
+        if (payments.financialForOrder(orderId, order.getCurrency()).netConfirmedCollections().signum() > 0)
+            throw OrderException.refundRequired();
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancelledBy(account);
         // Match database/ORM microsecond precision instead of rounding a later nanosecond upward.

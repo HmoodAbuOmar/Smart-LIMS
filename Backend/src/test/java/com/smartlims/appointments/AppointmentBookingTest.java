@@ -4,6 +4,7 @@ import com.smartlims.appointments.dto.*;
 import com.smartlims.appointments.exception.AppointmentException;
 import com.smartlims.auth.entity.Role;
 
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -14,6 +15,49 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class AppointmentBookingTest extends AppointmentTestSupport {
+    @Test
+    void receptionistSelectsEligibleOrdersAndBooksForTheSelectedLabDate() throws Exception {
+        var eligible = create(unlinked, first);
+        var occupied = create(other, first);
+        var inProgress = create(own, first);
+        var empty = create(own, first);
+        state(inProgress.id(), "IN_PROGRESS");
+        jdbc.update("DELETE FROM order_items WHERE order_id=?", empty.id());
+        var selected = slot(0, 2);
+        book(occupied, selected);
+        var zone = ZoneId.of("Asia/Jerusalem");
+        var date = selected.startsAt().atZone(zone).toLocalDate();
+        var from = date.atStartOfDay(zone).toInstant().toString();
+        var to = date.plusDays(1).atStartOfDay(zone).toInstant().toString();
+        var orderId = eligible.id().toString();
+        var slotId = selected.id().toString();
+        mvc.perform(bearer(get("/api/receptionist/orders").param("bookable", "true"), Role.RECEPTIONIST))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(orderId))
+                .andExpect(jsonPath("$.content[0].orderNumber").value(eligible.orderNumber()))
+                .andExpect(jsonPath("$.content[0].patientName").value(unlinked.getFullName()));
+        mvc.perform(bearer(get("/api/receptionist/orders").param("bookable", "true"), Role.PATIENT))
+                .andExpect(status().isForbidden());
+        mvc.perform(bearer(get("/api/receptionist/orders").param("bookable", "yes"), Role.RECEPTIONIST))
+                .andExpect(status().isBadRequest());
+        mvc.perform(bearer(get("/api/appointment-slots").param("orderId", orderId).param("from", from)
+                .param("to", to), Role.RECEPTIONIST))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(slotId))
+                .andExpect(jsonPath("$.content[0].capacity").value(2))
+                .andExpect(jsonPath("$.content[0].remainingCapacity").value(1));
+        var body = json.writeValueAsString(new AppointmentRequests.Book(orderId, slotId));
+        mvc.perform(bearer(post("/api/appointments"), Role.RECEPTIONIST).header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json").content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.orderId").value(orderId))
+                .andExpect(jsonPath("$.slotId").value(slotId))
+                .andExpect(jsonPath("$.appointmentDate").value(date.toString()))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+        error(mvc.perform(bearer(post("/api/appointments"), Role.RECEPTIONIST).header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json").content(body)), 409, "ORDER_NOT_BOOKABLE", null);
+        assertEquals("ORDER_NOT_BOOKABLE", assertThrows(AppointmentException.class, () -> book(empty, selected)).getCode());
+    }
+
     @Test
     void patientBooksWithOwnOrderAndRetriesWithoutNewRows() throws Exception {
         var slot = slot(0, 2);

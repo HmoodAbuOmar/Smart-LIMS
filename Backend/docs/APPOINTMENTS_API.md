@@ -93,6 +93,17 @@ Rows provide the appointment and slot IDs, slot start and end, local appointment
 
 The current page uses the development Today service and expects an array with localized patient names. Live integration needs to read the paged `content`, map `patient.fullName` for display, handle absent patient and order references, and use the returned eligibility fields. Refresh repeats the current GET. The create booking button opens Screenshot 09, which still needs live order and slot selection wired to the existing booking API. The booking contract uses order and slot IDs. The development editor still references appointment types.
 
+## Receptionist Create Booking
+
+Booking requires an existing order. The availability and booking endpoints
+require an order ID and reject orders that are ineligible for booking.
+
+1. Load eligible orders with `GET /api/receptionist/orders?bookable=true`. The paginated results include order IDs and numbers and patient names. Eligible orders are pending, have at least one test item, and have no confirmed or checked-in appointment.
+2. Send the selected order ID to `GET /api/appointment-slots`. Set `from` to midnight on the chosen date in `Asia/Jerusalem` and `to` to the following local midnight, both as RFC3339 timestamps. Display each returned slot's start, end, capacity, and remaining capacity.
+3. Send `orderId` and `slotId` to `POST /api/appointments` with a UUID `Idempotency-Key`. Reuse the key when retrying the same submission. The saved appointment includes its IDs, slot times, local date, timezone, status, version, and timestamps. Display **Sample collection** as the fixed appointment label.
+
+If eligibility or capacity changes before confirmation, refresh the order or slot selection after the corresponding conflict response.
+
 ## 1. Approved rules and UI coverage
 
 The owner approved S3-APT-D01–D03 on 2026-10-29. The reviewed screenshot requires
@@ -247,7 +258,7 @@ Existing 401 UNAUTHORIZED/403 FORBIDDEN and cookie CSRF apply.
 | 400 | INVALID_JSON | Missing/malformed object, wrong types, unknown properties. |
 | 404 | PATIENT_PROFILE_NOT_LINKED / ORDER_NOT_FOUND / APPOINTMENT_NOT_FOUND | Identity/ownership privacy. |
 | 404 | APPOINTMENT_SLOT_NOT_FOUND | Missing management target. |
-| 409 | ORDER_NOT_BOOKABLE | Non-PENDING order or active appointment exists. |
+| 409 | ORDER_NOT_BOOKABLE | Order is not pending, has no test items, or has an active appointment. |
 | 409 | APPOINTMENT_SLOT_UNAVAILABLE | Missing/inactive/past/full target or patient overlap. |
 | 409 | APPOINTMENT_NOT_CHANGEABLE | Cancelled/started or reschedule order non-PENDING. |
 | 409 | APPOINTMENT_CHANGED | Stale reschedule revision. |
