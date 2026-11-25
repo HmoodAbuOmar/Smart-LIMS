@@ -75,7 +75,8 @@ public class AuthController {
         LoginService.IssuedLogin issued = login.login(request);
         CsrfToken token = csrf.generateToken(httpRequest);
         csrf.saveToken(token, httpRequest, httpResponse);
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookies.issued(issued.accessToken()).toString())
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookies.issued(issued.accessToken()).toString());
+        return ResponseEntity.ok()
                 .header("Cache-Control", "no-store").body(new CookieLoginResponse(true, issued.account()));
     }
 
@@ -88,7 +89,8 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<SuccessResponse> logout(HttpServletRequest request, HttpServletResponse response) {
         csrf.saveToken(null, request, response);
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookies.cleared().toString())
+        response.addHeader(HttpHeaders.SET_COOKIE, cookies.cleared().toString());
+        return ResponseEntity.ok()
                 .header("Cache-Control", "no-store").body(new SuccessResponse(true));
     }
 
