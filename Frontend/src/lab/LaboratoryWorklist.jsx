@@ -66,7 +66,7 @@ export default function LaboratoryWorklist({ preview = null }) {
           </select>
         </label>
       </div>
-      {status === 'loading' ? <p className="lab-state" role="status">{copy.loading}</p> : status === 'error' ? <p className="lab-state" role="alert">{copy.error} <button type="button" onClick={() => { setStatus('loading'); setAttempt(value => value + 1) }}>{copy.retry}</button></p> : visible.length === 0 ? <p className="lab-state" role="status">{rows.length ? copy.noMatches : copy.noRows}</p> : <div className="lab-table"><table>
+      {status === 'loading' ? <p className="lab-state" role="status">{copy.loading}</p> : status === 'error' ? <p className="lab-state" role="alert">{copy.error} <button type="button" onClick={() => { setStatus('loading'); setAttempt(value => value + 1) }}>{copy.retry}</button></p> : visible.length === 0 ? <p className="lab-state" role="status">{rows.length ? copy.noMatches : copy.noRows}</p> : <div className="lab-table lab-worklist-table"><table>
         <thead><tr>{columns.map(key => <th scope="col" key={key}>{copy[key]}</th>)}</tr></thead>
         <tbody>{visible.map(row => {
           const action = rowAction(row)

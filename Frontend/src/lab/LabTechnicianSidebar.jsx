@@ -12,9 +12,9 @@ const navigation = [
 ]
 const classes = { sidebar: 'lab-sidebar', brand: 'lab-brand', logo: 'lab-logo', footer: 'lab-sidebar-footer', logout: 'lab-logout', error: 'lab-logout-error', language: 'lab-language' }
 
-export default function LabTechnicianSidebar({ copy, menuOpen, onSelect }) {
+export default function LabTechnicianSidebar({ copy, page = 'worklist', menuOpen, onSelect }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const items = navigation.map(item => ({ ...item, label: copy[item.id], dataPage: item.id }))
-  return <WorkspaceSidebar id="lab-navigation" prefix="lab" classes={classes} items={items} activeId="worklist" onNavigate={onSelect} mobileOpen={menuOpen} language={language} onLanguageChange={next => void i18n.changeLanguage(next)} navigationLabel={copy.navigation} logoutLabel={copy.logout} signingOutLabel={copy.signingOut} logoutError={copy.logoutError} logoutUnavailable={copy.logoutUnavailable} onLogoClick={() => onSelect('worklist')} onLogout={async () => { await logoutWithCookie(); window.location.hash = '/login' }} />
+  return <WorkspaceSidebar id="lab-navigation" prefix="lab" classes={classes} items={items} activeId={page} onNavigate={onSelect} mobileOpen={menuOpen} language={language} onLanguageChange={next => void i18n.changeLanguage(next)} navigationLabel={copy.navigation} logoutLabel={copy.logout} signingOutLabel={copy.signingOut} logoutError={copy.logoutError} logoutUnavailable={copy.logoutUnavailable} onLogoClick={() => onSelect('worklist')} onLogout={async () => { await logoutWithCookie(); window.location.hash = '/login' }} />
 }

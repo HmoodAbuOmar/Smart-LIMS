@@ -13,25 +13,35 @@ export function useLabNotice() {
   return useContext(NoticeContext)
 }
 
-export default function LabTechnicianLayout({ children }) {
+export default function LabTechnicianLayout({ page = 'worklist', children, onSelectPage, documentTitle, contentLabel: contentLabelOverride }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
+  const pageTitle = documentTitle || (page === 'samples' ? copy.sampleTitle : copy.title)
+  const contentLabel = contentLabelOverride || (page === 'samples' ? copy.sampleContent : copy.content)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notice, setNotice] = useState(null)
   const menuButton = useRef(null)
   useEffect(() => {
     const previous = document.title
-    document.title = `Smart-LIMS | ${copy.title}`
+    document.title = `Smart-LIMS | ${pageTitle}`
     return () => { document.title = previous }
-  }, [copy.title])
+  }, [pageTitle])
   function closeMenu() {
     setMobileOpen(false)
     menuButton.current?.focus()
   }
   function select(id) {
     closeMenu()
-    setNotice(id === 'worklist' ? null : id)
+    onSelectPage?.(id)
+    const preview = window.location.hash.startsWith('#/__lab')
+    const base = preview ? '/__lab' : '/lab-technician'
+    if (id === 'worklist' || id === 'samples') {
+      setNotice(null)
+      window.location.hash = id === 'samples' ? `${base}/samples` : base
+      return
+    }
+    setNotice(id)
   }
   return <NoticeContext.Provider value={setNotice}>
     <div className="lab-layout" dir={language === 'ar' ? 'rtl' : 'ltr'} lang={language} onKeyDown={event => { if (event.key === 'Escape' && mobileOpen) closeMenu() }}>
@@ -42,8 +52,8 @@ export default function LabTechnicianLayout({ children }) {
         <button type="button" className="lab-bell" aria-label={copy.notifications} onClick={() => setNotice('notifications')}><Bell size={20} aria-hidden="true" /></button>
         <WorkspaceAccountMenu name={copy.accountLabel} language={language} live />
       </header>
-      <LabTechnicianSidebar copy={copy} menuOpen={mobileOpen} onSelect={select} />
-      <main className="lab-main" id="lab-content" tabIndex={-1} aria-label={copy.content}>
+      <LabTechnicianSidebar copy={copy} page={page} menuOpen={mobileOpen} onSelect={select} />
+      <main className="lab-main" id="lab-content" tabIndex={-1} aria-label={contentLabel}>
         {notice && copy.missing[notice] && <p className="lab-notice" role="status">{copy.missing[notice]} <button type="button" onClick={() => setNotice(null)}>{copy.dismiss}</button></p>}
         {children}
       </main>

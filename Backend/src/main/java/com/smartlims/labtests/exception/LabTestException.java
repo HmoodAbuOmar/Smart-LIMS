@@ -32,8 +32,4 @@ public class LabTestException extends RuntimeException {
     public static LabTestException duplicate() {
         return new LabTestException(HttpStatus.CONFLICT, "LAB_TEST_CODE_IN_USE", "A laboratory test with this code already exists.", "code");
     }
-
-    public static LabTestException inUse() {
-        return new LabTestException(HttpStatus.CONFLICT, "LAB_TEST_IN_USE", "This laboratory test is used by an order or result.", null);
-    }
 }

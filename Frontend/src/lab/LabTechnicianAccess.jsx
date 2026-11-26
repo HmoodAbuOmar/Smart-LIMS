@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { authApi } from '../auth/api.js'
 import { accountDestination } from '../auth/access.js'
@@ -6,14 +6,34 @@ import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import WorkspaceRoleLabel from '../components/WorkspaceRoleLabel.jsx'
 import LabTechnicianLayout from './LabTechnicianLayout.jsx'
 import LaboratoryWorklist from './LaboratoryWorklist.jsx'
+import SampleList from './SampleList.jsx'
+import CollectSample from './CollectSample.jsx'
+import RejectSample from './RejectSample.jsx'
+import SampleDetails from './SampleDetails.jsx'
 import { worklistCopy } from './worklistCopy.js'
 import './lab.css'
 
-export default function LabTechnicianAccess() {
+export default function LabTechnicianAccess({ page = 'worklist' }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
   const [status, setStatus] = useState('loading')
+  const [collecting, setCollecting] = useState(false)
+  const [replacementId, setReplacementId] = useState('')
+  const [rejecting, setRejecting] = useState(null)
+  const [details, setDetails] = useState(null)
+  const [listReload, setListReload] = useState(0)
+  const opened = useRef(false)
+  const returnFocus = useRef('lab-collect-sample')
+  const showForm = page === 'samples' && (collecting || Boolean(replacementId) || Boolean(rejecting) || Boolean(details))
+  useEffect(() => { setCollecting(false); setReplacementId(''); setRejecting(null); setDetails(null) }, [page])
+  useEffect(() => {
+    if (page !== 'samples') opened.current = false
+    else if (!showForm && opened.current) {
+      opened.current = false
+      document.getElementById(returnFocus.current)?.focus()
+    }
+  }, [page, showForm])
   useEffect(() => {
     const controller = new AbortController()
     async function check() {
@@ -33,8 +53,56 @@ export default function LabTechnicianAccess() {
     void check()
     return () => controller.abort()
   }, [])
+  function openForm() {
+    opened.current = true
+    returnFocus.current = 'lab-collect-sample'
+    setReplacementId('')
+    setRejecting(null)
+    setDetails(null)
+    setCollecting(true)
+  }
+  function openReplacement(id) {
+    opened.current = true
+    returnFocus.current = `lab-replace-${id}`
+    setCollecting(false)
+    setRejecting(null)
+    setDetails(null)
+    setReplacementId(id)
+  }
+  function openReject(sample) {
+    opened.current = true
+    returnFocus.current = `lab-reject-${sample.id}`
+    setCollecting(false)
+    setReplacementId('')
+    setDetails(null)
+    setRejecting(sample)
+  }
+  function openDetails(sample) {
+    opened.current = true
+    returnFocus.current = `lab-sample-${sample.id}`
+    setCollecting(false)
+    setReplacementId('')
+    setRejecting(null)
+    setDetails(sample)
+  }
+  function closeForm() {
+    setCollecting(false)
+    setReplacementId('')
+    setRejecting(null)
+    setDetails(null)
+  }
+  const formTitle = rejecting ? copy.rejectTitle : replacementId ? copy.replaceTitle : details ? copy.sampleDetailsTitle : copy.collectTitle
+  const formLabel = rejecting ? copy.rejectContent : replacementId ? copy.replaceContent : details ? copy.sampleDetailsContent : copy.collectContent
   if (status === 'authorized') {
-    return <LabTechnicianLayout><LaboratoryWorklist /></LabTechnicianLayout>
+    return <LabTechnicianLayout page={page} onSelectPage={closeForm} documentTitle={showForm ? formTitle : undefined} contentLabel={showForm ? formLabel : undefined}>
+      {page === 'samples' ? <>
+        <div hidden={showForm || undefined}><SampleList reload={listReload} onCollect={openForm} onReplace={openReplacement} onReject={openReject} onOpen={openDetails} /></div>
+        {collecting && <CollectSample onBack={closeForm} />}
+        {replacementId && <CollectSample key={replacementId} replacementId={replacementId} onBack={closeForm} onRecorded={() => setListReload(value => value + 1)} />}
+        {rejecting && <RejectSample key={rejecting.id} sample={rejecting} onBack={closeForm} onRejected={() => { returnFocus.current = `lab-replace-${rejecting.id}`; setListReload(value => value + 1); closeForm() }} />}
+        {details && <SampleDetails key={details.id} sampleId={details.id} onBack={closeForm} onReject={openReject} onReplace={openReplacement} />}
+      </> : <LaboratoryWorklist />}
+    </LabTechnicianLayout>
   }
   return <main className="lab-access" lang={language} dir={language === 'ar' ? 'rtl' : 'ltr'} aria-busy={status === 'loading'}>
     <header className="lab-access-header">
