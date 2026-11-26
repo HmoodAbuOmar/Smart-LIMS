@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ClipboardCheck, ClipboardClock, ClipboardList, FileCheck2, FlaskConical } from 'lucide-react'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.jsx'
 import { logoutWithCookie } from '../auth/cookieSession.js'
+import { labSidebarSection } from './labNavigation.js'
 
 const navigation = [
   { id: 'worklist', Icon: ClipboardList },
@@ -12,9 +14,25 @@ const navigation = [
 ]
 const classes = { sidebar: 'lab-sidebar', brand: 'lab-brand', logo: 'lab-logo', footer: 'lab-sidebar-footer', logout: 'lab-logout', error: 'lab-logout-error', language: 'lab-language' }
 
+function fallbackSection(page) {
+  return page === 'samples' || page === 'drafts' || page === 'approved' || page === 'published' || page === 'worklist' ? page : 'worklist'
+}
+
 export default function LabTechnicianSidebar({ copy, page = 'worklist', menuOpen, onSelect }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
+  const [hash, setHash] = useState(() => window.location.hash)
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash)
+    sync()
+    window.addEventListener('hashchange', sync)
+    window.addEventListener('popstate', sync)
+    return () => {
+      window.removeEventListener('hashchange', sync)
+      window.removeEventListener('popstate', sync)
+    }
+  }, [])
+  const activeId = labSidebarSection(hash) || fallbackSection(page)
   const items = navigation.map(item => ({ ...item, label: copy[item.id], dataPage: item.id }))
-  return <WorkspaceSidebar id="lab-navigation" prefix="lab" classes={classes} items={items} activeId={page} onNavigate={onSelect} mobileOpen={menuOpen} language={language} onLanguageChange={next => void i18n.changeLanguage(next)} navigationLabel={copy.navigation} logoutLabel={copy.logout} signingOutLabel={copy.signingOut} logoutError={copy.logoutError} logoutUnavailable={copy.logoutUnavailable} onLogoClick={() => onSelect('worklist')} onLogout={async () => { await logoutWithCookie(); window.location.hash = '/login' }} />
+  return <WorkspaceSidebar id="lab-navigation" prefix="lab" classes={classes} items={items} activeId={activeId} onNavigate={onSelect} mobileOpen={menuOpen} language={language} onLanguageChange={next => void i18n.changeLanguage(next)} navigationLabel={copy.navigation} logoutLabel={copy.logout} signingOutLabel={copy.signingOut} logoutError={copy.logoutError} logoutUnavailable={copy.logoutUnavailable} onLogoClick={() => onSelect('worklist')} onLogout={async () => { await logoutWithCookie(); window.location.hash = '/login' }} />
 }

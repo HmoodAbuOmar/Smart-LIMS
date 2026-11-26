@@ -28,6 +28,7 @@ export async function loadSampleDetails(sampleId, options) {
     patientName,
     tests: linkedTests(sample, names),
     replacement: replacementReference(sample, siblings),
+    workItems: (items || []).filter(item => String(item?.orderId) === String(sample?.orderId)),
   }
 }
 

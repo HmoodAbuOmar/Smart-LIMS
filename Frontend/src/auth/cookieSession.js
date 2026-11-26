@@ -32,9 +32,10 @@ function currentCsrf() {
 }
 
 async function initializeCsrf(signal) {
-  // An authenticated read can clear the cookie. Issue it just before a write.
-  requireSuccess(await read('/api/auth/csrf-token', { signal }))
-  const token = currentCsrf()
+  // Use the token this response just issued. document.cookie can still list an
+  // older XSRF-TOKEN, and sending that value is rejected with 403.
+  const issued = requireSuccess(await read('/api/auth/csrf-token', { signal }))
+  const token = typeof issued.token === 'string' && issued.token ? issued.token : currentCsrf()
   if (!token) throw authError('SERVICE_UNAVAILABLE')
   return token
 }

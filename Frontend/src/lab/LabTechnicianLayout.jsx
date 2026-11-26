@@ -17,8 +17,8 @@ export default function LabTechnicianLayout({ page = 'worklist', children, onSel
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
-  const pageTitle = documentTitle || (page === 'samples' ? copy.sampleTitle : copy.title)
-  const contentLabel = contentLabelOverride || (page === 'samples' ? copy.sampleContent : copy.content)
+  const pageTitle = documentTitle || (page === 'samples' ? copy.sampleTitle : page === 'drafts' ? copy.drafts : page === 'approved' ? copy.approved : page === 'published' ? copy.published : copy.title)
+  const contentLabel = contentLabelOverride || (page === 'samples' ? copy.sampleContent : page === 'drafts' ? copy.draftsContent : page === 'approved' ? copy.approvedContent : page === 'published' ? copy.publishedContent : copy.content)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notice, setNotice] = useState(null)
   const menuButton = useRef(null)
@@ -27,6 +27,9 @@ export default function LabTechnicianLayout({ page = 'worklist', children, onSel
     document.title = `Smart-LIMS | ${pageTitle}`
     return () => { document.title = previous }
   }, [pageTitle])
+  useEffect(() => {
+    if (page === 'drafts' || page === 'approved' || page === 'published') setNotice(null)
+  }, [page])
   function closeMenu() {
     setMobileOpen(false)
     menuButton.current?.focus()
@@ -36,9 +39,9 @@ export default function LabTechnicianLayout({ page = 'worklist', children, onSel
     onSelectPage?.(id)
     const preview = window.location.hash.startsWith('#/__lab')
     const base = preview ? '/__lab' : '/lab-technician'
-    if (id === 'worklist' || id === 'samples') {
+    if (id === 'worklist' || id === 'samples' || id === 'drafts' || id === 'approved' || id === 'published') {
       setNotice(null)
-      window.location.hash = id === 'samples' ? `${base}/samples` : base
+      window.location.hash = id === 'worklist' ? base : `${base}/${id}`
       return
     }
     setNotice(id)
@@ -53,7 +56,7 @@ export default function LabTechnicianLayout({ page = 'worklist', children, onSel
         <WorkspaceAccountMenu name={copy.accountLabel} language={language} live />
       </header>
       <LabTechnicianSidebar copy={copy} page={page} menuOpen={mobileOpen} onSelect={select} />
-      <main className="lab-main" id="lab-content" tabIndex={-1} aria-label={contentLabel}>
+      <main className={`lab-main${contentLabel === copy.editorContent ? ' lab-main-draft' : ''}`} id="lab-content" tabIndex={-1} aria-label={contentLabel}>
         {notice && copy.missing[notice] && <p className="lab-notice" role="status">{copy.missing[notice]} <button type="button" onClick={() => setNotice(null)}>{copy.dismiss}</button></p>}
         {children}
       </main>

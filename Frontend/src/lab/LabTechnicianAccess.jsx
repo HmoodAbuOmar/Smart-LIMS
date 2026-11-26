@@ -10,10 +10,16 @@ import SampleList from './SampleList.jsx'
 import CollectSample from './CollectSample.jsx'
 import RejectSample from './RejectSample.jsx'
 import SampleDetails from './SampleDetails.jsx'
+import DraftResultEditor from './DraftResultEditor.jsx'
+import DraftResults from './DraftResults.jsx'
+import ApprovedResults from './ApprovedResults.jsx'
+import PublishedResults from './PublishedResults.jsx'
+import PublishedResultReport from './PublishedResultReport.jsx'
+import ResultReview from './ResultReview.jsx'
 import { worklistCopy } from './worklistCopy.js'
 import './lab.css'
 
-export default function LabTechnicianAccess({ page = 'worklist' }) {
+export default function LabTechnicianAccess({ page = 'worklist', draftId = '', reviewId = '', publishedId = '' }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
@@ -25,6 +31,9 @@ export default function LabTechnicianAccess({ page = 'worklist' }) {
   const [listReload, setListReload] = useState(0)
   const opened = useRef(false)
   const returnFocus = useRef('lab-collect-sample')
+  const reviewing = Boolean(reviewId)
+  const editing = page === 'drafts' && Boolean(draftId)
+  const reporting = page === 'published' && Boolean(publishedId)
   const showForm = page === 'samples' && (collecting || Boolean(replacementId) || Boolean(rejecting) || Boolean(details))
   useEffect(() => { setCollecting(false); setReplacementId(''); setRejecting(null); setDetails(null) }, [page])
   useEffect(() => {
@@ -94,14 +103,14 @@ export default function LabTechnicianAccess({ page = 'worklist' }) {
   const formTitle = rejecting ? copy.rejectTitle : replacementId ? copy.replaceTitle : details ? copy.sampleDetailsTitle : copy.collectTitle
   const formLabel = rejecting ? copy.rejectContent : replacementId ? copy.replaceContent : details ? copy.sampleDetailsContent : copy.collectContent
   if (status === 'authorized') {
-    return <LabTechnicianLayout page={page} onSelectPage={closeForm} documentTitle={showForm ? formTitle : undefined} contentLabel={showForm ? formLabel : undefined}>
-      {page === 'samples' ? <>
+    return <LabTechnicianLayout page={page === 'drafts' ? 'drafts' : page} onSelectPage={closeForm} documentTitle={reviewing ? copy.reviewTitle : editing ? copy.editorTitle : reporting ? copy.reportTitle : page === 'approved' ? copy.approved : page === 'published' ? copy.published : page === 'drafts' ? copy.drafts : showForm ? formTitle : undefined} contentLabel={reviewing ? copy.reviewContent : editing ? copy.editorContent : reporting ? copy.reportContent : page === 'approved' ? copy.approvedContent : page === 'published' ? copy.publishedContent : page === 'drafts' ? copy.draftsContent : showForm ? formLabel : undefined}>
+      {reviewing ? <ResultReview key={reviewId} resultId={reviewId} /> : editing ? <DraftResultEditor key={draftId} resultId={draftId} /> : reporting ? <PublishedResultReport key={publishedId} resultId={publishedId} /> : page === 'drafts' ? <DraftResults /> : page === 'approved' ? <ApprovedResults /> : page === 'published' ? <PublishedResults /> : page === 'samples' ? <>
         <div hidden={showForm || undefined}><SampleList reload={listReload} onCollect={openForm} onReplace={openReplacement} onReject={openReject} onOpen={openDetails} /></div>
         {collecting && <CollectSample onBack={closeForm} />}
         {replacementId && <CollectSample key={replacementId} replacementId={replacementId} onBack={closeForm} onRecorded={() => setListReload(value => value + 1)} />}
         {rejecting && <RejectSample key={rejecting.id} sample={rejecting} onBack={closeForm} onRejected={() => { returnFocus.current = `lab-replace-${rejecting.id}`; setListReload(value => value + 1); closeForm() }} />}
         {details && <SampleDetails key={details.id} sampleId={details.id} onBack={closeForm} onReject={openReject} onReplace={openReplacement} />}
-      </> : <LaboratoryWorklist />}
+      </> : page === 'drafts' ? <p className="lab-state" role="status">{copy.missing.drafts}</p> : <LaboratoryWorklist />}
     </LabTechnicianLayout>
   }
   return <main className="lab-access" lang={language} dir={language === 'ar' ? 'rtl' : 'ltr'} aria-busy={status === 'loading'}>

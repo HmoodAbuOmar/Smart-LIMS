@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { worklistCopy } from './worklistCopy.js'
 import { detailActions, linkedTests, typeContainer } from './sampleListModel.js'
 import { formatCollectionTime } from './collectSampleModel.js'
+import { OPEN_DRAFT_COPY, draftEditorHash, draftOpenDecision } from './draftResultModel.js'
+import { createOrOpenDraft } from './draftResultService.js'
 import { loadSampleDetails, receiptVersion, submitReceipt } from './sampleDetailsService.js'
 import { loadRejectionVersion } from './rejectSampleService.js'
 import { useLabNotice } from './LabTechnicianLayout.jsx'
@@ -17,7 +19,7 @@ const RECEIVE_ERRORS = {
   SAMPLE_STATE_CONFLICT: 'receiveState',
 }
 
-export default function SampleDetails({ sampleId, previewSample = null, onBack, onReject, onReplace }) {
+export default function SampleDetails({ sampleId, previewSample = null, onBack, onReject, onReplace, onOpenTest }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
@@ -29,6 +31,7 @@ export default function SampleDetails({ sampleId, previewSample = null, onBack, 
   const [status, setStatus] = useState(previewSample ? 'ready' : 'loading')
   const [sample, setSample] = useState(() => previewSample ? { ...previewSample, tests: linkedTests(previewSample), replacement: previewSample.replacement || '' } : null)
   const [pending, setPending] = useState(false)
+  const [openingId, setOpeningId] = useState('')
   const [error, setError] = useState('')
   useEffect(() => { heading.current?.focus() }, [])
   useEffect(() => () => request.current?.abort(), [])
@@ -75,6 +78,46 @@ export default function SampleDetails({ sampleId, previewSample = null, onBack, 
       if (!controller.signal.aborted) setPending(false)
     }
   }
+  async function openLinked(test) {
+    if (openingId || pending) return
+    if (previewSample) {
+      if (onOpenTest?.(test) !== true) notify?.('openTest')
+      return
+    }
+    const decision = draftOpenDecision(
+      (sample?.workItems || []).find(item => String(item?.orderItemId) === String(test.orderItemId)),
+      sample?.status === 'RECEIVED' ? [{ orderId: sample.orderId, status: 'RECEIVED', attestations: [{ orderItemId: test.orderItemId }] }] : [],
+    )
+    if (decision.action === 'open') {
+      const hash = draftEditorHash(decision.resultId, false)
+      if (hash) window.location.hash = hash
+      else setError(copy.openTestError)
+      return
+    }
+    if (decision.action !== 'create') {
+      setError(copy[OPEN_DRAFT_COPY[decision.reason]] || copy.openTestUnlinked)
+      return
+    }
+    const controller = new AbortController()
+    request.current?.abort()
+    request.current = controller
+    setOpeningId(test.orderItemId)
+    setError('')
+    try {
+      const saved = await createOrOpenDraft(decision.orderItemId, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      if (!saved?.confirmed || !saved.id) {
+        setError(copy.openTestUnconfirmed)
+        return
+      }
+      window.location.hash = draftEditorHash(saved.id, false)
+    } catch (failure) {
+      if (controller.signal.aborted) return
+      setError(copy[OPEN_DRAFT_COPY[failure?.code]] || copy.openTestError)
+    } finally {
+      if (!controller.signal.aborted) setOpeningId('')
+    }
+  }
   const back = <button type="button" className="lab-collect-back" onClick={onBack}>{copy.back}</button>
   return <div className="lab-collect-screen">
     <div className="lab-heading">
@@ -115,7 +158,7 @@ export default function SampleDetails({ sampleId, previewSample = null, onBack, 
           </tr></thead>
           <tbody>{tests.map(test => <tr key={test.orderItemId}>
             <td><bdi>{test.testName || copy.empty}</bdi></td>
-            <td><button type="button" className="lab-outline" onClick={() => notify?.('openTest')}>{copy.openTest}</button></td>
+            <td><button type="button" className="lab-outline" disabled={openingId === test.orderItemId || undefined} onClick={() => { void openLinked(test) }}>{copy.openTest}</button></td>
           </tr>)}</tbody>
         </table></div>}
       </section>
