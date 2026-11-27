@@ -31,8 +31,3 @@ build/
 
 ### VS Code ###
 .vscode/
-
-# Local laboratory example switch and its run markers. Not application data.
-lab-examples.enabled
-lab-examples.ready
-lab-examples.error
