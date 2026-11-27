@@ -169,13 +169,7 @@ class LabTestServiceTest {
         UUID id = UUID.randomUUID();
         LabTest test = new LabTest("GONE", "Unused", null, BigDecimal.ONE, "BLOOD", null);
         when(repository.findForUpdate(id)).thenReturn(Optional.of(test));
-        var counts = mock(jakarta.persistence.TypedQuery.class);
-        var updates = mock(jakarta.persistence.Query.class);
-        when(entities.createQuery(anyString(), eq(Long.class))).thenReturn(counts);
-        when(entities.createQuery(anyString())).thenReturn(updates);
-        when(counts.setParameter(anyString(), any())).thenReturn(counts);
-        when(updates.setParameter(anyString(), any())).thenReturn(updates);
-        when(counts.getSingleResult()).thenReturn(0L);
+        when(repository.hasRetainedUse(id)).thenReturn(false);
 
         service.delete(actor("ADMIN"), id.toString());
 
@@ -187,10 +181,7 @@ class LabTestServiceTest {
     void orderedTestCannotBeDeleted() {
         UUID id = UUID.randomUUID();
         when(repository.findForUpdate(id)).thenReturn(Optional.of(new LabTest("USED", "Used", null, BigDecimal.ONE, "BLOOD", null)));
-        var counts = mock(jakarta.persistence.TypedQuery.class);
-        when(entities.createQuery(anyString(), eq(Long.class))).thenReturn(counts);
-        when(counts.setParameter(anyString(), any())).thenReturn(counts);
-        when(counts.getSingleResult()).thenReturn(1L);
+        when(repository.hasRetainedUse(id)).thenReturn(true);
 
         LabTestException error = assertThrows(LabTestException.class, () -> service.delete(actor("ADMIN"), id.toString()));
 
