@@ -15,6 +15,11 @@ public final class AppointmentMapping {
     private AppointmentMapping() {
     }
 
+    public static boolean isScheduledDate(Appointment appointment, Instant at) {
+        return appointment.getSlot().getStartsAt().atZone(LAB_ZONE).toLocalDate()
+                .equals(at.atZone(LAB_ZONE).toLocalDate());
+    }
+
     public static AppointmentResponses.Slot slot(AppointmentSlot s, long occupied) {
         return new AppointmentResponses.Slot(s.getId(), s.getStartsAt(), s.getEndsAt(), s.getCapacity(), s.getCapacity() - occupied, s.isActive(), LAB_ZONE.getId());
     }

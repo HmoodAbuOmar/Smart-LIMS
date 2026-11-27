@@ -24,6 +24,7 @@ public enum AuditOperation {
     PATIENT_LINK_ISSUE("LINK_ISSUED", "patient profile", "Issued a patient account link."),
     ORDER_CREATE("CREATE", "order", "Created an order with retained test snapshots."),
     ORDER_CANCEL("CANCEL", "order", "Cancelled an order. Historical items were retained."),
+    REFUND_RECORD("CREATE", "payment transaction", "Recorded a staff-confirmed refund."),
     APPOINTMENT_BOOK("BOOK", "appointment", "Booked an appointment."),
     APPOINTMENT_MOVE("RESCHEDULE", "appointment", "Rescheduled an appointment. Move history was retained."),
     APPOINTMENT_CANCEL("CANCEL", "appointment", "Cancelled an appointment and released its capacity.");

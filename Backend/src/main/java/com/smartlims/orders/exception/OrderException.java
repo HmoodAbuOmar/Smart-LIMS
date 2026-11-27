@@ -44,6 +44,11 @@ public class OrderException extends RuntimeException {
         return new OrderException(HttpStatus.CONFLICT, "ORDER_NOT_CANCELLABLE", "Only pending orders can be cancelled.", null);
     }
 
+    public static OrderException refundRequired() {
+        return new OrderException(HttpStatus.CONFLICT, "ORDER_REFUND_REQUIRED",
+                "The remaining net paid amount must be refunded before cancellation.", null);
+    }
+
     public static OrderException unavailable() {
         return new OrderException(HttpStatus.CONFLICT, "ORDER_TEST_UNAVAILABLE", "One or more selected tests are unavailable.", "testIds");
     }

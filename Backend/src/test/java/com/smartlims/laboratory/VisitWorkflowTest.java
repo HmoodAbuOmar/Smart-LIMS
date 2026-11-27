@@ -26,6 +26,7 @@ class VisitWorkflowTest extends LaboratoryTestSupport {
     void realArrivalChecksInAppointmentAndCompletionDoesNotInventPublishedResults() throws Exception {
         var o = create(own, first);
         var a = appointment(o, 0, 1);
+        moveAppointmentToToday(a);
         var v = arrive(o, a.id());
         assertEquals("IN_PROGRESS", v.orderStatus().name());
         assertEquals(a.id(), v.appointmentId());
@@ -59,6 +60,7 @@ class VisitWorkflowTest extends LaboratoryTestSupport {
     void checkedInAppointmentStillConsumesSharedCapacityAndCannotBeDirectlyCancelled() throws Exception {
         var o = create(own, first);
         var a = appointment(o, 0, 1);
+        moveAppointmentToToday(a);
         arrive(o, a.id());
         error(mvc.perform(bearer(post("/api/appointments/" + a.id() + "/cancel"), Role.PATIENT).contentType("application/json").content("{}")), 409, "APPOINTMENT_NOT_CHANGEABLE", null);
         var otherOrder = create(other, first);
@@ -117,6 +119,7 @@ class VisitWorkflowTest extends LaboratoryTestSupport {
     void rollbackRestoresOrderAppointmentVisitAndEventsTogether() {
         var o = create(own, first);
         var a = appointment(o, 0, 1);
+        moveAppointmentToToday(a);
         assertThrows(IllegalStateException.class, () -> new TransactionTemplate(transactionManager).execute(tx -> {
             arrive(o, a.id());
             throw new IllegalStateException("Synthetic rollback");

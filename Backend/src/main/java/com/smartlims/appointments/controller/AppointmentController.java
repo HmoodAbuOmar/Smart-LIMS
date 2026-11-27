@@ -43,6 +43,17 @@ public class AppointmentController {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(reads.listMe(actor, AppointmentQuery.of(query, "tab")));
     }
 
+    @GetMapping("/api/appointments/today")
+    public ResponseEntity<?> today(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(reads.today(actor, query));
+    }
+
+    @GetMapping("/api/receptionist/appointments")
+    public ResponseEntity<?> listReceptionist(@RequestParam MultiValueMap<String, String> query, JwtAuthenticationToken actor) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(reads.listReceptionist(actor, AppointmentQuery.of(query, "date", "status", "search", "sort")));
+    }
+
     @GetMapping("/api/appointments/me/{id}")
     public ResponseEntity<?> getMe(@PathVariable String id, JwtAuthenticationToken actor) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(reads.getMe(actor, id));

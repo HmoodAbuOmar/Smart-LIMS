@@ -76,8 +76,7 @@ public class AuthController {
         LoginService.IssuedLogin issued = login.login(request);
         CsrfToken token = csrf.generateToken(httpRequest);
         csrf.saveToken(token, httpRequest, httpResponse);
-        // A ResponseEntity Set-Cookie header replaces cookies already written on the
-        // servlet response, which dropped the rotated CSRF cookie.
+
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookies.issued(issued.accessToken()).toString());
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(new CookieLoginResponse(true, issued.account()));
@@ -93,6 +92,7 @@ public class AuthController {
     public ResponseEntity<SuccessResponse> logout(HttpServletRequest request, HttpServletResponse response) {
         csrf.saveToken(null, request, response);
         response.addHeader(HttpHeaders.SET_COOKIE, cookies.cleared().toString());
+
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(new SuccessResponse(true));
     }
 

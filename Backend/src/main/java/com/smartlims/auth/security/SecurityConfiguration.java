@@ -93,6 +93,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/appointment-slots/{id}").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/appointments").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/appointments/me", "/api/appointments/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/today").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/appointments/{id}/alternatives").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/appointments/{id}/reschedule", "/api/appointments/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
 
@@ -111,7 +112,14 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/orders/me").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/orders/me", "/api/orders/me/{id}").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/receptionist/orders", "/api/receptionist/orders/{id}").hasRole("RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/receptionist/appointments").hasRole("RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/receptionist/payments", "/api/receptionist/payments/{id}",
+                                "/api/receptionist/payments/eligible-orders").hasRole("RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/receptionist/payments").hasRole("RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/orders/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/orders/{id}/payment-transactions").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/orders/{id}/refunds").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/orders/{id}/cancel").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
 
                         .requestMatchers(HttpMethod.GET, "/api/notifications/me", "/api/notifications/me/unread-count").hasRole("PATIENT")

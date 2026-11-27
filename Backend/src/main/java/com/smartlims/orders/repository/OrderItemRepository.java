@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.*;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, UUID>, JpaSpecificationExecutor<OrderItem> {
     List<OrderItem> findByOrder_Id(UUID order);
+
+    List<OrderItem> findByOrder_IdInOrderById(Collection<UUID> orders);
 }

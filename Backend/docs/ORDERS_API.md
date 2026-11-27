@@ -273,3 +273,86 @@ supersedes earlier staff-browsing deferrals for ADMIN only. Patient reads,
 creation/cancellation and receptionist permissions remain as documented below.
 Payment status/transaction amounts are unsupported, not zero. Complete additive
 contract and screenshot mapping: [ADMIN_ACTIVITY_API.md](ADMIN_ACTIVITY_API.md).
+
+## Receptionist payments and order balances
+
+All receptionist payment endpoints require an active receptionist account and return
+`Cache-Control: no-store`. Orders and patients come from the persisted order
+reference. Migration V30 creates an empty transaction table.
+
+- `GET /api/receptionist/payments` accepts optional `search` (literal substring
+  of order number, patient name, or file number), `fromDate` and `toDate` (inclusive
+  `YYYY-MM-DD` dates in `Asia/Jerusalem`), `type` (`ALL`, `PAYMENT`, `REFUND`),
+  `status` (`ALL`, `CONFIRMED`, `PENDING`, `FAILED`, `CANCELLED`), and `orderId`
+  (UUID). Pagination uses zero-based `page` (default 0) and `size` (default 20,
+  maximum 100). Results are sorted by transaction timestamp descending, then UUID.
+- `GET /api/receptionist/payments/{id}` returns the transaction for receipt
+  display or `404 PAYMENT_TRANSACTION_NOT_FOUND`. List and receipt rows include
+  transaction ID, receipt number, order and patient references, type, status,
+  method, ILS amount, and timestamps. `transactionAt` uses the confirmation
+  timestamp when present and the recording timestamp otherwise. A receipt
+  number or method can be absent.
+- The list's `financial` summary covers every match across all pages.
+  Net confirmed collections equal confirmed payments minus confirmed refunds.
+  Pending payments are reported separately. Failed and cancelled transactions
+  contribute no money to the summary.
+- `GET /api/receptionist/orders/{id}` keeps `order.totalAmount` based on item
+  snapshots and includes the order's `financial` summary. Use
+  `financial.netConfirmedCollections` for Paid. For an active order,
+  `outstanding` is the order total minus net confirmed collections, floored at
+  zero. Cancelled orders have zero outstanding and retain the ledger totals. Filter the payments
+  list by `orderId` for the Payments tab.
+
+### Record a desk payment
+
+- `GET /api/receptionist/payments/eligible-orders` returns paginated non-cancelled
+  ILS orders with positive outstanding balances, ordered newest first with
+  UUID as a tie-breaker. Use the order and patient fields for the selector and
+  `balance` for the selected order. It accepts `page` and `size`.
+- `POST /api/receptionist/payments` requires receptionist authorization and one
+  UUID `Idempotency-Key` header. Send `orderId`, a positive JSON number
+  `amount` in ILS with up to two decimal places, and `method` (`CASH` or
+  `CARD`). The server records a confirmed payment and generates its receipt
+  number. Partial and full payments are allowed up to the current outstanding
+  amount. Pending payments are excluded from the paid balance.
+- A new payment returns `201`, a receipt `Location`, and the persisted
+  `transaction` and updated `balance` (total, paid, outstanding, currency).
+  Retrying the same input and key as the same receptionist returns `200` with
+  the original receipt and the current balance. Reusing that key for a
+  different order, amount, or method returns `409 IDEMPOTENCY_KEY_REUSED`.
+- Refresh the eligible orders after `409 ORDER_NOT_PAYABLE` or
+  `409 PAYMENT_EXCEEDS_OUTSTANDING`. The payment appears in the existing list
+  and Order Workspace totals after commit.
+
+### Refund recording and order cancellation
+
+- Only `PENDING` orders can be cancelled. The existing cancellation endpoint
+  and its ownership and reason checks still apply. If confirmed payments minus
+  confirmed refunds is positive, `POST /api/orders/{id}/cancel` returns
+  `409 ORDER_REFUND_REQUIRED` and leaves the order and appointment unchanged.
+  Resubmit cancellation after refunds reduce the net paid amount to zero.
+- `GET /api/orders/{id}/payment-transactions` gives admins the order ledger,
+  original payment IDs, and totals. It accepts `page` and `size`. Receptionists
+  can read the same order ledger through the existing receptionist payment list.
+- `POST /api/orders/{id}/refunds` is admin-only. It records an **already completed**
+  refund for a pending order. Send a UUID `Idempotency-Key`, `originalPaymentId`,
+  positive ILS `amount` with at most two decimal places, `reason`,
+  `confirmationReference`, and RFC3339 `occurredAt`. The reference must identify
+  the completed cash refund or successful external refund and must not contain
+  payment card details. This API does not call a payment provider or transfer money.
+- Each refund links to one original confirmed payment on the same order, inherits
+  its method, and is capped by both the original payment's unrefunded amount
+  and the order's confirmed net paid amount. Refund amounts spanning multiple
+  original payments require one recording per payment. An unallocated legacy
+  confirmed refund requires ledger reconciliation before recording another refund.
+- A successful record returns `201` with the transaction and current financial
+  summary. An identical retry replays the original receipt with `200`. Changed
+  retry intent, duplicate confirmation references, and excessive amounts return
+  `409`. The receipt exposes linked payment ID, refund reason, recorder ID,
+  confirmation reference, and the declared refund occurrence time. The date range
+  filters continue to use ledger confirmation or recording time.
+- Refund recording and cancellation are separate transactions. Each takes the
+  same order lock as desk payment recording and validates the ledger under that
+  lock. The refund row and its audit event commit together. Cancellation checks
+  the latest balance again and retains all payment and refund rows. Receptionist
+  refund recording is unavailable pending explicit authorization.

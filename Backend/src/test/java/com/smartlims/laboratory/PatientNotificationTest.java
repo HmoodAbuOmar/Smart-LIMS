@@ -290,6 +290,7 @@ class PatientNotificationTest extends MedicalHistoryTestSupport {
         assertEquals(1, events("APPOINTMENT_CANCELLED"));
         var order = create(own, first);
         var a = appointment(order, 2, 3);
+        moveAppointmentToToday(a);
         var visit = arrive(order, a.id());
         arrive(order, null); // second actual visit must not repeat ORDER_IN_PROGRESS
         assertEquals(1, events("ORDER_IN_PROGRESS"));

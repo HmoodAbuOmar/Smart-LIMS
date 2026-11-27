@@ -158,12 +158,20 @@ public class PatientService {
     public PatientResponse create(Authentication actor, @Valid CreatePatientRequest request) {
         UserAccount account = currentAccount(actor, false, "ADMIN", "RECEPTIONIST");
         validateBirthDate(request.dateOfBirth());
+        validatePatientText(request.fullName(), "fullName");
+        validatePatientText(request.phoneNumber(), "phoneNumber");
+        validatePatientText(request.address(), "address");
         String number = String.format(Locale.ROOT, "PAT-%06d", patients.nextPatientNumber());
         Patient patient = new Patient(number, account, request.fullName(),
                 request.dateOfBirth(), request.gender(), request.phoneNumber(), request.address());
         var saved = patients.saveAndFlush(patient);
         audit.record(account, PATIENT_CREATE, saved.getId());
         return mapper.toResponse(saved);
+    }
+
+    private static void validatePatientText(String value, String field) {
+        if (value != null && value.indexOf(0) >= 0)
+            throw new PatientValidationException(field);
     }
 
     @Transactional(readOnly = true)

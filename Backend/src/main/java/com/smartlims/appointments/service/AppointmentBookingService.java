@@ -10,6 +10,7 @@ import com.smartlims.appointments.repository.*;
 import com.smartlims.auth.entity.*;
 import com.smartlims.orders.entity.*;
 import com.smartlims.orders.repository.TestOrderRepository;
+import com.smartlims.orders.specification.OrderSpecifications;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -19,6 +20,7 @@ import java.util.*;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -74,7 +76,7 @@ public class AppointmentBookingService {
         return new AppointmentResponses.Booking(AppointmentMapping.detail(appointment, now), true);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AppointmentResponses.Page<AppointmentResponses.Slot> slots(Authentication actor, AppointmentQuery query) {
         var account = access.current(actor, Role.PATIENT, Role.ADMIN, Role.RECEPTIONIST);
         UUID orderId = query.uuid("orderId");
@@ -86,7 +88,8 @@ public class AppointmentBookingService {
     }
 
     private void requireBookable(TestOrder order) {
-        if (order.getStatus() != OrderStatus.PENDING || appointments.existsActiveOrder(order.getId()))
+        if (!orders.exists(OrderSpecifications.bookable()
+                .and((root, query, builder) -> builder.equal(root.get("id"), order.getId()))))
             throw AppointmentException.conflict("ORDER_NOT_BOOKABLE");
     }
 }

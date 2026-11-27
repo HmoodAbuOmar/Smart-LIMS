@@ -12,6 +12,9 @@ public interface VisitRepository extends JpaRepository<Visit, UUID>, JpaSpecific
 
     boolean existsByAppointment_Id(UUID appointment);
 
+    @Query("select v.appointment.id from Visit v where v.appointment.id in :appointments")
+    Set<UUID> visitedAppointments(@Param("appointments") Collection<UUID> appointments);
+
     boolean existsByOrder_Id(UUID order);
 
     boolean existsByOrder_IdAndStatus(UUID order, Visit.Status status);

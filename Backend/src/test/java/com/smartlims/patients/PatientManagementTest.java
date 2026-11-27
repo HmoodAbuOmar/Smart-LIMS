@@ -75,7 +75,7 @@ class PatientManagementTest extends IsolatedPostgresTest {
     @BeforeEach
     void fixtures() {
         // IsolatedPostgresTest refuses any URL outside the dedicated regression database.
-        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
+        jdbc.execute("TRUNCATE TABLE payment_transactions,audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items, test_orders, patient_link_tokens, patients, email_action_tokens, users");
         reset(patients);
         for (Role role : Role.values()) {
             UserAccount user = UserAccount.invite("Synthetic Test Account", role.name().toLowerCase(Locale.ROOT)
@@ -249,6 +249,45 @@ class PatientManagementTest extends IsolatedPostgresTest {
     }
 
     @Test
+    void receptionistDirectoryPagesKeepPatientsWithSharedNamesAndPhonesDistinct() throws Exception {
+        String directoryPatient = BODY.replace(" Example Address ", " ");
+        for (int index = 0; index < 9; index++) {
+            create(Role.RECEPTIONIST, directoryPatient);
+        }
+        create(Role.RECEPTIONIST, BODY.replace("Example Patient", "Different Name"));
+
+        List<String> numbers = jdbc.queryForList(
+                "SELECT patient_number FROM patients WHERE full_name = 'Example Patient' ORDER BY created_at DESC, id",
+                String.class);
+        var first = bearer(get("/api/patients").param("search", "  eXaMpLe  ")
+                .param("page", "0").param("size", "8").param("sort", "createdAt,desc"), Role.RECEPTIONIST);
+        var response = mvc.perform(first).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(8))
+                .andExpect(jsonPath("$.totalElements").value(9))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(8))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(false));
+        for (int index = 0; index < 8; index++) {
+            response.andExpect(jsonPath("$.content[" + index + "].patientNumber").value(numbers.get(index)));
+        }
+        mvc.perform(bearer(get("/api/patients").param("search", "example")
+                        .param("page", "1").param("size", "8").param("sort", "createdAt,desc"), Role.RECEPTIONIST))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].patientNumber").value(numbers.get(8)))
+                .andExpect(jsonPath("$.content[0].fullName").value("Example Patient"))
+                .andExpect(jsonPath("$.content[0].phoneNumber").value("000001"))
+                .andExpect(jsonPath("$.content[0].dateOfBirth").value("2000-01-01"))
+                .andExpect(jsonPath("$.content[0].address").isEmpty())
+                .andExpect(jsonPath("$.content[0].linkStatus").value("UNLINKED"))
+                .andExpect(jsonPath("$.totalElements").value(9))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test
     void staffReadStatusPreservesDemographicsAndPatientAndWriteResponseShapes() throws Exception {
         JsonNode linked = create(Role.ADMIN, BODY);
         JsonNode unlinked = create(Role.RECEPTIONIST, BODY.replace(" Example Address ", " "));
@@ -402,6 +441,21 @@ class PatientManagementTest extends IsolatedPostgresTest {
         create(Role.ADMIN, BODY.replace("2000-01-01", today.toString()));
         mvc.perform(bearer(post("/api/patients"), Role.ADMIN).contentType(MediaType.APPLICATION_JSON)
                 .content(BODY.replace("2000-01-01", today.plusDays(1).toString()))).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void receptionistCreateRejectsNullCharactersBeforePersisting() throws Exception {
+        var values = Map.of("fullName", " Example Patient ", "phoneNumber", " 000001 ",
+                "address", " Example Address ");
+        for (var field : values.entrySet()) {
+            String body = BODY.replace(field.getValue(), field.getValue().strip() + "\\u0000");
+            mvc.perform(bearer(post("/api/patients"), Role.RECEPTIONIST)
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.fieldErrors." + field.getKey()).exists());
+        }
+        assertEquals(0, patients.count());
     }
 
     @Test

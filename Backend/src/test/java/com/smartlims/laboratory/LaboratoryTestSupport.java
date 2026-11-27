@@ -93,7 +93,14 @@ abstract class LaboratoryTestSupport extends IsolatedPostgresTest {
     }
 
     com.smartlims.visits.dto.VisitResponse arrive(OrderDetailResponse order, UUID appointment) {
-        return visitService.arrive(actor(Role.RECEPTIONIST), new com.smartlims.visits.dto.VisitRequests.Arrival(order.id().toString(), appointment == null ? null : appointment.toString(), order.items().stream().map(i -> i.id().toString()).toList(), Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS).toString()), List.of(UUID.randomUUID().toString())).visit();
+        return visitService.arrive(actor(Role.RECEPTIONIST), new com.smartlims.visits.dto.VisitRequests.Arrival(order.id().toString(), appointment == null ? null : appointment.toString(), order.items().stream().map(i -> i.id().toString()).toList(), com.smartlims.laboratory.dto.LaboratoryInput.now().toString()), List.of(UUID.randomUUID().toString())).visit();
+    }
+
+    void moveAppointmentToToday(com.smartlims.appointments.dto.AppointmentResponses.Detail appointment) {
+        var zone = com.smartlims.appointments.service.AppointmentMapping.LAB_ZONE;
+        var start = LocalDate.now(zone).atStartOfDay(zone).toInstant();
+        jdbc.update("UPDATE appointment_slots SET starts_at=?,ends_at=? WHERE id=?",
+                java.sql.Timestamp.from(start), java.sql.Timestamp.from(start.plusSeconds(1800)), appointment.slotId());
     }
 
     com.smartlims.appointments.dto.AppointmentResponses.Detail appointment(OrderDetailResponse order, int index, int capacity) {
@@ -141,7 +148,7 @@ abstract class LaboratoryTestSupport extends IsolatedPostgresTest {
 
     @BeforeEach
     void workflowFixtures() {
-        jdbc.execute("TRUNCATE TABLE audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
+        jdbc.execute("TRUNCATE TABLE payment_transactions,audit_logs,reference_ranges,patient_notifications,laboratory_events,result_specimens,result_values,test_results,specimen_attestations,samples,visit_items,visits,test_parameters,appointment_reschedules,appointments,appointment_slots,order_items,test_orders,lab_test_categories,lab_tests,patient_link_tokens,patients,email_action_tokens,users");
         for (Role role : Role.values()) {
             var account = account(role.name().toLowerCase(Locale.ROOT), role);
             actors.put(role, account);
