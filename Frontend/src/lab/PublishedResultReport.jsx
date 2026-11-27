@@ -32,7 +32,9 @@ export default function PublishedResultReport({ resultId, preview = null }) {
   const [historyStatus, setHistoryStatus] = useState(() => fixture?.versions ? 'ready' : 'loading')
   const [notice, setNotice] = useState('')
   const view = useMemo(() => publishedReportView(result, language), [language, result])
-  const history = useMemo(() => publishedHistoryRows(versions, language), [language, versions])
+  // Laboratory staff may read every retained version, including a newer draft.
+  // The report body stays on the published result that was opened.
+  const history = useMemo(() => publishedHistoryRows(versions, language, { includeDrafts: true }), [language, versions])
   const previewRoute = Boolean(fixture) || window.location.hash.startsWith('#/__lab')
   useEffect(() => { heading.current?.focus() }, [])
   useEffect(() => {
@@ -82,6 +84,7 @@ export default function PublishedResultReport({ resultId, preview = null }) {
     setHistoryStatus('loading')
     loadPublishedHistory(view.orderItemId, { signal: controller.signal }).then(loaded => {
       if (controller.signal.aborted) return
+      // History is display-only. A newer draft must not replace the opened publication.
       setVersions(Array.isArray(loaded) ? loaded : [])
       setHistoryStatus('ready')
     }, () => {

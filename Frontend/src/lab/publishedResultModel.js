@@ -73,9 +73,10 @@ export function publishedReportView(result, language) {
   }
 }
 
-export function publishedHistoryRows(versions, language) {
+export function publishedHistoryRows(versions, language, { includeDrafts = true } = {}) {
   return (versions || [])
     .filter(version => version && typeof version === 'object')
+    .filter(version => includeDrafts || version.status !== 'DRAFT')
     .map(version => {
       const number = versionNumber(version.versionNumber)
       const status = STATUSES.has(version.status) ? version.status : ''
@@ -84,7 +85,9 @@ export function publishedHistoryRows(versions, language) {
         versionNumber: number,
         versionLabel: versionMark(number),
         status,
-        current: version.isCurrent === true,
+        // Only the publication the server still marks current carries Current.
+        // A newer draft keeps isCurrent false and must not take that place.
+        current: status === 'PUBLISHED' && version.isCurrent === true,
         approvedAt: clock(version.approvedAt, language),
         publishedAt: clock(version.publishedAt, language),
         samples: sampleReference(version.specimens),

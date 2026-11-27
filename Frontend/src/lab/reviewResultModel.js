@@ -4,6 +4,22 @@ import { rejectionVersion } from './sampleListModel.js'
 const COMPARATORS = new Set(['<', '<=', '>', '>='])
 const FLAGS = new Set(['NORMAL', 'HIGH', 'LOW', 'ABNORMAL', 'NOT_EVALUATED'])
 const STATUSES = new Set(['DRAFT', 'APPROVED', 'PUBLISHED'])
+const AUTHOR_EVENTS = new Set(['CREATE', 'EDIT', 'CORRECTION'])
+
+// Laboratory approval is an authorized administrator reviewer, identified by
+// the server allowlist. The account payload does not carry that grant, so a
+// technician — and an admin without an explicit grant — is not a reviewer.
+export function reviewAudience(viewer) {
+  if (viewer?.role === 'admin' && viewer.authorizedReviewer === true) return 'reviewer'
+  return 'technician'
+}
+
+function authorship(result, userId) {
+  const id = String(userId || '')
+  if (!id || !Array.isArray(result?.events)) return 'unknown'
+  const authored = result.events.some(event => AUTHOR_EVENTS.has(event?.kind) && String(event?.actor?.id || '') === id)
+  return authored ? 'author' : 'other'
+}
 
 function present(value) {
   return typeof value === 'string' && value.trim().length > 0
@@ -75,7 +91,7 @@ export function reviewValueText(value) {
   return comparator ? `${comparator} ${number}` : number
 }
 
-export function reviewView(result) {
+export function reviewView(result, viewer = null) {
   const rows = [...(result?.values || [])]
     .sort((left, right) => (left?.displayOrder - right?.displayOrder) || String(left?.code || '').localeCompare(String(right?.code || '')) || String(left?.parameterId || '').localeCompare(String(right?.parameterId || '')))
     .map(value => ({
@@ -96,6 +112,11 @@ export function reviewView(result) {
   const ready = checks.values && checks.sample && checks.measured && checks.record
   const status = STATUSES.has(result?.status) ? result.status : ''
   const version = rejectionVersion(result?.version)
+  const reviewer = reviewAudience(viewer) === 'reviewer'
+  // A reviewer who authored or edited this version cannot approve it. The
+  // approver may publish. Unknown authorship hides approval rather than guessing.
+  const author = authorship(result, viewer?.userId)
+  const eligible = reviewer && ready && version != null
   return {
     id: String(result?.id || ''),
     status,
@@ -109,9 +130,9 @@ export function reviewView(result) {
     checks,
     rows,
     actions: {
-      approve: status === 'DRAFT' && ready && version != null,
-      publish: status === 'APPROVED' && ready && version != null,
-      edit: status === 'DRAFT' || status === 'APPROVED',
+      approve: eligible && status === 'DRAFT' && author === 'other',
+      publish: eligible && status === 'APPROVED',
+      edit: !reviewer && (status === 'DRAFT' || status === 'APPROVED'),
       preview: status === 'APPROVED' || status === 'PUBLISHED',
     },
   }

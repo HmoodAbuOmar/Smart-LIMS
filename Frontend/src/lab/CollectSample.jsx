@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { worklistCopy } from './worklistCopy.js'
 import { orderPatient } from './sampleListModel.js'
-import { collectionReady, filterCollectionOrders, formatCollectionTime, normalizeReplacement, parseCollectionTime, REPLACEMENT_ALLOWS_PARTIAL } from './collectSampleModel.js'
+import { collectionReady, filterCollectionOrders, formatCollectionTime, normalizeReplacement, parseCollectionTime } from './collectSampleModel.js'
 import { loadCollectionOrders, loadReplacementSource, loadSampleTypes, submitCollection, submitReplacement } from './collectSampleService.js'
 
 function OrderCombo({ orders, orderId, onSelect, copy }) {
@@ -82,9 +82,7 @@ export default function CollectSample({ preview = null, replacementId = '', repl
   const [orderId, setOrderId] = useState('')
   const [sampleType, setSampleType] = useState(() => source?.sampleType || '')
   const [containerType, setContainerType] = useState('')
-  const [notes, setNotes] = useState('')
   const [collectedText, setCollectedText] = useState(() => formatCollectionTime(new Date(), language))
-  const [selected, setSelected] = useState(() => new Set((source?.tests || []).map(test => test.orderItemId)))
   const [blocked, setBlocked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [outcome, setOutcome] = useState(null)
@@ -127,36 +125,23 @@ export default function CollectSample({ preview = null, replacementId = '', repl
     if (!source?.id) return undefined
     setSampleType(source.sampleType || '')
     setContainerType('')
-    setNotes('')
-    setSelected(new Set(source.tests.map(test => test.orderItemId)))
     setCollectedText(formatCollectionTime(new Date(), seenLanguage.current))
     setOutcome(null)
     return undefined
   }, [source])
-  const order = orders.find(item => item.orderId === orderId) || null
-  const tests = replacing ? source?.tests || [] : order?.tests || []
   const collectedAt = parseCollectionTime(collectedText)
-  const ready = collectionReady({
-    orderId: replacing ? source?.id : orderId,
+  // Notes and test links are not fields on POST /api/samples. A replacement can
+  // still be recorded with the rejected sample id. Regular collection has no
+  // visitId on the order list, so that save stays unavailable.
+  const ready = replacing ? collectionReady({
+    orderId: source?.id,
     sampleType,
     containerType,
-    selectedIds: [...selected],
     collectedAt,
-  })
-  const lockedTests = replacing && !REPLACEMENT_ALLOWS_PARTIAL
+    requireTests: false,
+  }) : false
   function chooseOrder(next) {
     setOrderId(next)
-    setSelected(new Set())
-    setBlocked(false)
-  }
-  function toggle(id) {
-    const key = String(id)
-    setSelected(current => {
-      const next = new Set(current)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
     setBlocked(false)
   }
   async function save(event) {
@@ -184,7 +169,7 @@ export default function CollectSample({ preview = null, replacementId = '', repl
           setOutcome({ error: copy.replaceUnconfirmed })
           return
         }
-        setOutcome({ confirmed: true, notesDropped: notes.trim().length > 0 })
+        setOutcome({ confirmed: true })
         onRecorded?.()
       } catch {
         setOutcome({ error: copy.replaceSaveError })
@@ -228,29 +213,12 @@ export default function CollectSample({ preview = null, replacementId = '', repl
           <input value={collectedText} autoComplete="off" spellCheck="false" disabled={outcome?.confirmed || undefined} aria-invalid={collectedText.trim() && !collectedAt ? true : undefined} onChange={event => { setCollectedText(event.target.value); setBlocked(false); setOutcome(null) }} onBlur={event => { const parsed = parseCollectionTime(event.target.value); if (parsed) setCollectedText(formatCollectionTime(parsed, language)) }} />
         </label>
       </div>
-      <div className="lab-collect-links" role="group" aria-labelledby={`${alertId}-tests`}>
-        <p id={`${alertId}-tests`}>{copy.linkedTests}</p>
-        {replacing ? tests.length === 0 ? <p className="lab-collect-none">{copy.replaceNoTests}</p> : <ul>
-          {tests.map(test => <li key={test.orderItemId}><label>
-            <input type="checkbox" checked={selected.has(test.orderItemId)} disabled={lockedTests || outcome?.confirmed || undefined} onChange={() => { if (!lockedTests) toggle(test.orderItemId) }} />
-            <span><bdi>{test.testName || copy.empty}</bdi></span>
-          </label></li>)}
-        </ul> : !order ? <p className="lab-collect-none">{copy.selectOrderTests}</p> : tests.length === 0 ? <p className="lab-collect-none">{copy.noTestsOnOrder}</p> : <ul>
-          {tests.map(test => <li key={test.orderItemId}><label>
-            <input type="checkbox" checked={selected.has(test.orderItemId)} onChange={() => toggle(test.orderItemId)} />
-            <span><bdi>{test.testName || copy.empty}</bdi></span>
-          </label></li>)}
-        </ul>}
-      </div>
-      <label className="lab-field">
-        <span>{copy.notes}</span>
-        <textarea value={notes} rows={2} disabled={outcome?.confirmed || undefined} onChange={event => { setNotes(event.target.value); setBlocked(false); setOutcome(null) }} />
-      </label>
+      <p className="lab-detail-note" id={`${alertId}-fields`} role="status">{copy.collectionFieldsMissing}</p>
       {blocked && <div className="lab-collect-alert" id={alertId} role="alert"><p>{copy.saveBlocked}</p></div>}
       {outcome?.error && <div className="lab-collect-alert" id={alertId} role="alert"><p>{outcome.error}</p></div>}
-      {outcome?.confirmed && <div className="lab-collect-success" id={alertId} role="status"><p>{copy.replaceSaved}{outcome.notesDropped ? ` ${copy.replaceNotesDropped}` : ''}</p></div>}
+      {outcome?.confirmed && <div className="lab-collect-success" id={alertId} role="status"><p>{copy.replaceSaved}</p></div>}
       <div className="lab-collect-actions">
-        <button type="submit" className="lab-collect" disabled={!ready || saving || outcome?.confirmed || undefined} aria-describedby={blocked || outcome ? alertId : undefined}>{replacing ? copy.saveReplacement : copy.saveCollection}</button>
+        <button type="submit" className="lab-collect" disabled={!ready || saving || outcome?.confirmed || undefined} aria-describedby={`${alertId}-fields${blocked || outcome ? ` ${alertId}` : ''}`}>{replacing ? copy.saveReplacement : copy.saveCollection}</button>
         {back}
       </div>
     </form>}

@@ -24,6 +24,7 @@ export default function LabTechnicianAccess({ page = 'worklist', draftId = '', r
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
   const [status, setStatus] = useState('loading')
+  const [viewer, setViewer] = useState(null)
   const [collecting, setCollecting] = useState(false)
   const [replacementId, setReplacementId] = useState('')
   const [rejecting, setRejecting] = useState(null)
@@ -49,7 +50,10 @@ export default function LabTechnicianAccess({ page = 'worklist', draftId = '', r
       try {
         const access = await authApi.getAccess({ signal: controller.signal })
         controller.signal.throwIfAborted()
-        if (access.authenticated && access.role === 'lab_technician') setStatus('authorized')
+        if (access.authenticated && access.role === 'lab_technician') {
+          setViewer({ role: access.role, userId: access.userId, authorizedReviewer: access.authorizedReviewer === true })
+          setStatus('authorized')
+        }
         else {
           const destination = accountDestination(access)
           if (destination) window.location.hash = destination.slice(1)
@@ -103,8 +107,8 @@ export default function LabTechnicianAccess({ page = 'worklist', draftId = '', r
   const formTitle = rejecting ? copy.rejectTitle : replacementId ? copy.replaceTitle : details ? copy.sampleDetailsTitle : copy.collectTitle
   const formLabel = rejecting ? copy.rejectContent : replacementId ? copy.replaceContent : details ? copy.sampleDetailsContent : copy.collectContent
   if (status === 'authorized') {
-    return <LabTechnicianLayout page={page === 'drafts' ? 'drafts' : page} onSelectPage={closeForm} documentTitle={reviewing ? copy.reviewTitle : editing ? copy.editorTitle : reporting ? copy.reportTitle : page === 'approved' ? copy.approved : page === 'published' ? copy.published : page === 'drafts' ? copy.drafts : showForm ? formTitle : undefined} contentLabel={reviewing ? copy.reviewContent : editing ? copy.editorContent : reporting ? copy.reportContent : page === 'approved' ? copy.approvedContent : page === 'published' ? copy.publishedContent : page === 'drafts' ? copy.draftsContent : showForm ? formLabel : undefined}>
-      {reviewing ? <ResultReview key={reviewId} resultId={reviewId} /> : editing ? <DraftResultEditor key={draftId} resultId={draftId} /> : reporting ? <PublishedResultReport key={publishedId} resultId={publishedId} /> : page === 'drafts' ? <DraftResults /> : page === 'approved' ? <ApprovedResults /> : page === 'published' ? <PublishedResults /> : page === 'samples' ? <>
+    return <LabTechnicianLayout page={page === 'drafts' ? 'drafts' : page} onSelectPage={closeForm} documentTitle={reviewing ? copy.reviewDraftTitle : editing ? copy.editorTitle : reporting ? copy.reportTitle : page === 'approved' ? copy.approved : page === 'published' ? copy.published : page === 'drafts' ? copy.drafts : showForm ? formTitle : undefined} contentLabel={reviewing ? copy.reviewDraftContent : editing ? copy.editorContent : reporting ? copy.reportContent : page === 'approved' ? copy.approvedContent : page === 'published' ? copy.publishedContent : page === 'drafts' ? copy.draftsContent : showForm ? formLabel : undefined}>
+      {reviewing ? <ResultReview key={reviewId} resultId={reviewId} viewer={viewer} /> : editing ? <DraftResultEditor key={draftId} resultId={draftId} /> : reporting ? <PublishedResultReport key={publishedId} resultId={publishedId} /> : page === 'drafts' ? <DraftResults /> : page === 'approved' ? <ApprovedResults /> : page === 'published' ? <PublishedResults /> : page === 'samples' ? <>
         <div hidden={showForm || undefined}><SampleList reload={listReload} onCollect={openForm} onReplace={openReplacement} onReject={openReject} onOpen={openDetails} /></div>
         {collecting && <CollectSample onBack={closeForm} />}
         {replacementId && <CollectSample key={replacementId} replacementId={replacementId} onBack={closeForm} onRecorded={() => setListReload(value => value + 1)} />}

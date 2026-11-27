@@ -4,7 +4,7 @@ import { Check } from 'lucide-react'
 import { worklistCopy } from './worklistCopy.js'
 import { draftEditorHash } from './draftResultModel.js'
 import { loadDraftResult } from './draftResultService.js'
-import { reviewView } from './reviewResultModel.js'
+import { reviewAudience, reviewView } from './reviewResultModel.js'
 import { publishedReportHash } from './publishedResultModel.js'
 import { submitResultReview } from './reviewResultService.js'
 
@@ -29,18 +29,19 @@ function show(value, copy) {
   return value || copy.empty
 }
 
-export default function ResultReview({ resultId, preview = null }) {
+export default function ResultReview({ resultId, preview = null, viewer = null }) {
   const { i18n } = useTranslation()
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
   const copy = worklistCopy[language]
   const fixture = import.meta.env.DEV ? preview : null
+  const reviewer = reviewAudience(viewer) === 'reviewer'
   const heading = useRef(null)
   const request = useRef(null)
   const lock = useRef(false)
   const alertId = useId()
   const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState(() => fixture?.missing ? 'error' : fixture?.result ? 'ready' : 'loading')
-  const [view, setView] = useState(() => fixture?.result ? reviewView(fixture.result) : null)
+  const [view, setView] = useState(() => fixture?.result ? reviewView(fixture.result, viewer) : null)
   const [pending, setPending] = useState(false)
   const [notice, setNotice] = useState(null)
   useEffect(() => { heading.current?.focus() }, [])
@@ -52,7 +53,7 @@ export default function ResultReview({ resultId, preview = null }) {
       return undefined
     }
     if (fixture?.result) {
-      setView(reviewView(fixture.result))
+      setView(reviewView(fixture.result, viewer))
       setStatus('ready')
       return undefined
     }
@@ -60,13 +61,13 @@ export default function ResultReview({ resultId, preview = null }) {
     request.current = controller
     loadDraftResult(resultId, { signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return
-      setView(reviewView(result))
+      setView(reviewView(result, viewer))
       setStatus('ready')
     }, () => {
       if (!controller.signal.aborted) setStatus('error')
     })
     return () => controller.abort()
-  }, [attempt, fixture, resultId])
+  }, [attempt, fixture, resultId, viewer])
   const previewRoute = Boolean(fixture) || window.location.hash.startsWith('#/__lab')
   async function submit(action) {
     if (lock.current || !view || status !== 'ready') return
@@ -83,7 +84,9 @@ export default function ResultReview({ resultId, preview = null }) {
       setNotice({ tone: 'error', key: 'reviewPreview' })
       return
     }
-    if ((action === 'approve' && !view.actions.approve) || (action === 'publish' && !view.actions.publish)) return
+    if (action === 'approve' || action === 'publish') {
+      if (!reviewer || !view.actions[action]) return
+    }
     const controller = new AbortController()
     request.current = controller
     lock.current = true
@@ -104,7 +107,7 @@ export default function ResultReview({ resultId, preview = null }) {
         }
         setNotice({ tone: 'error', key: 'reportRouteMissing' })
       }
-      setView(reviewView(saved.result))
+      setView(reviewView(saved.result, viewer))
     } catch (failure) {
       if (controller.signal.aborted) return
       setNotice({ tone: 'error', key: ACTION_ERRORS[failure?.code] || 'reviewFailed' })
@@ -118,15 +121,15 @@ export default function ResultReview({ resultId, preview = null }) {
   const identity = view ? [view.patientName, view.patientNumber, view.orderNumber, view.versionLabel] : []
   const actions = view?.actions || {}
   const buttons = [
-    actions.publish ? ['publish', 'publishResult', 'lab-collect'] : null,
-    actions.approve ? ['approve', 'approveResult', 'lab-collect'] : null,
-    actions.edit ? ['edit', 'editResult', 'lab-draft-review'] : null,
+    reviewer && actions.publish ? ['publish', 'publishResult', 'lab-collect'] : null,
+    reviewer && actions.approve ? ['approve', 'approveResult', 'lab-collect'] : null,
+    actions.edit ? ['edit', view.status === 'DRAFT' ? 'editDraft' : 'editResult', 'lab-draft-review'] : null,
     actions.preview ? ['preview', 'previewReport', 'lab-draft-review'] : null,
   ].filter(Boolean)
   return <div className="lab-review-screen">
     <div className="lab-heading">
       <div>
-        <h1 tabIndex={-1} ref={heading}>{copy.reviewTitle}</h1>
+        <h1 tabIndex={-1} ref={heading}>{reviewer ? copy.reviewTitle : copy.reviewDraftTitle}</h1>
         {view && <p className="lab-draft-meta">
           <span className="lab-draft-meta-text">{identity.map((part, index) => <span key={index}>{index > 0 && <span aria-hidden="true"> · </span>}<bdi>{show(part, copy)}</bdi></span>)}</span>
           {view.status && <span className={`lab-badge lab-${view.status}`}>{copy[view.status]}</span>}
@@ -149,6 +152,7 @@ export default function ResultReview({ resultId, preview = null }) {
         {buttons.length > 0 && <div className="lab-review-actions">
           {buttons.map(([action, label, className]) => <button key={action} type="button" className={className} disabled={pending || undefined} onClick={() => { void submit(action) }}>{copy[label]}</button>)}
         </div>}
+        {!reviewer && <p className="lab-draft-note" role="status">{copy.reviewerHandled}{view.status === 'DRAFT' ? ` ${copy.reviewerHandoffMissing}` : ''}</p>}
         {notice && <p id={alertId} className="lab-collect-alert" role="alert">{copy[notice.key]}</p>}
       </section>
       <section className="lab-review-card" aria-labelledby="lab-review-result-heading">

@@ -112,12 +112,12 @@ export function parseCollectionTime(value) {
 
 // Save stays unavailable until one eligible order, one of its tests, a sample
 // type, a container, and a collection time that is not in the future are present.
-export function collectionReady({ orderId, sampleType = '', containerType = '', selectedIds = [], collectedAt = '' }) {
+export function collectionReady({ orderId, sampleType = '', containerType = '', selectedIds = [], collectedAt = '', requireTests = true }) {
   const type = String(sampleType).trim()
   const container = String(containerType).trim()
   const collected = new Date(collectedAt)
   return Boolean(orderId)
-    && selectedIds.length > 0
+    && (!requireTests || selectedIds.length > 0)
     && type.length > 0
     && type.length <= 40
     && container.length > 0
