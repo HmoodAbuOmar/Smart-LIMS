@@ -1,6 +1,9 @@
 package com.smartlims.auth.security;
 
+import jakarta.servlet.http.Cookie;
+
 import org.junit.jupiter.api.Test;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -58,6 +61,19 @@ class BrowserSecurityTest {
         }
         assertThrows(IllegalStateException.class,
                 () -> new SecurityConfiguration().csrfTokenRepository(false, new MockEnvironment()));
+    }
+
+    @Test
+    void csrfHeaderMatchesTheCookieJavaScriptReadWhenAnotherCookieIsFirst() {
+        var repository = new SpaCookieCsrfRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
+        var matching = new MockHttpServletRequest();
+        matching.setCookies(new Cookie("XSRF-TOKEN", "stale"), new Cookie("XSRF-TOKEN", "issued"));
+        matching.addHeader("X-XSRF-TOKEN", "issued");
+        assertEquals("issued", repository.loadToken(matching).getToken());
+        var unknown = new MockHttpServletRequest();
+        unknown.setCookies(new Cookie("XSRF-TOKEN", "stale"), new Cookie("XSRF-TOKEN", "issued"));
+        unknown.addHeader("X-XSRF-TOKEN", "unknown");
+        assertEquals("stale", repository.loadToken(unknown).getToken());
     }
 
     @Test

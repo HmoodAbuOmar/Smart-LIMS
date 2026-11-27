@@ -42,10 +42,11 @@ public class AuthController {
     }
 
     @GetMapping("/csrf-token")
-    public ResponseEntity<MessageResponse> csrfToken(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<CsrfIssuedResponse> csrfToken(HttpServletRequest request, HttpServletResponse response) {
         CsrfToken token = csrf.generateToken(request);
         csrf.saveToken(token, request, response);
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(new MessageResponse("CSRF token issued."));
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(new CsrfIssuedResponse("CSRF token issued.", token.getToken()));
     }
 
     @PostMapping(path = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -75,9 +76,10 @@ public class AuthController {
         LoginService.IssuedLogin issued = login.login(request);
         CsrfToken token = csrf.generateToken(httpRequest);
         csrf.saveToken(token, httpRequest, httpResponse);
+
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookies.issued(issued.accessToken()).toString());
-        return ResponseEntity.ok()
-                .header("Cache-Control", "no-store").body(new CookieLoginResponse(true, issued.account()));
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(new CookieLoginResponse(true, issued.account()));
     }
 
     @GetMapping("/me")
@@ -90,8 +92,8 @@ public class AuthController {
     public ResponseEntity<SuccessResponse> logout(HttpServletRequest request, HttpServletResponse response) {
         csrf.saveToken(null, request, response);
         response.addHeader(HttpHeaders.SET_COOKIE, cookies.cleared().toString());
-        return ResponseEntity.ok()
-                .header("Cache-Control", "no-store").body(new SuccessResponse(true));
+
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(new SuccessResponse(true));
     }
 
     @PostMapping(path = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -117,6 +119,9 @@ public class AuthController {
     }
 
     public record CookieLoginResponse(boolean success, AccountResponse user) {
+    }
+
+    public record CsrfIssuedResponse(String message, String token) {
     }
 
     public record SuccessResponse(boolean success) {

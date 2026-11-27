@@ -44,7 +44,10 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> {
                 })
-                .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository)
+                .csrf(csrf -> csrf.csrfTokenRepository(new SpaCookieCsrfRepository(csrfRepository))
+                        // Stateless JWTs have no session to fixate. The default strategy
+                        // deletes the readable CSRF cookie on every authenticated request.
+                        .sessionAuthenticationStrategy((authentication, request, response) -> { })
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                         .requireCsrfProtectionMatcher(tokenResolver::requiresCsrf)
                         .withObjectPostProcessor(new ObjectPostProcessor<CsrfFilter>() {
