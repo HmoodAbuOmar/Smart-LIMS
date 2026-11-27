@@ -15,12 +15,13 @@ export default function AppointmentEditor({ mode, record, initialDate, initialOr
   const initialSelectionApplied = useRef(false)
   const selectedOrder = useRef('')
   useEffect(() => { const element = dialog.current, previous = document.body.style.overflow; live.current = true; document.body.style.overflow = 'hidden'; element.showModal(); element.querySelector('input,textarea,select')?.focus(); return () => { live.current = false; element.close(); document.body.style.overflow = previous; const target = opener?.isConnected ? opener : document.querySelector('.ra-page .ra-create'); target?.focus() } }, [opener])
+  const slotOrderId = mode === 'move' ? record?.orderId : orderId
   useEffect(() => {
-    if (mode === 'cancel') return
+    if (mode === 'cancel' || (mode === 'book' && !slotOrderId)) return
     let active = true
-    service.slots(date).then(slots => { if (active) { setSlots(slots); setClock(Date.now()); setLoading(false) } }, () => { if (active) { setLoading(false); setError('error') } })
+    service.slots(date, slotOrderId, mode === 'move' ? record?.id : undefined).then(slots => { if (active) { setSlots(slots); setClock(Date.now()); setLoading(false) } }, () => { if (active) { setLoading(false); setError('error') } })
     return () => { active = false }
-  }, [date, mode, service, attempt])
+  }, [date, mode, service, attempt, slotOrderId, record?.id])
   useEffect(() => {
     if (mode !== 'book') return
     let active = true
@@ -66,9 +67,9 @@ export default function AppointmentEditor({ mode, record, initialDate, initialOr
     <header><h2 id="ra-editor-title">{title}</h2><button type="button" aria-label={copy.close} disabled={busy} onClick={onClose}><X size={18} aria-hidden="true" /></button></header>
     {record && <p><strong>{record.patient[language === 'ar' ? 'nameAr' : 'nameEn']}</strong> · <bdi>{record.orderNumber}</bdi></p>}
     {mode === 'cancel' ? <><label htmlFor="ra-reason">{copy.reason} *</label><textarea id="ra-reason" required maxLength={1000} rows={3} disabled={busy} value={reason} onChange={event => setReason(event.target.value)} aria-invalid={error === 'reasonRequired'} /><p>{copy.cancelledNote}</p></> : <>
-      {mode === 'book' && <><label htmlFor="ra-order">{copy.chooseOrder} *</label><select id="ra-order" value={orderId} aria-invalid={ordersState === 'error'} disabled={busy || ordersState !== 'ready' || !orders.length} onChange={event => { selectedOrder.current = event.target.value; setOrder(event.target.value); key.current = null }}><option value="">{ordersState === 'loading' ? copy.loadingOrders : ordersState === 'error' ? copy.orderLoadError : !orders.length ? copy.noOrdersAvailable : copy.chooseOrder}</option>{orders.map(order => <option key={order.id} value={order.id}>{order.orderNumber} — {displayPatientName(order.patient, language)}</option>)}</select>{ordersState === 'error' && <button type="button" className="ra-orders-retry" disabled={busy} onClick={() => { setOrdersState('loading'); setOrderAttempt(value => value + 1) }}>{copy.retry}</button>}<label>{copy.type}<input readOnly value={copy.collection} /></label></>}
+      {mode === 'book' && <><label htmlFor="ra-order">{copy.chooseOrder} *</label><select id="ra-order" value={orderId} aria-invalid={ordersState === 'error'} disabled={busy || ordersState !== 'ready' || !orders.length} onChange={event => { selectedOrder.current = event.target.value; setOrder(event.target.value); setSlot(''); setSlots([]); setLoading(true); key.current = null }}><option value="">{ordersState === 'loading' ? copy.loadingOrders : ordersState === 'error' ? copy.orderLoadError : !orders.length ? copy.noOrdersAvailable : copy.chooseOrder}</option>{orders.map(order => <option key={order.id} value={order.id}>{order.orderNumber} — {displayPatientName(order.patient, language)}</option>)}</select>{ordersState === 'error' && <button type="button" className="ra-orders-retry" disabled={busy} onClick={() => { setOrdersState('loading'); setOrderAttempt(value => value + 1) }}>{copy.retry}</button>}<label>{copy.type}<input readOnly value={copy.collection} /></label></>}
       <label htmlFor="ra-slot-date">{copy.date}</label><input id="ra-slot-date" type="date" min={todayDate()} value={date} disabled={busy} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(''); key.current = null; setLoading(true) }} />
-      {loading ? <p role="status">{copy.loading}</p> : <fieldset className="ra-slots"><legend>{copy.chooseSlot}</legend>{!slots.length && <p>{copy.noSlots}</p>}{slots.map(slot => {
+      {mode === 'book' && !orderId ? null : loading ? <p role="status">{copy.loading}</p> : <fieldset className="ra-slots"><legend>{copy.chooseSlot}</legend>{!slots.length && <p>{copy.noSlots}</p>}{slots.map(slot => {
         const unavailable = !slot.active || !slot.remainingCapacity || Date.parse(slot.startsAt) <= clock || slot.id === record?.slotId
         return <button key={slot.id} type="button" data-slot-id={slot.id} aria-pressed={slotId === slot.id} disabled={busy || unavailable} onClick={() => { setSlot(slot.id); key.current = null; setError('') }}><bdi>{formatTime(slot.startsAt, language)} – {formatTime(slot.endsAt, language)}</bdi><small>{copy.remaining}: {slot.remainingCapacity.toLocaleString(language)} / {slot.capacity.toLocaleString(language)}{!slot.remainingCapacity ? ` · ${copy.full}` : ''}</small></button>
       })}</fieldset>}

@@ -12,4 +12,8 @@ export function balances(order) {
   const paid = receipts - refunds, total = cents(order.totalAmount)
   return { total, paid, outstanding: Math.max(0, total - paid), receipts, refunds }
 }
-export function ordersRoute(id) { return `/__receptionist/orders${id ? `?orderId=${encodeURIComponent(id)}` : ''}` }
+export function ordersRoute(id) {
+  const preview = globalThis.window?.location?.hash?.startsWith('#/__receptionist')
+  const base = preview ? '/__receptionist' : '/receptionist'
+  return `${base}/orders${id ? `?orderId=${encodeURIComponent(id)}` : ''}`
+}

@@ -1,4 +1,3 @@
-import { appointmentsCopy } from './appointments/appointmentsCopy.js'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { authApi } from '../auth/api.js'
@@ -6,18 +5,17 @@ import { accountDestination } from '../auth/access.js'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import WorkspaceRoleLabel from '../components/WorkspaceRoleLabel.jsx'
 import WorkspaceAccountMenu from '../components/WorkspaceAccountMenu.jsx'
+import ReceptionistAppointments from './appointments/ReceptionistAppointments.jsx'
+import ReceptionistLayout from './components/ReceptionistLayout.jsx'
+import ReceptionistOrders from './orders/ReceptionistOrders.jsx'
+import ReceptionistPatients from './patients/ReceptionistPatients.jsx'
+import ReceptionistPayments from './payments/ReceptionistPayments.jsx'
+import ReceptionistToday from './today/ReceptionistToday.jsx'
 import { todayCopy } from './today/todayCopy.js'
-import { patientsCopy } from './patients/patientsCopy.js'
-import { walkInCopy } from './walk-in/walkInCopy.js'
-import { ordersCopy } from './orders/ordersCopy.js'
+import ReceptionistWalkIn from './walk-in/ReceptionistWalkIn.jsx'
+import { liveAppointments, livePatients, liveToday, liveWalkIn } from './receptionistLiveApi.js'
 import './today/today.css'
 
-const paymentUnavailable = {
-  en: 'Staff payment services are unavailable.',
-  ar: 'خدمات الدفع للموظفين غير متاحة.',
-}
-
-// The staff session can be confirmed independently of workspace data integration.
 export default function ReceptionistAccessEntry({ page = 'today', role = 'receptionist' }) {
   const { t, i18n } = useTranslation('auth')
   const language = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en'
@@ -44,9 +42,23 @@ export default function ReceptionistAccessEntry({ page = 'today', role = 'recept
     void check()
     return () => controller.abort()
   }, [role])
-  const title = role === 'receptionist' ? `${copy.workspace} — ${page === 'walkIn' ? walkInCopy[language].title : copy[page]}` : t(`workspace.${role}`)
-  const unavailable = role !== 'receptionist' ? t('workspace.dataUnavailable')
-    : page === 'payments' ? paymentUnavailable[language] : page === 'appointments' ? appointmentsCopy[language].production : page === 'orders' ? ordersCopy[language].production : page === 'walkIn' ? walkInCopy[language].productionUnavailable : page === 'patients' ? patientsCopy[language].unavailable : copy.unavailable
+  if (status === 'authorized' && role === 'receptionist') {
+    const query = new URLSearchParams(window.location.hash.split('?')[1] || '')
+    const patientId = query.get('patientId') || null
+    const fromPatients = !!patientId && query.get('from') === 'patients'
+    const bookingContext = query.get('purpose') === 'scheduled' ? { date: query.get('bookingDate') } : null
+    const navPage = page === 'walkIn' ? bookingContext ? 'appointments' : fromPatients ? 'patients' : 'today' : page
+    const hash = window.location.hash
+    return <ReceptionistLayout page={navPage} live name={name}>
+      {page === 'payments' ? <ReceptionistPayments key={hash} service={liveWalkIn} />
+        : page === 'appointments' ? <ReceptionistAppointments key={hash} service={liveAppointments} initialOrderId={query.get('orderId')} initialDate={query.get('date')} openBooking={query.get('book') === '1'} />
+        : page === 'orders' ? <ReceptionistOrders key={hash} orderId={query.get('orderId')} service={liveWalkIn} />
+        : page === 'walkIn' ? <ReceptionistWalkIn key={hash} service={liveWalkIn} patientsService={livePatients} initialPatientId={patientId} initialTab={fromPatients ? 'details' : 'orders'} fromPatients={fromPatients} bookingContext={bookingContext} />
+        : page === 'patients' ? <ReceptionistPatients key={hash} service={livePatients} />
+        : <ReceptionistToday key={hash} service={liveToday} />}
+    </ReceptionistLayout>
+  }
+  const title = role === 'receptionist' ? `${copy.workspace} — ${copy[page] || page}` : t(`workspace.${role}`)
   return <main className="r01-access" lang={language} dir={language === 'ar' ? 'rtl' : 'ltr'} aria-busy={status === 'loading'}>
     <header className="r01-access-header">
       <WorkspaceRoleLabel role={role} language={language} />
@@ -55,8 +67,8 @@ export default function ReceptionistAccessEntry({ page = 'today', role = 'recept
     </header>
     <h1>{title}</h1>
     {status === 'loading' ? <p role="status">{t('actions.loading')}</p> : <>
-      <p role="alert">{status === 'authorized' ? unavailable : t('errors.accessUnavailable')}</p>
-      {status !== 'authorized' && <a href="#/login">{copy.login}</a>}
+      <p role="alert">{t('errors.accessUnavailable')}</p>
+      <a href="#/login">{copy.login}</a>
     </>}
   </main>
 }
